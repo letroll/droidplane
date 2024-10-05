@@ -1,19 +1,15 @@
-package ch.benediktkoeppel.code.droidplane.view;
+package ch.benediktkoeppel.code.droidplane.view
 
-import android.app.Activity;
-import android.os.Bundle;
-import android.util.Base64;
-import android.webkit.WebView;
+import android.app.Activity
+import android.os.Bundle
+import android.util.Base64
+import android.webkit.WebView
+import ch.benediktkoeppel.code.droidplane.R
 
-import ch.benediktkoeppel.code.droidplane.R;
-
-public class RichTextViewActivity extends Activity {
-
-    @Override
-    protected void onCreate(Bundle savedInstanceState) {
-
-        super.onCreate(savedInstanceState);
-        setContentView(R.layout.activity_rich_text_view);
+class RichTextViewActivity : Activity() {
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        setContentView(R.layout.activity_rich_text_view)
 
         // get data from intent. Data has to be base64 encoded, otherwise WebView stops processing
         // at the first # character. See https://developer.android.com/reference/android/webkit/WebView#loadData(java.lang.String,%20java.lang.String,%20java.lang.String)
@@ -24,15 +20,12 @@ public class RichTextViewActivity extends Activity {
         // > base64 or encode any # characters in the content as %23, otherwise they will be treated
         // > as the end of the content and the remaining text used as a document fragment
         // > identifier.
-
-        String richTextContent = getIntent().getStringExtra("richTextContent");
-        String encodedContent = Base64.encodeToString(richTextContent.getBytes(), Base64.NO_PADDING);
+        val richTextContent = intent.getStringExtra("richTextContent")
+        val encodedContent = Base64.encodeToString(richTextContent!!.toByteArray(), Base64.NO_PADDING)
 
         // set data of web view
-        WebView webView = findViewById(R.id.webview);
+        val webView = findViewById<WebView>(R.id.webview)
 
-        webView.loadData(encodedContent, "text/html", "base64");
-
+        webView.loadData(encodedContent, "text/html", "base64")
     }
-
 }
