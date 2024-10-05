@@ -239,7 +239,7 @@ class MindmapNodeLayout : LinearLayout {
             // we are on currently. We need to go to the Top, and then descend into the mindmap to reach the right
             // point
             val mindmapView = mainActivity.horizontalMindmapView
-            mindmapView.downTo(mainActivity, linkedInternal, true)
+            mindmapView?.downTo(mainActivity, linkedInternal, true)
         } else {
             Toast.makeText(
                 context,
