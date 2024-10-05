@@ -7,8 +7,6 @@ import android.os.AsyncTask;
 import android.util.Log;
 import android.util.Pair;
 
-import com.google.android.gms.analytics.HitBuilders;
-import com.google.android.gms.analytics.Tracker;
 
 import org.xmlpull.v1.XmlPullParser;
 import org.xmlpull.v1.XmlPullParserException;
@@ -316,23 +314,9 @@ public class AsyncMindmapLoaderTask extends AsyncTask<String, Void, Object> {
 
 
         long loadDocumentEndTime = System.currentTimeMillis();
-        Tracker tracker = MainApplication.getTracker();
-        tracker.send(new HitBuilders.TimingBuilder()
-                .setCategory("document")
-                .setValue(loadDocumentEndTime - loadDocumentStartTime)
-                .setVariable("loadDocument")
-                .setLabel("loadTime")
-                .build());
         Log.d(MainApplication.TAG, "Document loaded");
 
         //long numNodes = document.getElementsByTagName("node").getLength();
-        tracker.send(new HitBuilders.EventBuilder()
-                .setCategory("document")
-                .setAction("loadDocument")
-                .setLabel("numNodes")
-                .setValue(numNodes)
-                .build()
-        );
 
         // now the full mindmap is loaded
         mindmap.setLoaded(true);

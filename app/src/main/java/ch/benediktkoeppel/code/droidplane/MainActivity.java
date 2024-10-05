@@ -20,9 +20,6 @@ import android.widget.LinearLayout;
 import androidx.fragment.app.FragmentActivity;
 import androidx.lifecycle.ViewModelProviders;
 
-import com.google.android.gms.analytics.HitBuilders;
-import com.google.android.gms.analytics.Tracker;
-
 import ch.benediktkoeppel.code.droidplane.controller.AsyncMindmapLoaderTask;
 import ch.benediktkoeppel.code.droidplane.controller.OnRootNodeLoadedListener;
 import ch.benediktkoeppel.code.droidplane.model.Mindmap;
@@ -51,30 +48,10 @@ public class MainActivity extends FragmentActivity {
     private boolean mindmapIsLoading;
 
     @Override
-    public void onStart() {
-
-        super.onStart();
-        ((MainApplication)getApplication()).getGoogleAnalytics().reportActivityStart(this);
-    }
-
-    @Override
-    public void onStop() {
-
-        super.onStop();
-        ((MainApplication)getApplication()).getGoogleAnalytics().reportActivityStop(this);
-    }
-
-    @Override
     public void onCreate(Bundle savedInstanceState) {
 
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
-
-        // initialize android stuff
-        // Google Analytics
-        Tracker tracker = ((MainApplication)getApplication()).getTracker();
-        tracker.setScreenName("MainActivity");
-        tracker.send(new HitBuilders.EventBuilder().build());
 
         // enable the Android home button
         enableHomeButton();
@@ -378,6 +355,7 @@ public class MainActivity extends FragmentActivity {
         // The ACTION_OPEN_DOCUMENT intent was sent with the request code READ_REQUEST_CODE. If the request code seen
         // here doesn't match, it's the response to some other intent, and the code below shouldn't run at all.
 
+        super.onActivityResult(requestCode, resultCode, resultData);
         if (requestCode == READ_REQUEST_CODE && resultCode == Activity.RESULT_OK) {
             // The document selected by the user won't be returned in the intent. Instead, a URI to that document
             // will be contained in the return intent provided to this method as a parameter. Pull that URI using
