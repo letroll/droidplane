@@ -77,18 +77,15 @@ public class MainActivity extends FragmentActivity {
                 public void rootNodeLoaded(Mindmap mindmap, MindmapNode rootNode) {
                     // now set up the view
                     MindmapNode finalRootNode = rootNode;
-                    runOnUiThread(new Runnable() {
-                        @Override
-                        public void run() {
+                    runOnUiThread(() -> {
 
-                            horizontalMindmapView.setMindmap(mindmap);
+                        horizontalMindmapView.setMindmap(mindmap);
 
-                            // by default, the root node is the deepest node that is expanded
-                            horizontalMindmapView.setDeepestSelectedMindmapNode(finalRootNode);
+                        // by default, the root node is the deepest node that is expanded
+                        horizontalMindmapView.setDeepestSelectedMindmapNode(finalRootNode);
 
-                            horizontalMindmapView.onRootNodeLoaded();
+                        horizontalMindmapView.onRootNodeLoaded();
 
-                        }
                     });
 
                 }
@@ -99,7 +96,6 @@ public class MainActivity extends FragmentActivity {
                     this,
                     onRootNodeLoadedListener,
                     mindmap,
-                    horizontalMindmapView,
                     getIntent()
             ).execute();
 

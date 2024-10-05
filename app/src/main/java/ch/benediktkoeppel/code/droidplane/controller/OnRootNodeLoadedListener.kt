@@ -1,9 +1,8 @@
-package ch.benediktkoeppel.code.droidplane.controller;
+package ch.benediktkoeppel.code.droidplane.controller
 
-import ch.benediktkoeppel.code.droidplane.model.Mindmap;
-import ch.benediktkoeppel.code.droidplane.model.MindmapNode;
+import ch.benediktkoeppel.code.droidplane.model.Mindmap
+import ch.benediktkoeppel.code.droidplane.model.MindmapNode
 
-public interface OnRootNodeLoadedListener {
-
-    void rootNodeLoaded(Mindmap mindmap, MindmapNode rootNode);
+interface OnRootNodeLoadedListener {
+    fun rootNodeLoaded(mindmap: Mindmap?, rootNode: MindmapNode?)
 }

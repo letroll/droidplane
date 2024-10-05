@@ -27,7 +27,6 @@ import ch.benediktkoeppel.code.droidplane.R;
 import ch.benediktkoeppel.code.droidplane.model.Mindmap;
 import ch.benediktkoeppel.code.droidplane.model.MindmapIndexes;
 import ch.benediktkoeppel.code.droidplane.model.MindmapNode;
-import ch.benediktkoeppel.code.droidplane.view.HorizontalMindmapView;
 
 public class AsyncMindmapLoaderTask extends AsyncTask<String, Void, Object> {
 
@@ -36,8 +35,6 @@ public class AsyncMindmapLoaderTask extends AsyncTask<String, Void, Object> {
     private final Intent intent;
     private final String action;
 
-    // TODO: why is HorizontalMindmapView needed here?
-    private final HorizontalMindmapView horizontalMindmapView;
 
     private final Mindmap mindmap;
     private final OnRootNodeLoadedListener onRootNodeLoadedListener;
@@ -45,14 +42,12 @@ public class AsyncMindmapLoaderTask extends AsyncTask<String, Void, Object> {
     public AsyncMindmapLoaderTask(MainActivity mainActivity,
                                   OnRootNodeLoadedListener onRootNodeLoadedListener,
                                   Mindmap mindmap,
-                                  HorizontalMindmapView horizontalMindmapView,
                                   Intent intent) {
 
         this.mainActivity = mainActivity;
         this.onRootNodeLoadedListener = onRootNodeLoadedListener;
         this.intent = intent;
         this.action = intent.getAction();
-        this.horizontalMindmapView = horizontalMindmapView;
         this.mindmap = mindmap;
     }
 
