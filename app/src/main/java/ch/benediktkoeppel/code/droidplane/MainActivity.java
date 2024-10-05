@@ -64,11 +64,11 @@ public class MainActivity extends FragmentActivity {
 
         // then populate view with mindmap
         // if we already have a loaded mindmap, use this; otherwise load from the intent
-        if (mindmap.isLoaded()) {
+        if (mindmap.isLoaded) {
             horizontalMindmapView.setMindmap(mindmap);
-            horizontalMindmapView.setDeepestSelectedMindmapNode(mindmap.getRootNode());
+            horizontalMindmapView.setDeepestSelectedMindmapNode(mindmap.rootNode);
             horizontalMindmapView.onRootNodeLoaded();
-            mindmap.getRootNode().subscribeNodeRichContentChanged(this);
+            mindmap.rootNode.subscribeNodeRichContentChanged(this);
 
         } else {
 
@@ -251,7 +251,7 @@ public class MainActivity extends FragmentActivity {
 
         // MindmapNodeLayout extends LinearView, so we can cast targetView back to MindmapNodeLayout
         MindmapNodeLayout mindmapNodeLayout = (MindmapNodeLayout)contextMenuInfo.targetView;
-        Log.d(MainApplication.TAG, "mindmapNodeLayout.text = " + mindmapNodeLayout.getMindmapNode().getText());
+        Log.d(MainApplication.TAG, "mindmapNodeLayout.text = " + mindmapNodeLayout.mindmapNode.getText());
 
         Log.d(MainApplication.TAG, "contextMenuInfo.position = " + contextMenuInfo.position);
         Log.d(MainApplication.TAG, "item.getTitle() = " + item.getTitle());
@@ -266,14 +266,14 @@ public class MainActivity extends FragmentActivity {
                         Log.d(MainApplication.TAG, "Copying text to clipboard");
                         ClipboardManager clipboardManager = (ClipboardManager)getSystemService(CLIPBOARD_SERVICE);
 
-                        ClipData clipData = ClipData.newPlainText("node", mindmapNodeLayout.getMindmapNode().getText());
+                        ClipData clipData = ClipData.newPlainText("node", mindmapNodeLayout.mindmapNode.getText());
                         clipboardManager.setPrimaryClip(clipData);
 
                         break;
 
                     // open the URI specified in the "LINK" tag
                     case R.id.contextopenlink:
-                        Log.d(MainApplication.TAG, "Opening node link " + mindmapNodeLayout.getMindmapNode().getLink());
+                        Log.d(MainApplication.TAG, "Opening node link " + mindmapNodeLayout.mindmapNode.getLink());
                         mindmapNodeLayout.openLink(this);
 
                         break;
@@ -281,7 +281,7 @@ public class MainActivity extends FragmentActivity {
                     // open RichText content
                     case R.id.openrichtext:
                         Log.d(MainApplication.TAG,
-                                "Opening rich text of node " + mindmapNodeLayout.getMindmapNode().getRichTextContents()
+                                "Opening rich text of node " + mindmapNodeLayout.mindmapNode.getRichTextContents()
                         );
                         mindmapNodeLayout.openRichText(this);
 

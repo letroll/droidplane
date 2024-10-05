@@ -1,61 +1,44 @@
-package ch.benediktkoeppel.code.droidplane.model;
+package ch.benediktkoeppel.code.droidplane.model
 
-import android.net.Uri;
-
-import androidx.lifecycle.ViewModel;
+import android.net.Uri
+import androidx.lifecycle.ViewModel
 
 /**
  * Mindmap handles the loading and storing of a mind map document.
  */
-public class Mindmap extends ViewModel {
-
-    /**
-     * The currently loaded Uri
-     */
-    private Uri uri;
-
-    /**
-     * The root node of the document.
-     */
-    private MindmapNode rootNode;
-
-    /**
-     * A map that resolves node IDs to Node objects
-     */
-    MindmapIndexes mindmapIndexes;
-
-    // whether the mindmap has finished loading
-    private boolean isLoaded = false;
-
+class Mindmap : ViewModel() {
     /**
      * Returns the Uri which is currently loaded in document.
      *
      * @return Uri
      */
-    public Uri getUri() {
-
-        return this.uri;
-    }
-
     /**
      * Set the Uri after loading a new document.
      *
      * @param uri
      */
-    public void setUri(Uri uri) {
-
-        this.uri = uri;
-    }
+    /**
+     * The currently loaded Uri
+     */
+    @JvmField var uri: Uri? = null
 
     /**
      * Returns the root node of the currently loaded mind map
      *
      * @return the root node
      */
-    public MindmapNode getRootNode() {
+    /**
+     * The root node of the document.
+     */
+    @JvmField var rootNode: MindmapNode? = null
 
-        return rootNode;
-    }
+    /**
+     * A map that resolves node IDs to Node objects
+     */
+    @JvmField var mindmapIndexes: MindmapIndexes? = null
+
+    // whether the mindmap has finished loading
+    @JvmField var isLoaded: Boolean = false
 
     /**
      * Returns the node for a given Node ID
@@ -63,31 +46,11 @@ public class Mindmap extends ViewModel {
      * @param id
      * @return
      */
-    public MindmapNode getNodeByID(String id) {
-        return mindmapIndexes.getNodesByIdIndex().get(id);
+    fun getNodeByID(id: String?): MindmapNode? {
+        return mindmapIndexes!!.nodesByIdIndex[id]
     }
 
-    public MindmapNode getNodeByNumericID(Integer numericId) {
-        return mindmapIndexes.getNodesByNumericIndex().get(numericId);
-    }
-
-    public boolean isLoaded() {
-        return isLoaded;
-    }
-
-    public void setLoaded(boolean loaded) {
-        isLoaded = loaded;
-    }
-
-    public void setRootNode(MindmapNode rootNode) {
-        this.rootNode = rootNode;
-    }
-
-    public void setMindmapIndexes(MindmapIndexes mindmapIndexes) {
-        this.mindmapIndexes = mindmapIndexes;
-    }
-
-    public MindmapIndexes getMindmapIndexes() {
-        return mindmapIndexes;
+    fun getNodeByNumericID(numericId: Int?): MindmapNode? {
+        return mindmapIndexes!!.nodesByNumericIndex[numericId]
     }
 }

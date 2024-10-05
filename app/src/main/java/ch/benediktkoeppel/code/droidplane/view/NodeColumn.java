@@ -160,7 +160,7 @@ public class NodeColumn extends LinearLayout implements OnCreateContextMenuListe
     public void deselectAllNodes() {
         // deselect all nodes
         for (MindmapNodeLayout mindmapNodeLayout : mindmapNodeLayouts) {
-            MindmapNode mindmapNode = mindmapNodeLayout.getMindmapNode();
+            MindmapNode mindmapNode = mindmapNodeLayout.mindmapNode;
             mindmapNode.setSelected(false);
         }
 
@@ -224,7 +224,7 @@ public class NodeColumn extends LinearLayout implements OnCreateContextMenuListe
     
     private int getPositionOf(MindmapNode node) {
         for (int i = 0; i < mindmapNodeLayouts.size(); i++) {
-            if (mindmapNodeLayouts.get(i).getMindmapNode() == node) {
+            if (mindmapNodeLayouts.get(i).mindmapNode == node) {
                 return i;
             }
         }

@@ -335,7 +335,7 @@ public class HorizontalMindmapView extends HorizontalScrollView implements OnTou
         removeAllColumns();
 
         // go down into the root node
-        down(getContext(), mindmap.getRootNode());
+        down(getContext(), mindmap.rootNode);
     }
 
     /**
@@ -366,7 +366,7 @@ public class HorizontalMindmapView extends HorizontalScrollView implements OnTou
 
         // close the application if no column was removed, and the force switch was on
         if (!wasColumnRemoved && force) {
-            AndroidHelper.getActivity(getContext(), Activity.class).finish();
+            AndroidHelper.INSTANCE.getActivity(getContext(), Activity.class).finish();
         }
 
         // enable the up navigation with the Home (app) button (top left corner)
@@ -479,11 +479,11 @@ public class HorizontalMindmapView extends HorizontalScrollView implements OnTou
         if (nodeTitle == null || nodeTitle.equals("")) {
             Log.d(MainApplication.TAG, "Setting application title to default string: " +
                                        getResources().getString(R.string.app_name));
-            AndroidHelper.getActivity(context, Activity.class).setTitle(R.string.app_name);
+            AndroidHelper.INSTANCE.getActivity(context, Activity.class).setTitle(R.string.app_name);
 
         } else {
             Log.d(MainApplication.TAG, "Setting application title to node name: " + nodeTitle);
-            AndroidHelper.getActivity(context, Activity.class).setTitle(nodeTitle);
+            AndroidHelper.INSTANCE.getActivity(context, Activity.class).setTitle(nodeTitle);
             // TODO: java.lang.NullPointerException: Attempt to invoke virtual method 'void android.app.Activity.setTitle(java.lang.CharSequence)' on a null object reference
         }
     }
@@ -497,9 +497,9 @@ public class HorizontalMindmapView extends HorizontalScrollView implements OnTou
         // disable the home button
         int numberOfColumns = getNumberOfColumns();
         if (numberOfColumns >= 2) {
-            AndroidHelper.getActivity(context, MainActivity.class).enableHomeButton();
+            AndroidHelper.INSTANCE.getActivity(context, MainActivity.class).enableHomeButton();
         } else {
-            AndroidHelper.getActivity(context, MainActivity.class).disableHomeButton();
+            AndroidHelper.INSTANCE.getActivity(context, MainActivity.class).disableHomeButton();
         }
     }
 
@@ -527,22 +527,22 @@ public class HorizontalMindmapView extends HorizontalScrollView implements OnTou
         MindmapNodeLayout clickedNode = clickedNodeColumn.getNodeAtPosition(position);
 
         // if the clicked node has child nodes, we set it to selected and drill down
-        if (clickedNode.getMindmapNode().getNumChildMindmapNodes() > 0) {
+        if (clickedNode.mindmapNode.getNumChildMindmapNodes() > 0) {
 
             // give it a special color
             clickedNodeColumn.setItemColor(position);
 
             // and drill down
-            down(mainActivity, clickedNode.getMindmapNode());
+            down(mainActivity, clickedNode.mindmapNode);
         }
 
         // if the clicked node has a link (and is a leaf), open the link
-        else if (clickedNode.getMindmapNode().getLink() != null) {
+        else if (clickedNode.mindmapNode.getLink() != null) {
             clickedNode.openLink(mainActivity);
         }
 
         // if the clicked node has a rich text content (and is a leaf), open the rich text
-        else if (clickedNode.getMindmapNode().getRichTextContents() != null && !clickedNode.getMindmapNode().getRichTextContents().isEmpty()) {
+        else if (clickedNode.mindmapNode.getRichTextContents() != null && !clickedNode.mindmapNode.getRichTextContents().isEmpty()) {
             clickedNode.openRichText(mainActivity);
         }
 

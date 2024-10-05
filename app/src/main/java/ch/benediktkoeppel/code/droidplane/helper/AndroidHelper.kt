@@ -1,18 +1,18 @@
-package ch.benediktkoeppel.code.droidplane.helper;
+package ch.benediktkoeppel.code.droidplane.helper
 
-import android.app.Activity;
-import android.content.Context;
-import android.content.ContextWrapper;
+import android.app.Activity
+import android.content.Context
+import android.content.ContextWrapper
 
-public class AndroidHelper {
-
-    public static <T extends Activity> T getActivity(Context context, Class<T> clazz) {
-        while (context instanceof ContextWrapper) {
+object AndroidHelper {
+    fun <T : Activity?> getActivity(context: Context?, clazz: Class<T>): T? {
+        var context = context
+        while (context is ContextWrapper) {
             if (clazz.isInstance(context)) {
-                return clazz.cast(context);
+                return clazz.cast(context)
             }
-            context = ((ContextWrapper)context).getBaseContext();
+            context = context.baseContext
         }
-        return null;
+        return null
     }
 }

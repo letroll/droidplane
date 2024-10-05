@@ -83,7 +83,7 @@ public class AsyncMindmapLoaderTask extends AsyncTask<String, Void, Object> {
             // store the Uri. Next time the MainActivity is started, we'll
             // check whether the Uri has changed (-> load new document) or
             // remained the same (-> reuse previous document)
-            this.mindmap.setUri(uri);
+            this.mindmap.uri = uri;
         }
 
         // started from the launcher
@@ -151,7 +151,7 @@ public class AsyncMindmapLoaderTask extends AsyncTask<String, Void, Object> {
                         // if we don't have a parent node, then this is the root node
                         if (parentNode == null) {
                             rootNode = newMindmapNode;
-                            mindmap.setRootNode(rootNode);
+                            mindmap.rootNode = rootNode;
                             onRootNodeLoadedListener.rootNodeLoaded(mindmap, rootNode);
 
                         } else {
@@ -301,7 +301,7 @@ public class AsyncMindmapLoaderTask extends AsyncTask<String, Void, Object> {
 
         // load all nodes of root node into simplified MindmapNode, and index them by ID for faster lookup
         MindmapIndexes mindmapIndexes = loadAndIndexNodesByIds(rootNode);
-        mindmap.setMindmapIndexes(mindmapIndexes);
+        mindmap.mindmapIndexes = mindmapIndexes;
 
         // Nodes can refer to other nodes with arrowlinks. We want to have the link on both ends of the link, so we can
         // now set the corresponding links
@@ -314,7 +314,7 @@ public class AsyncMindmapLoaderTask extends AsyncTask<String, Void, Object> {
         //long numNodes = document.getElementsByTagName("node").getLength();
 
         // now the full mindmap is loaded
-        mindmap.setLoaded(true);
+        mindmap.isLoaded = true;
         mainActivity.setMindmapIsLoading(false);
 
     }
@@ -505,7 +505,7 @@ public class AsyncMindmapLoaderTask extends AsyncTask<String, Void, Object> {
 
     private void fillArrowLinks() {
 
-        Map<String, MindmapNode> nodesById = mindmap.getMindmapIndexes().getNodesByIdIndex();
+        Map<String, MindmapNode> nodesById = mindmap.mindmapIndexes.getNodesByIdIndex();
 
         for (String nodeId : nodesById.keySet()) {
             MindmapNode mindmapNode = nodesById.get(nodeId);
