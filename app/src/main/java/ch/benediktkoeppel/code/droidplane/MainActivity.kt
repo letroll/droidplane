@@ -74,12 +74,14 @@ class MainActivity : FragmentActivity() {
             }
 
             // load the file asynchronously
-            AsyncMindmapLoaderTask(
-                this,
-                onRootNodeLoadedListener,
-                mindmap,
-                intent
-            ).execute()
+            mindmap?.let {
+                AsyncMindmapLoaderTask(
+                    this,
+                    onRootNodeLoadedListener,
+                    it,
+                    intent
+                ).execute()
+            }
         }
     }
 

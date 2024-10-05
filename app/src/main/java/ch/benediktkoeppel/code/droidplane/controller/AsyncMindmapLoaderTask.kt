@@ -1,519 +1,395 @@
-package ch.benediktkoeppel.code.droidplane.controller;
+package ch.benediktkoeppel.code.droidplane.controller
 
-import android.content.ContentResolver;
-import android.content.Intent;
-import android.net.Uri;
-import android.os.AsyncTask;
-import android.util.Log;
-import android.util.Pair;
+import android.content.Intent
+import android.net.Uri
+import android.os.AsyncTask
+import android.util.Log
+import android.util.Pair
+import ch.benediktkoeppel.code.droidplane.MainActivity
+import ch.benediktkoeppel.code.droidplane.MainApplication
+import ch.benediktkoeppel.code.droidplane.R
+import ch.benediktkoeppel.code.droidplane.model.Mindmap
+import ch.benediktkoeppel.code.droidplane.model.MindmapIndexes
+import ch.benediktkoeppel.code.droidplane.model.MindmapNode
+import org.xmlpull.v1.XmlPullParser
+import org.xmlpull.v1.XmlPullParserException
+import org.xmlpull.v1.XmlPullParserFactory
+import java.io.FileNotFoundException
+import java.io.IOException
+import java.io.InputStream
+import java.util.Stack
 
+class AsyncMindmapLoaderTask(
+// TODO: why is MainActivty needed here?
+    private val mainActivity: MainActivity,
+    private val onRootNodeLoadedListener: OnRootNodeLoadedListener,
+    private val mindmap: Mindmap,
+    private val intent: Intent
+) : AsyncTask<String?, Void?, Any?>() {
+    private val action = intent.action
 
-import org.xmlpull.v1.XmlPullParser;
-import org.xmlpull.v1.XmlPullParserException;
-import org.xmlpull.v1.XmlPullParserFactory;
-
-import java.io.FileNotFoundException;
-import java.io.IOException;
-import java.io.InputStream;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Stack;
-
-import ch.benediktkoeppel.code.droidplane.MainActivity;
-import ch.benediktkoeppel.code.droidplane.MainApplication;
-import ch.benediktkoeppel.code.droidplane.R;
-import ch.benediktkoeppel.code.droidplane.model.Mindmap;
-import ch.benediktkoeppel.code.droidplane.model.MindmapIndexes;
-import ch.benediktkoeppel.code.droidplane.model.MindmapNode;
-
-public class AsyncMindmapLoaderTask extends AsyncTask<String, Void, Object> {
-
-    // TODO: why is MainActivty needed here?
-    private final MainActivity mainActivity;
-    private final Intent intent;
-    private final String action;
-
-
-    private final Mindmap mindmap;
-    private final OnRootNodeLoadedListener onRootNodeLoadedListener;
-
-    public AsyncMindmapLoaderTask(MainActivity mainActivity,
-                                  OnRootNodeLoadedListener onRootNodeLoadedListener,
-                                  Mindmap mindmap,
-                                  Intent intent) {
-
-        this.mainActivity = mainActivity;
-        this.onRootNodeLoadedListener = onRootNodeLoadedListener;
-        this.intent = intent;
-        this.action = intent.getAction();
-        this.mindmap = mindmap;
-    }
-
-    @Override
-    protected Object doInBackground(String... strings) {
-
+    override fun doInBackground(vararg p0: String?): Any? {
         // prepare loading of the Mindmap file
-        InputStream mm = null;
+
+        var mm: InputStream? = null
 
         // determine whether we are started from the EDIT or VIEW intent, or whether we are started from the
         // launcher started from ACTION_EDIT/VIEW intent
-        if ((Intent.ACTION_EDIT.equals(action) || Intent.ACTION_VIEW.equals(action)) ||
-                Intent.ACTION_OPEN_DOCUMENT.equals(action)
+        if ((Intent.ACTION_EDIT == action || Intent.ACTION_VIEW == action) ||
+            Intent.ACTION_OPEN_DOCUMENT == action
         ) {
-
-            Log.d(MainApplication.TAG, "started from ACTION_EDIT/VIEW intent");
+            Log.d(MainApplication.TAG, "started from ACTION_EDIT/VIEW intent")
 
             // get the URI to the target document (the Mindmap we are opening) and open the InputStream
-            Uri uri = intent.getData();
+            val uri = intent.data
             if (uri != null) {
-                ContentResolver cr = mainActivity.getContentResolver();
+                val cr = mainActivity.contentResolver
                 try {
-                    mm = cr.openInputStream(uri);
-                } catch (FileNotFoundException e) {
-
-                    mainActivity.abortWithPopup(R.string.filenotfound);
-                    e.printStackTrace();
+                    mm = cr.openInputStream(uri)
+                } catch (e: FileNotFoundException) {
+                    mainActivity.abortWithPopup(R.string.filenotfound)
+                    e.printStackTrace()
                 }
             } else {
-                mainActivity.abortWithPopup(R.string.novalidfile);
+                mainActivity.abortWithPopup(R.string.novalidfile)
             }
 
             // store the Uri. Next time the MainActivity is started, we'll
             // check whether the Uri has changed (-> load new document) or
             // remained the same (-> reuse previous document)
-            this.mindmap.uri = uri;
-        }
-
-        // started from the launcher
-        else {
-            Log.d(MainApplication.TAG, "started from app launcher intent");
+            mindmap.uri = uri
+        } else {
+            Log.d(MainApplication.TAG, "started from app launcher intent")
 
             // display the default Mindmap "example.mm", from the resources
-            mm = mainActivity.getApplicationContext().getResources().openRawResource(R.raw.example);
+            mm = mainActivity.applicationContext.resources.openRawResource(R.raw.example)
         }
 
         // load the mindmap
-        Log.d(MainApplication.TAG, "InputStream fetched, now starting to load document");
+        Log.d(MainApplication.TAG, "InputStream fetched, now starting to load document")
 
-        loadDocument(mm);
+        loadDocument(mm)
 
-        return null;
+        return null
     }
-
 
     /**
      * Loads a mind map (*.mm) XML document into its internal DOM tree
      *
      * @param inputStream the inputStream to load
      */
-    public void loadDocument(InputStream inputStream) {
-
+    fun loadDocument(inputStream: InputStream?) {
         // show loading indicator
-        mainActivity.setMindmapIsLoading(true);
+
+        mainActivity.setMindmapIsLoading(true)
 
         // start measuring the document load time
-        long loadDocumentStartTime = System.currentTimeMillis();
+        val loadDocumentStartTime = System.currentTimeMillis()
 
-        MindmapNode rootNode = null;
-        Stack<MindmapNode> nodeStack = new Stack<>();
-        int numNodes = 0;
+        var rootNode: MindmapNode? = null
+        val nodeStack = Stack<MindmapNode>()
+        var numNodes = 0
 
         try {
             // set up XML pull parsing
-            XmlPullParserFactory factory = XmlPullParserFactory.newInstance();
-            factory.setNamespaceAware(true);
-            XmlPullParser xpp = factory.newPullParser();
-            xpp.setInput(inputStream, "UTF-8");
+            val factory = XmlPullParserFactory.newInstance()
+            factory.isNamespaceAware = true
+            val xpp = factory.newPullParser()
+            xpp.setInput(inputStream, "UTF-8")
 
             // stream parse the XML
-            int eventType = xpp.getEventType();
+            var eventType = xpp.eventType
             while (eventType != XmlPullParser.END_DOCUMENT) {
                 if (eventType == XmlPullParser.START_DOCUMENT) {
-                    Log.d(MainApplication.TAG, "Received XML Start Document");
-
+                    Log.d(MainApplication.TAG, "Received XML Start Document")
                 } else if (eventType == XmlPullParser.START_TAG) {
-
-                    if (xpp.getName().equals("node")) {
-
-                        MindmapNode parentNode = null;
+                    if (xpp.name == "node") {
+                        var parentNode: MindmapNode? = null
                         if (!nodeStack.empty()) {
-                            parentNode = nodeStack.peek();
+                            parentNode = nodeStack.peek()
                         }
 
-                        MindmapNode newMindmapNode = parseNodeTag(xpp, parentNode);
-                        nodeStack.push(newMindmapNode);
-                        numNodes += 1;
+                        val newMindmapNode = parseNodeTag(xpp, parentNode)
+                        nodeStack.push(newMindmapNode)
+                        numNodes += 1
 
-                        newMindmapNode.subscribeNodeRichContentChanged(mainActivity);
+                        newMindmapNode.subscribeNodeRichContentChanged(mainActivity)
 
                         // if we don't have a parent node, then this is the root node
                         if (parentNode == null) {
-                            rootNode = newMindmapNode;
-                            mindmap.rootNode = rootNode;
-                            onRootNodeLoadedListener.rootNodeLoaded(mindmap, rootNode);
-
+                            rootNode = newMindmapNode
+                            mindmap.rootNode = rootNode
+                            onRootNodeLoadedListener.rootNodeLoaded(mindmap, rootNode)
                         } else {
-                            parentNode.addChildMindmapNode(newMindmapNode);
+                            parentNode.addChildMindmapNode(newMindmapNode)
                             if (parentNode.hasAddedChildMindmapNodeSubscribers()) {
-                                MindmapNode finalParentNode = parentNode;
-                                mainActivity.runOnUiThread(() -> {
-                                    finalParentNode.notifySubscribersAddedChildMindmapNode(newMindmapNode);
-                                });
+                                val finalParentNode: MindmapNode = parentNode
+                                mainActivity.runOnUiThread {
+                                    finalParentNode.notifySubscribersAddedChildMindmapNode(newMindmapNode)
+                                }
                             }
                         }
-
-                    }
-
-                    else if (xpp.getName().equals("richcontent")
-                            && (
-                            xpp.getAttributeValue(null, "TYPE").equals("NODE")
-                                    || xpp.getAttributeValue(null, "TYPE").equals("NOTE")
-                                    || xpp.getAttributeValue(null, "TYPE").equals("DETAILS")
-                    )
+                    } else if (xpp.name == "richcontent"
+                        && (xpp.getAttributeValue(null, "TYPE") == "NODE"
+                            || xpp.getAttributeValue(null, "TYPE") == "NOTE"
+                            || xpp.getAttributeValue(null, "TYPE") == "DETAILS"
+                            )
                     ) {
-
                         // extract the richcontent (HTML) of the node. This works both for nodes with a rich text content
                         // (TYPE="NODE"), for "Notes" (TYPE="NOTE"), for "Details" (TYPE="DETAILS").
 
                         // if this is an empty tag, we won't need to bother trying to read its content
                         // we don't even need to read the <richcontent> node's attributes, as we would
                         // only be interested in it's children
-                        if (xpp.isEmptyElementTag()) {
-                            Log.d(MainApplication.TAG, "Received empty richcontent node - skipping");
 
+                        if (xpp.isEmptyElementTag) {
+                            Log.d(MainApplication.TAG, "Received empty richcontent node - skipping")
                         } else {
-                            String richTextContent = loadRichContentNodes(xpp);
+                            val richTextContent = loadRichContentNodes(xpp)
 
                             // if we have no parent node, something went seriously wrong - we can't have a richcontent that is not part of a mindmap node
-                            if (nodeStack.empty()) {
-                                throw new IllegalStateException("Received richtext without a parent node");
-                            }
+                            check(!nodeStack.empty()) { "Received richtext without a parent node" }
 
-                            MindmapNode parentNode = nodeStack.peek();
-                            parentNode.addRichTextContent(richTextContent);
+                            val parentNode = nodeStack.peek()
+                            parentNode.addRichTextContent(richTextContent)
 
                             // let view know that node content has changed
                             if (parentNode.hasNodeRichContentChangedSubscribers()) {
-                                MindmapNode finalParentNode = parentNode;
-                                mainActivity.runOnUiThread(() -> {
-                                    finalParentNode.notifySubscribersNodeRichContentChanged();
-                                });
+                                val finalParentNode = parentNode
+                                mainActivity.runOnUiThread {
+                                    finalParentNode.notifySubscribersNodeRichContentChanged()
+                                }
                             }
                         }
-                    }
-
-                    else if (xpp.getName().equals("font")) {
-                        String boldAttribute = xpp.getAttributeValue(null, "BOLD");
+                    } else if (xpp.name == "font") {
+                        val boldAttribute = xpp.getAttributeValue(null, "BOLD")
 
                         // if we have no parent node, something went seriously wrong - we can't have a font node that is not part of a mindmap node
-                        if (nodeStack.empty()) {
-                            throw new IllegalStateException("Received richtext without a parent node");
-                        }
-                        MindmapNode parentNode = nodeStack.peek();
+                        check(!nodeStack.empty()) { "Received richtext without a parent node" }
+                        val parentNode = nodeStack.peek()
 
-                        if (boldAttribute != null && boldAttribute.equals("true")) {
-                            parentNode.setBold(true);
+                        if (boldAttribute != null && boldAttribute == "true") {
+                            parentNode.isBold = true
                         }
 
-                        String italicsAttribute = xpp.getAttributeValue(null, "ITALIC");
-                        if (italicsAttribute != null && italicsAttribute.equals("true")) {
-                            parentNode.setItalic(true);
+                        val italicsAttribute = xpp.getAttributeValue(null, "ITALIC")
+                        if (italicsAttribute != null && italicsAttribute == "true") {
+                            parentNode.isItalic = true
                         }
 
                         // let view know that node content has changed
                         if (parentNode.hasNodeStyleChangedSubscribers()) {
-                            MindmapNode finalParentNode = parentNode;
-                            mainActivity.runOnUiThread(() -> {
-                                finalParentNode.notifySubscribersNodeStyleChanged();
-                            });
+                            val finalParentNode = parentNode
+                            mainActivity.runOnUiThread {
+                                finalParentNode.notifySubscribersNodeStyleChanged()
+                            }
                         }
-
-                    }
-
-                    else if (xpp.getName().equals("icon") && xpp.getAttributeValue(null, "BUILTIN") != null) {
-                        String iconName = xpp.getAttributeValue(null, "BUILTIN");
+                    } else if (xpp.name == "icon" && xpp.getAttributeValue(null, "BUILTIN") != null) {
+                        val iconName = xpp.getAttributeValue(null, "BUILTIN")
 
                         // if we have no parent node, something went seriously wrong - we can't have icons that is not part of a mindmap node
-                        if (nodeStack.empty()) {
-                            throw new IllegalStateException("Received icon without a parent node");
-                        }
+                        check(!nodeStack.empty()) { "Received icon without a parent node" }
 
-                        MindmapNode parentNode = nodeStack.peek();
-                        parentNode.addIconName(iconName);
+                        val parentNode = nodeStack.peek()
+                        parentNode.addIconName(iconName)
 
                         // let view know that node content has changed
                         if (parentNode.hasNodeStyleChangedSubscribers()) {
-                            MindmapNode finalParentNode = parentNode;
-                            mainActivity.runOnUiThread(() -> {
-                                finalParentNode.notifySubscribersNodeStyleChanged();
-                            });
+                            val finalParentNode = parentNode
+                            mainActivity.runOnUiThread {
+                                finalParentNode.notifySubscribersNodeStyleChanged()
+                            }
                         }
-
-                    }
-
-                    else if (xpp.getName().equals("arrowlink")) {
-                        String destinationId = xpp.getAttributeValue(null, "DESTINATION");
+                    } else if (xpp.name == "arrowlink") {
+                        val destinationId = xpp.getAttributeValue(null, "DESTINATION")
 
                         // if we have no parent node, something went seriously wrong - we can't have icons that is not part of a mindmap node
-                        if (nodeStack.empty()) {
-                            throw new IllegalStateException("Received arrowlink without a parent node");
-                        }
+                        check(!nodeStack.empty()) { "Received arrowlink without a parent node" }
 
-                        MindmapNode parentNode = nodeStack.peek();
-                        parentNode.addArrowLinkDestinationId(destinationId);
-
-                    }
-
-                    else {
+                        val parentNode = nodeStack.peek()
+                        parentNode.addArrowLinkDestinationId(destinationId)
+                    } else {
                         // Log.d(MainApplication.TAG, "Received unknown node " + xpp.getName());
                     }
-
-
                 } else if (eventType == XmlPullParser.END_TAG) {
-                    if (xpp.getName().equals("node")) {
-                        MindmapNode completedMindmapNode = nodeStack.pop();
-                        completedMindmapNode.setLoaded(true);
+                    if (xpp.name == "node") {
+                        val completedMindmapNode = nodeStack.pop()
+                        completedMindmapNode.setLoaded(true)
                     }
-
                 } else if (eventType == XmlPullParser.TEXT) {
                     // TODO: do we have TEXT nodes in the mindmap at all?
-
                 } else {
-                    throw new IllegalStateException("Received unknown event " + eventType);
+                    throw IllegalStateException("Received unknown event $eventType")
                 }
-                eventType = xpp.next();
+                eventType = xpp.next()
             }
-
-        } catch (Exception e) {
-            throw new RuntimeException(e);
+        } catch (e: Exception) {
+            throw RuntimeException(e)
         }
 
         // stack should now be empty
         if (!nodeStack.empty()) {
-            throw new RuntimeException("Stack should be empty");
+            throw RuntimeException("Stack should be empty")
             // TODO: we could try to be lenient here to allow opening partial documents (which sometimes happens when dropbox doesn't fully sync). Probably doesn't work anyways, as we already throw a runtime exception above if we receive garbage
         }
-
 
         // TODO: can we do this as we stream through the XML above?
 
         // load all nodes of root node into simplified MindmapNode, and index them by ID for faster lookup
-        MindmapIndexes mindmapIndexes = loadAndIndexNodesByIds(rootNode);
-        mindmap.mindmapIndexes = mindmapIndexes;
+        val mindmapIndexes = loadAndIndexNodesByIds(rootNode)
+        mindmap.mindmapIndexes = mindmapIndexes
 
         // Nodes can refer to other nodes with arrowlinks. We want to have the link on both ends of the link, so we can
         // now set the corresponding links
-        fillArrowLinks();
+        fillArrowLinks()
 
-
-        long loadDocumentEndTime = System.currentTimeMillis();
-        Log.d(MainApplication.TAG, "Document loaded");
+        val loadDocumentEndTime = System.currentTimeMillis()
+        Log.d(MainApplication.TAG, "Document loaded")
 
         //long numNodes = document.getElementsByTagName("node").getLength();
 
         // now the full mindmap is loaded
-        mindmap.isLoaded = true;
-        mainActivity.setMindmapIsLoading(false);
-
+        mindmap.isLoaded = true
+        mainActivity.setMindmapIsLoading(false)
     }
 
-    private String loadRichContentNodes(XmlPullParser xpp) throws IOException, XmlPullParserException {
+    @Throws(IOException::class, XmlPullParserException::class) private fun loadRichContentNodes(xpp: XmlPullParser): String {
         // as we are stream processing the XML, we need to consume the full XML until the
         // richcontent tag is closed (i.e. until we're back at the current parsing depth)
         // eagerly parse until richcontent node is closed
-        int startingDepth = xpp.getDepth();
-        String richTextContent = "";
+        val startingDepth = xpp.depth
+        var richTextContent = ""
 
-        int richContentSubParserEventType = xpp.next();
+        var richContentSubParserEventType = xpp.next()
 
         do {
-
             // EVENT TYPES as reported by next()
-            switch (richContentSubParserEventType) {
-                /**
-                 * Signalize that parser is at the very beginning of the document
-                 * and nothing was read yet.
-                 * This event type can only be observed by calling getEvent()
-                 * before the first call to next(), nextToken, or nextTag()</a>).
-                 */
-                case XmlPullParser.START_DOCUMENT:
-                    throw new IllegalStateException("Received START_DOCUMENT but were already within the document");
 
-                /**
-                 * Logical end of the xml document. Returned from getEventType, next()
-                 * and nextToken()
-                 * when the end of the input document has been reached.
-                 * <p><strong>NOTE:</strong> subsequent calls to
-                 * <a href="#next()">next()</a> or <a href="#nextToken()">nextToken()</a>
-                 * may result in exception being thrown.
-                 */
-                case XmlPullParser.END_DOCUMENT:
-                    throw new IllegalStateException("Received END_DOCUMENT but expected to just parse a sub-document");
+            when (richContentSubParserEventType) {
+                XmlPullParser.START_DOCUMENT -> throw IllegalStateException("Received START_DOCUMENT but were already within the document")
 
-                /**
-                 * Returned from getEventType(),
-                 * <a href="#next()">next()</a>, <a href="#nextToken()">nextToken()</a> when
-                 * a start tag was read.
-                 * The name of start tag is available from getName(), its namespace and prefix are
-                 * available from getNamespace() and getPrefix()
-                 * if <a href='#FEATURE_PROCESS_NAMESPACES'>namespaces are enabled</a>.
-                 * See getAttribute* methods to retrieve element attributes.
-                 * See getNamespace* methods to retrieve newly declared namespaces.
-                 */
-                case XmlPullParser.START_TAG: {
-                    String tagString = "";
+                XmlPullParser.END_DOCUMENT -> throw IllegalStateException("Received END_DOCUMENT but expected to just parse a sub-document")
 
-                    String tagName = xpp.getName();
-                    tagString += "<" + tagName;
+                XmlPullParser.START_TAG -> {
+                    var tagString = ""
 
-                    for (int i = 0; i < xpp.getAttributeCount(); i++) {
-                        String attributeName = xpp.getAttributeName(i);
-                        String attributeValue = xpp.getAttributeValue(i);
+                    val tagName = xpp.name
+                    tagString += "<$tagName"
 
-                        String attributeString = " " + attributeName + "=" + '"' + attributeValue + '"';
-                        tagString += attributeString;
+                    var i = 0
+                    while (i < xpp.attributeCount) {
+                        val attributeName = xpp.getAttributeName(i)
+                        val attributeValue = xpp.getAttributeValue(i)
+
+                        val attributeString = " $attributeName=\"$attributeValue\""
+                        tagString += attributeString
+                        i++
                     }
 
-                    tagString += ">";
+                    tagString += ">"
 
-                    richTextContent += tagString;
-
-                    break;
+                    richTextContent += tagString
                 }
 
-                /**
-                 * Returned from getEventType(), <a href="#next()">next()</a>, or
-                 * <a href="#nextToken()">nextToken()</a> when an end tag was read.
-                 * The name of start tag is available from getName(), its
-                 * namespace and prefix are
-                 * available from getNamespace() and getPrefix().
-                 */
-                case XmlPullParser.END_TAG: {
-                    String tagName = xpp.getName();
-                    String tagString = "</" + tagName + ">";
-                    richTextContent += tagString;
-                    break;
+                XmlPullParser.END_TAG -> {
+                    val tagName = xpp.name
+                    val tagString = "</$tagName>"
+                    richTextContent += tagString
                 }
 
-                /**
-                 * Character data was read and will is available by calling getText().
-                 * <p><strong>Please note:</strong> <a href="#next()">next()</a> will
-                 * accumulate multiple
-                 * events into one TEXT event, skipping IGNORABLE_WHITESPACE,
-                 * PROCESSING_INSTRUCTION and COMMENT events,
-                 * In contrast, <a href="#nextToken()">nextToken()</a> will stop reading
-                 * text when any other event is observed.
-                 * Also, when the state was reached by calling next(), the text value will
-                 * be normalized, whereas getText() will
-                 * return unnormalized content in the case of nextToken(). This allows
-                 * an exact roundtrip without changing line ends when examining low
-                 * level events, whereas for high level applications the text is
-                 * normalized appropriately.
-                 */
-                case XmlPullParser.TEXT: {
-                    String text = xpp.getText();
-                    richTextContent += text;
-                    break;
+                XmlPullParser.TEXT -> {
+                    val text = xpp.text
+                    richTextContent += text
                 }
 
-                default:
-                    throw new IllegalStateException("Received unexpected event type " + richContentSubParserEventType);
+                else -> throw IllegalStateException("Received unexpected event type $richContentSubParserEventType")
 
             }
 
-            richContentSubParserEventType = xpp.next();
+            richContentSubParserEventType = xpp.next()
 
-        // stop parsing once we have come out far enough from the XML to be at the starting depth again
-        } while (xpp.getDepth() != startingDepth);
-        return richTextContent;
+            // stop parsing once we have come out far enough from the XML to be at the starting depth again
+        } while (xpp.depth != startingDepth)
+        return richTextContent
     }
 
-    private MindmapNode parseNodeTag(XmlPullParser xpp, MindmapNode parentNode) {
-        String id = xpp.getAttributeValue(null, "ID");
-        int numericId;
-        try {
-            numericId = Integer.parseInt(id.replaceAll("\\D+", ""));
-        } catch (NumberFormatException e) {
-            numericId = id.hashCode();
+    private fun parseNodeTag(xpp: XmlPullParser, parentNode: MindmapNode?): MindmapNode {
+        val id = xpp.getAttributeValue(null, "ID")
+        var numericId = try {
+            id.replace("\\D+".toRegex(), "").toInt()
+        } catch (e: NumberFormatException) {
+            id.hashCode()
         }
 
-        String text = xpp.getAttributeValue(null, "TEXT");
+        val text = xpp.getAttributeValue(null, "TEXT")
 
         // get link
-        String linkAttribute = xpp.getAttributeValue(null, "LINK");
-        Uri link;
-        if (linkAttribute != null && !linkAttribute.equals("")) {
-            link = Uri.parse(linkAttribute);
+        val linkAttribute = xpp.getAttributeValue(null, "LINK")
+        val link = if (linkAttribute != null && linkAttribute != "") {
+            Uri.parse(linkAttribute)
         } else {
-            link = null;
+            null
         }
 
         // get tree ID (of cloned node)
-        String treeIdAttribute = xpp.getAttributeValue(null, "TREE_ID");
+        val treeIdAttribute = xpp.getAttributeValue(null, "TREE_ID")
 
-        MindmapNode newMindmapNode = new MindmapNode(mindmap, parentNode, id, numericId, text, link, treeIdAttribute);
-        return newMindmapNode;
+        val newMindmapNode = MindmapNode(mindmap, parentNode, id, numericId, text, link, treeIdAttribute)
+        return newMindmapNode
     }
-
 
     /**
      * Index all nodes (and child nodes) by their ID, for fast lookup
      *
      * @param root
      */
-    private MindmapIndexes loadAndIndexNodesByIds(MindmapNode root) {
-
+    private fun loadAndIndexNodesByIds(root: MindmapNode?): MindmapIndexes {
         // TODO: check if this optimization was necessary - otherwise go back to old implementation
 
         // TODO: this causes us to load all mindmap nodes, defeating the lazy loading in ch.benediktkoeppel.code.droidplane.model.MindmapNode.getChildNodes
 
-        Stack<MindmapNode> stack = new Stack<>();
-        stack.push(root);
+        val stack = Stack<MindmapNode?>()
+        stack.push(root)
 
         // try first to just extract all IDs and the respective node, and
         // only insert into the hashmap once we know the size of the hashmap
-        List<Pair<String, MindmapNode>> idAndNode = new ArrayList<>();
-        List<Pair<Integer, MindmapNode>> numericIdAndNode = new ArrayList<>();
+        val idAndNode: MutableList<Pair<String, MindmapNode>> = ArrayList()
+        val numericIdAndNode: MutableList<Pair<Int, MindmapNode>> = ArrayList()
 
         while (!stack.isEmpty()) {
-            MindmapNode node = stack.pop();
+            val node = stack.pop()
 
-            idAndNode.add(new Pair<>(node.getId(), node));
-            numericIdAndNode.add(new Pair<>(node.getNumericId(), node));
+            idAndNode.add(Pair(node!!.id, node))
+            numericIdAndNode.add(Pair(node.numericId, node))
 
-            for (MindmapNode mindmapNode : node.getChildMindmapNodes()) {
-                stack.push(mindmapNode);
+            for (mindmapNode in node.childMindmapNodes) {
+                stack.push(mindmapNode)
             }
-
         }
 
-        Map<String, MindmapNode> newNodesById = new HashMap<>(idAndNode.size());
-        Map<Integer, MindmapNode> newNodesByNumericId = new HashMap<>(numericIdAndNode.size());
+        val newNodesById: MutableMap<String, MindmapNode> = HashMap(idAndNode.size)
+        val newNodesByNumericId: MutableMap<Int, MindmapNode> = HashMap(numericIdAndNode.size)
 
-        for (Pair<String, MindmapNode> i : idAndNode) {
-            newNodesById.put(i.first, i.second);
+        for (i in idAndNode) {
+            newNodesById[i.first] = i.second
         }
-        for (Pair<Integer, MindmapNode> i : numericIdAndNode) {
-            newNodesByNumericId.put(i.first, i.second);
+        for (i in numericIdAndNode) {
+            newNodesByNumericId[i.first] = i.second
         }
 
-        return new MindmapIndexes(newNodesById, newNodesByNumericId);
-
+        return MindmapIndexes(newNodesById, newNodesByNumericId)
     }
 
-    private void fillArrowLinks() {
+    private fun fillArrowLinks() {
+        val nodesById = mindmap.mindmapIndexes!!.nodesByIdIndex
 
-        Map<String, MindmapNode> nodesById = mindmap.mindmapIndexes.getNodesByIdIndex();
-
-        for (String nodeId : nodesById.keySet()) {
-            MindmapNode mindmapNode = nodesById.get(nodeId);
-            for (String linkDestinationId : mindmapNode.getArrowLinkDestinationIds()) {
-                MindmapNode destinationNode = nodesById.get(linkDestinationId);
+        for (nodeId in nodesById.keys) {
+            val mindmapNode = nodesById[nodeId]
+            for (linkDestinationId in mindmapNode!!.arrowLinkDestinationIds) {
+                val destinationNode = nodesById[linkDestinationId]
                 if (destinationNode != null) {
-                    mindmapNode.getArrowLinkDestinationNodes().add(destinationNode);
-                    destinationNode.getArrowLinkIncomingNodes().add(mindmapNode);
+                    mindmapNode.arrowLinkDestinationNodes.add(destinationNode)
+                    destinationNode.arrowLinkIncomingNodes.add(mindmapNode)
                 }
             }
         }
