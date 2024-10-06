@@ -111,7 +111,7 @@ class MindmapNodeLayout : LinearLayout {
 
         val textView = findViewById<TextView>(R.id.label)
         textView.setTextColor(context.resources.getColor(android.R.color.primary_text_light))
-        val spannableString = SpannableString(mindmapNode!!.text)
+        val spannableString = SpannableString(mindmapNode!!.getNodeText())
         if (mindmapNode.isBold) {
             spannableString.setSpan(StyleSpan(Typeface.BOLD), 0, spannableString.length, 0)
         }
@@ -180,7 +180,7 @@ class MindmapNodeLayout : LinearLayout {
     fun onCreateContextMenu(menu: ContextMenu, v: View?, menuInfo: ContextMenuInfo?) {
         // build the menu
 
-        menu.setHeaderTitle(mindmapNode!!.text)
+        menu.setHeaderTitle(mindmapNode!!.getNodeText())
         if (iconResourceIds!!.size > 0) {
             menu.setHeaderIcon(iconResourceIds!![0])
         }
@@ -200,7 +200,7 @@ class MindmapNodeLayout : LinearLayout {
 
         // add menu for each arrow link
         for (linkedNode in mindmapNode.arrowLinks) {
-            menu.add(CONTEXT_MENU_ARROWLINK_GROUP_ID, linkedNode.numericId, 0, linkedNode.text)
+            menu.add(CONTEXT_MENU_ARROWLINK_GROUP_ID, linkedNode.numericId, 0, linkedNode.getNodeText())
         }
     }
 
@@ -211,10 +211,10 @@ class MindmapNodeLayout : LinearLayout {
         // TODO: if link is internal, substring ID
 
         Log.d(MainApplication.TAG, "Opening link (to string): " + mindmapNode!!.link.toString())
-        Log.d(MainApplication.TAG, "Opening link (fragment, everything after '#'): " + mindmapNode.link.fragment)
+        Log.d(MainApplication.TAG, "Opening link (fragment, everything after '#'): " + mindmapNode.link?.fragment)
 
         // if the link has a "#ID123", it's an internal link within the document
-        if (mindmapNode.link.fragment != null && mindmapNode.link.fragment!!.startsWith("ID")) {
+        if (mindmapNode.link?.fragment != null && mindmapNode.link.fragment!!.startsWith("ID")) {
             openInternalFragmentLink(mainActivity)
         } else {
             openIntentLink(mainActivity)
@@ -228,7 +228,7 @@ class MindmapNodeLayout : LinearLayout {
         // internal link, so this.link is of the form "#ID_123234534" this.link.getFragment() should give everything
         // after the "#" it is null if there is no "#", which should be the case for all other links
 
-        val fragment = mindmapNode!!.link.fragment
+        val fragment = mindmapNode!!.link?.fragment
 
         val linkedInternal = mindmapNode.mindmap.getNodeByID(fragment)
 
@@ -268,9 +268,9 @@ class MindmapNodeLayout : LinearLayout {
         try {
             // get path of mindmap file
             val fileName: String?
-            if (mindmapNode!!.link.path!!.startsWith("/")) {
+            if (mindmapNode!!.link?.path!!.startsWith("/")) {
                 // absolute filename
-                fileName = mindmapNode.link.path
+                fileName = mindmapNode.link?.path
             } else {
                 // link is relative to mindmap file
 
@@ -278,7 +278,7 @@ class MindmapNodeLayout : LinearLayout {
                 Log.d(MainApplication.TAG, "Mindmap path $mindmapPath")
                 val mindmapDirectoryPath = mindmapPath!!.substring(0, mindmapPath.lastIndexOf("/"))
                 Log.d(MainApplication.TAG, "Mindmap directory path $mindmapDirectoryPath")
-                fileName = mindmapDirectoryPath + "/" + mindmapNode.link.path
+                fileName = mindmapDirectoryPath + "/" + mindmapNode.link?.path
             }
             val file = File(fileName)
             if (!file.exists()) {

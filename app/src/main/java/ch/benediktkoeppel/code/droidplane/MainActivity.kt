@@ -183,7 +183,7 @@ class MainActivity : FragmentActivity() {
 
         // MindmapNodeLayout extends LinearView, so we can cast targetView back to MindmapNodeLayout
         val mindmapNodeLayout = contextMenuInfo!!.targetView as MindmapNodeLayout
-        Log.d(MainApplication.TAG, "mindmapNodeLayout.text = " + mindmapNodeLayout.mindmapNode!!.text)
+        Log.d(MainApplication.TAG, "mindmapNodeLayout.text = " + mindmapNodeLayout.mindmapNode!!.getNodeText())
 
         Log.d(MainApplication.TAG, "contextMenuInfo.position = " + contextMenuInfo.position)
         Log.d(MainApplication.TAG, "item.getTitle() = " + item.title)
@@ -194,7 +194,7 @@ class MainActivity : FragmentActivity() {
                     Log.d(MainApplication.TAG, "Copying text to clipboard")
                     val clipboardManager = getSystemService(CLIPBOARD_SERVICE) as ClipboardManager
 
-                    val clipData = ClipData.newPlainText("node", mindmapNodeLayout.mindmapNode.text)
+                    val clipData = ClipData.newPlainText("node", mindmapNodeLayout.mindmapNode.getNodeText())
                     clipboardManager.setPrimaryClip(clipData)
                 }
 

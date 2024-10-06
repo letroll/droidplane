@@ -153,7 +153,7 @@ public class HorizontalMindmapView extends HorizontalScrollView implements OnTou
         MindmapNode previousParent = null;
         for (NodeColumn column : nodeColumns) {
             MindmapNode thisParent = column.getParentNode();
-            if (!Objects.equals(thisParent.getParentNode(), previousParent)) {
+            if (!Objects.equals(thisParent.parentNode, previousParent)) {
                 throw new IllegalStateException("Node column " + nodeColumn + " has a parent that doesn't match with the left column");
             }
             previousParent = thisParent;
@@ -278,7 +278,7 @@ public class HorizontalMindmapView extends HorizontalScrollView implements OnTou
         if (!nodeColumns.isEmpty()) {
 
             MindmapNode parent = nodeColumns.get(nodeColumns.size() - 1).getParentNode();
-            String text = parent.getText();
+            String text = parent.getNodeText();
             if (text != null && !text.isEmpty()) {
                 return text;
             } else if (parent.getRichTextContents() != null && !parent.getRichTextContents().isEmpty()) {
@@ -388,8 +388,8 @@ public class HorizontalMindmapView extends HorizontalScrollView implements OnTou
         // add a new column for this node and add it to the HorizontalMindmapView
         NodeColumn nodeColumn;
         synchronized (node) {
-            if (node.getParentNode() != null) {
-                synchronized (node.getParentNode()) {
+            if (node.parentNode != null) {
+                synchronized (node.parentNode) {
                     nodeColumn = new NodeColumn(getContext(), node);
                     addColumn(nodeColumn);
                 }
@@ -434,9 +434,9 @@ public class HorizontalMindmapView extends HorizontalScrollView implements OnTou
         // go upwards from the target node, and keep track of each node leading down to the target node
         List<MindmapNode> nodeHierarchy = new ArrayList<>();
         MindmapNode tmpNode = node;
-        while (tmpNode.getParentNode() != null) {   // TODO: this gives a NPE when rotating the device
+        while (tmpNode.parentNode != null) {   // TODO: this gives a NPE when rotating the device
             nodeHierarchy.add(tmpNode);
-            tmpNode = tmpNode.getParentNode();
+            tmpNode = tmpNode.parentNode;
         }
 
         // reverse the list, so that we start with the root node
@@ -537,7 +537,7 @@ public class HorizontalMindmapView extends HorizontalScrollView implements OnTou
         }
 
         // if the clicked node has a link (and is a leaf), open the link
-        else if (clickedNode.mindmapNode.getLink() != null) {
+        else if (clickedNode.mindmapNode.link != null) {
             clickedNode.openLink(mainActivity);
         }
 

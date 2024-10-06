@@ -214,7 +214,7 @@ class AsyncMindmapLoaderTask(
                 } else if (eventType == XmlPullParser.END_TAG) {
                     if (xpp.name == "node") {
                         val completedMindmapNode = nodeStack.pop()
-                        completedMindmapNode.setLoaded(true)
+                        completedMindmapNode.loaded = true
                     }
                 } else if (eventType == XmlPullParser.TEXT) {
                     // TODO: do we have TEXT nodes in the mindmap at all?
