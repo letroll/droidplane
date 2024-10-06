@@ -291,7 +291,7 @@ class MindmapNode(
         return this.subscribedNodeColumn != null
     }
 
-    fun notifySubscribersAddedChildMindmapNode(mindmapNode: MindmapNode?) {
+    fun notifySubscribersAddedChildMindmapNode(mindmapNode: MindmapNode) {
         if (this.subscribedNodeColumn != null) {
             subscribedNodeColumn!!.get()!!.notifyNewMindmapNode(mindmapNode)
         }

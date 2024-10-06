@@ -223,6 +223,7 @@ public class HorizontalMindmapView extends HorizontalScrollView implements OnTou
         }
     }
 
+    //TODO remove kotlin bang bang
     /**
      * Removes the rightmost column and returns true. If there was no column to remove, returns false. It never
      * removes the last column, i.e. it never removes the root node of the mind map.

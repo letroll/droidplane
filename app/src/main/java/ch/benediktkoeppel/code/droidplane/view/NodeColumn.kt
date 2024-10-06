@@ -1,75 +1,73 @@
-package ch.benediktkoeppel.code.droidplane.view;
+package ch.benediktkoeppel.code.droidplane.view
 
-import java.util.ArrayList;
-import java.util.List;
-
-import android.annotation.SuppressLint;
-import android.content.Context;
-import android.content.res.Resources;
-import android.graphics.Point;
-import android.util.Log;
-import android.view.ContextMenu;
-import android.view.ContextMenu.ContextMenuInfo;
-import android.view.Display;
-import android.view.View;
-import android.view.View.OnCreateContextMenuListener;
-import android.view.ViewGroup;
-import android.view.WindowManager;
-import android.widget.AdapterView;
-import android.widget.AdapterView.OnItemClickListener;
-import android.widget.LinearLayout;
-import android.widget.ListView;
-import androidx.annotation.NonNull;
-
-import ch.benediktkoeppel.code.droidplane.MainApplication;
-import ch.benediktkoeppel.code.droidplane.R;
-import ch.benediktkoeppel.code.droidplane.model.MindmapNode;
+import android.content.Context
+import android.graphics.Point
+import android.util.Log
+import android.view.ContextMenu
+import android.view.ContextMenu.ContextMenuInfo
+import android.view.View
+import android.view.View.OnCreateContextMenuListener
+import android.view.ViewGroup
+import android.view.WindowManager
+import android.widget.AdapterView.AdapterContextMenuInfo
+import android.widget.AdapterView.OnItemClickListener
+import android.widget.LinearLayout
+import android.widget.ListView
+import ch.benediktkoeppel.code.droidplane.MainApplication
+import ch.benediktkoeppel.code.droidplane.R
+import ch.benediktkoeppel.code.droidplane.model.MindmapNode
 
 /**
  * A column of MindmapNodes, i.e. one level in the mind map. It extends LinearLayout, and then embeds a ListView.
  * This is because we want to have a fine border around the ListView and we can only achieve this by having it
  * wrapped in a LinearLayout with a padding.
  */
-public class NodeColumn extends LinearLayout implements OnCreateContextMenuListener {
-
+class NodeColumn : LinearLayout, OnCreateContextMenuListener {
+    /**
+     * Returns the parent node of this column.
+     *
+     * @return the parent node of this colunn
+     */
     /**
      * The parent node (i.e. the node that is parent to everything we display in this column)
      */
-    private final MindmapNode parent;
-    private final Context context;
+    val parentNode: MindmapNode?
+    private val context: Context
 
     /**
      * The list of all MindmapNodeLayouts which we display in this column
      */
-    private ArrayList<MindmapNodeLayout> mindmapNodeLayouts;
+    private var mindmapNodeLayouts: ArrayList<MindmapNodeLayout>? = null
 
     /**
      * The adapter for this column
      */
-    private MindmapNodeAdapter adapter;
+    private var adapter: MindmapNodeAdapter? = null
 
+    /**
+     * Returns the ListView of this NodeColumn
+     * @return the ListView of this NodeColumn
+     */
     /**
      * The actual ListView that we'll display
      */
-    private ListView listView;
+    var listView: ListView? = null
+        private set
 
     /**
      * This constructor is only used to make graphical GUI layout tools happy. If used in running code, it will always
      * throw a IllegalArgumentException.
      *
      * @param context
-     * @deprecated
      */
-    public NodeColumn(Context context) {
-
-        super(context);
-        parent = null;
-        this.context = context;
-        if (!isInEditMode()) {
-            throw new IllegalArgumentException(
-                    "The constructor public NodeColumn(Context context) may only be called by graphical layout tools," +
-					" i.e. when View#isInEditMode() is true. In production, use the constructor public NodeColumn" +
-					"(Context context, Node parent).");
+    @Deprecated("")
+    constructor(context: Context) : super(context) {
+        parentNode = null
+        this.context = context
+        require(isInEditMode) {
+            "The constructor public NodeColumn(Context context) may only be called by graphical layout tools," +
+                " i.e. when View#isInEditMode() is true. In production, use the constructor public NodeColumn" +
+                "(Context context, Node parent)."
         }
     }
 
@@ -80,135 +78,90 @@ public class NodeColumn extends LinearLayout implements OnCreateContextMenuListe
      * @param context
      * @param parent
      */
-    public NodeColumn(Context context, MindmapNode parent) {
+    constructor(context: Context, parent: MindmapNode) : super(context) {
+        this.context = context
 
-        super(context);
+        this.parentNode = parent
 
-        this.context = context;
-
-        this.parent = parent;
-
-        parent.subscribe(this);
+        parent.subscribe(this)
 
         // create list items for each child node
-        mindmapNodeLayouts = new ArrayList<>();
-        List<MindmapNode> mindmapNodes = parent.getChildMindmapNodes();
-        for (MindmapNode mindmapNode : mindmapNodes) {
-            mindmapNodeLayouts.add(new MindmapNodeLayout(context, mindmapNode));
+        mindmapNodeLayouts = ArrayList()
+        val mindmapNodes: List<MindmapNode> = parent.childMindmapNodes
+        for (mindmapNode in mindmapNodes) {
+            mindmapNodeLayouts!!.add(MindmapNodeLayout(context, mindmapNode))
         }
 
         // define the layout of this LinearView
-        int linearViewHeight = LayoutParams.MATCH_PARENT;
-        int linearViewWidth = getOptimalColumnWidth(context);
-        LinearLayout.LayoutParams linearViewLayout = new LinearLayout.LayoutParams(linearViewWidth, linearViewHeight);
-        setLayoutParams(linearViewLayout);
-        setPadding(0, 0, 1, 0);
-        setBackgroundColor(context.getResources().getColor(android.R.color.darker_gray));
-
+        val linearViewHeight = LayoutParams.MATCH_PARENT
+        val linearViewWidth = getOptimalColumnWidth(context)
+        val linearViewLayout = LayoutParams(linearViewWidth, linearViewHeight)
+        layoutParams = linearViewLayout
+        setPadding(0, 0, 1, 0)
+        setBackgroundColor(context.resources.getColor(android.R.color.darker_gray))
 
         // create a ListView
-        listView = new ListView(context);
+        listView = ListView(context)
 
         // define the layout of the listView
         // should be as high as the parent (i.e. full screen height)
-        int listViewHeight = LayoutParams.MATCH_PARENT;
-        int listViewWidth = LayoutParams.MATCH_PARENT;
-        ViewGroup.LayoutParams listViewLayout = new ViewGroup.LayoutParams(listViewWidth, listViewHeight);
-        listView.setLayoutParams(listViewLayout);
-        listView.setBackgroundColor(context.getResources().getColor(android.R.color.background_light));
-
+        val listViewHeight = LayoutParams.MATCH_PARENT
+        val listViewWidth = LayoutParams.MATCH_PARENT
+        val listViewLayout = ViewGroup.LayoutParams(listViewWidth, listViewHeight)
+        listView!!.layoutParams = listViewLayout
+        listView!!.setBackgroundColor(context.resources.getColor(android.R.color.background_light))
 
         // create adapter (i.e. data provider) for the column
-        adapter = new MindmapNodeAdapter(getContext(), R.layout.mindmap_node_list_item, mindmapNodeLayouts);
+        adapter = MindmapNodeAdapter(getContext(), R.layout.mindmap_node_list_item, mindmapNodeLayouts!!)
 
         // add the content adapter
-        listView.setAdapter(adapter);
+        listView!!.adapter = adapter
 
         // call NodeColumn's onCreateContextMenu when a context menu for one of the listView items should be generated
-        listView.setOnCreateContextMenuListener(this);
+        listView!!.setOnCreateContextMenuListener(this)
 
         // add the listView to the linearView
-        this.addView(listView);
+        this.addView(listView)
     }
 
-    public void notifyNewMindmapNode(MindmapNode mindmapNode) {
-
-        mindmapNodeLayouts.add(new MindmapNodeLayout(context, mindmapNode));
-        adapter.notifyDataSetChanged();
-
+    fun notifyNewMindmapNode(mindmapNode: MindmapNode) {
+        mindmapNodeLayouts!!.add(MindmapNodeLayout(context, mindmapNode))
+        adapter!!.notifyDataSetChanged()
     }
 
     // TODO we need a new notifier, if the node itself has updated (if text was updated, or icon was updated)
-
     /**
      * Sets the width of this column to columnWidth
      *
      * @param columnWidth width of the column
      */
-    private void setWidth(int columnWidth) {
+    private fun setWidth(columnWidth: Int) {
+        Log.d(MainApplication.TAG, "Setting column width to $columnWidth")
 
-        Log.d(MainApplication.TAG, "Setting column width to " + columnWidth);
-
-        ViewGroup.LayoutParams listViewParam = this.getLayoutParams();
-        listViewParam.width = columnWidth;
-        this.setLayoutParams(listViewParam);
+        val listViewParam = this.layoutParams
+        listViewParam.width = columnWidth
+        this.layoutParams = listViewParam
     }
 
     /**
      * Deselects all nodes of this column
      */
-    public void deselectAllNodes() {
+    fun deselectAllNodes() {
         // deselect all nodes
-        for (MindmapNodeLayout mindmapNodeLayout : mindmapNodeLayouts) {
-            MindmapNode mindmapNode = mindmapNodeLayout.mindmapNode;
-            mindmapNode.setSelected(false);
+        for (mindmapNodeLayout in mindmapNodeLayouts!!) {
+            val mindmapNode = mindmapNodeLayout.mindmapNode
+            mindmapNode!!.isSelected = false
         }
 
         // then notify about the GUI change
-        adapter.notifyDataSetChanged();
-    }
-
-    /**
-     * Returns the parent node of this column.
-     *
-     * @return the parent node of this colunn
-     */
-    public MindmapNode getParentNode() {
-
-        return parent;
-    }
-
-    /**
-     * Calculates the column width which this column should have
-     *
-     * @return
-     */
-    private static int getOptimalColumnWidth(Context context) {
-
-        // and R.integer.horizontally_visible_panes defines how many columns should be visible side by side
-        // so we need 1/(horizontally_visible_panes) * displayWidth as column width
-        Resources resources = context.getResources();
-        int horizontallyVisiblePanes = resources.getInteger(R.integer.horizontally_visible_panes);
-        Display display = ((WindowManager)context.getSystemService(Context.WINDOW_SERVICE)).getDefaultDisplay();
-        int displayWidth;
-
-        // get the Display width
-        Point displaySize = new Point();
-        display.getSize(displaySize);
-        displayWidth = displaySize.x;
-        int columnWidth = displayWidth / horizontallyVisiblePanes;
-
-        Log.d(MainApplication.TAG, "Calculated column width = " + columnWidth);
-
-        return columnWidth;
+        adapter!!.notifyDataSetChanged()
     }
 
     /**
      * Resizes the column to its optimal column width
      */
-    public void resizeColumnWidth(Context context) {
-
-        setWidth(getOptimalColumnWidth(context));
+    fun resizeColumnWidth(context: Context) {
+        setWidth(getOptimalColumnWidth(context))
     }
 
     /**
@@ -217,22 +170,21 @@ public class NodeColumn extends LinearLayout implements OnCreateContextMenuListe
      * @param position the position from which the MindmapNodeLayout should be returned
      * @return MindmapNodeLayout
      */
-    public MindmapNodeLayout getNodeAtPosition(int position) {
-
-        return mindmapNodeLayouts.get(position);
+    fun getNodeAtPosition(position: Int): MindmapNodeLayout {
+        return mindmapNodeLayouts!![position]
     }
-    
-    private int getPositionOf(MindmapNode node) {
-        for (int i = 0; i < mindmapNodeLayouts.size(); i++) {
-            if (mindmapNodeLayouts.get(i).mindmapNode == node) {
-                return i;
+
+    private fun getPositionOf(node: MindmapNode): Int {
+        for (i in mindmapNodeLayouts!!.indices) {
+            if (mindmapNodeLayouts!![i].mindmapNode == node) {
+                return i
             }
         }
-        return 0;
+        return 0
     }
-    
-    void scrollTo(MindmapNode node) {
-        post(() -> listView.smoothScrollToPosition(getPositionOf(node)));
+
+    fun scrollTo(node: MindmapNode) {
+        post { listView!!.smoothScrollToPosition(getPositionOf(node)) }
     }
 
     /**
@@ -240,18 +192,18 @@ public class NodeColumn extends LinearLayout implements OnCreateContextMenuListe
      *
      * @param position
      */
-    public void setItemColor(int position) {
-
+    fun setItemColor(position: Int) {
         // deselect all nodes
-        for (int i = 0; i < mindmapNodeLayouts.size(); i++) {
-            mindmapNodeLayouts.get(i).setSelected(false);
+
+        for (i in mindmapNodeLayouts!!.indices) {
+            mindmapNodeLayouts!![i].isSelected = false
         }
 
         // then select node at position
-        mindmapNodeLayouts.get(position).setSelected(true);
+        mindmapNodeLayouts!![position].isSelected = true
 
         // then notify about the GUI change
-        adapter.notifyDataSetChanged();
+        adapter!!.notifyDataSetChanged()
     }
 
     /**
@@ -262,11 +214,9 @@ public class NodeColumn extends LinearLayout implements OnCreateContextMenuListe
      *
      * @param listener
      */
-    public void setOnItemClickListener(OnItemClickListener listener) {
-
-        listView.setOnItemClickListener(listener);
+    fun setOnItemClickListener(listener: OnItemClickListener?) {
+        listView!!.onItemClickListener = listener
     }
-
 
     /* (non-Javadoc)
      *
@@ -275,29 +225,44 @@ public class NodeColumn extends LinearLayout implements OnCreateContextMenuListe
      * @see android.view.View.OnCreateContextMenuListener#onCreateContextMenu(android.view.ContextMenu, android.view
      * .View, android.view.ContextMenu.ContextMenuInfo)
      */
-    @Override
-    public void onCreateContextMenu(ContextMenu menu, View v, ContextMenuInfo menuInfo) {
-
-        super.onCreateContextMenu(menu);
+    override fun onCreateContextMenu(menu: ContextMenu, v: View, menuInfo: ContextMenuInfo) {
+        super.onCreateContextMenu(menu)
 
         // get the menu information
-        AdapterView.AdapterContextMenuInfo contextMenuInfo = (AdapterView.AdapterContextMenuInfo)menuInfo;
+        val contextMenuInfo = menuInfo as AdapterContextMenuInfo
 
         // get the clicked node
-        MindmapNodeLayout clickedNode = mindmapNodeLayouts.get(contextMenuInfo.position);
+        val clickedNode = mindmapNodeLayouts!![contextMenuInfo.position]
 
         // forward the event to the clicked node
-        clickedNode.onCreateContextMenu(menu, v, menuInfo);
-
+        clickedNode.onCreateContextMenu(menu, v, menuInfo)
     }
 
-    /**
-     * Returns the ListView of this NodeColumn
-     * @return the ListView of this NodeColumn
-     */
-    public ListView getListView() {
+    companion object {
+        /**
+         * Calculates the column width which this column should have
+         *
+         * @return
+         */
+        private fun getOptimalColumnWidth(context: Context): Int {
+            // and R.integer.horizontally_visible_panes defines how many columns should be visible side by side
+            // so we need 1/(horizontally_visible_panes) * displayWidth as column width
 
-        return listView;
+            val resources = context.resources
+            val horizontallyVisiblePanes = resources.getInteger(R.integer.horizontally_visible_panes)
+            val display = (context.getSystemService(Context.WINDOW_SERVICE) as WindowManager).defaultDisplay
+            val displayWidth: Int
+
+            // get the Display width
+            val displaySize = Point()
+            display.getSize(displaySize)
+            displayWidth = displaySize.x
+            val columnWidth = displayWidth / horizontallyVisiblePanes
+
+            Log.d(MainApplication.TAG, "Calculated column width = $columnWidth")
+
+            return columnWidth
+        }
     }
 }
 
