@@ -55,8 +55,8 @@ class MainActivity : FragmentActivity() {
         // then populate view with mindmap
         // if we already have a loaded mindmap, use this; otherwise load from the intent
         if (mindmap!!.isLoaded) {
-            horizontalMindmapView!!.setMindmap(mindmap)
-            horizontalMindmapView!!.setDeepestSelectedMindmapNode(mindmap!!.rootNode)
+            horizontalMindmapView!!.mindmap = mindmap
+            horizontalMindmapView!!.deepestSelectedMindmapNode = mindmap!!.rootNode
             horizontalMindmapView!!.onRootNodeLoaded()
             mindmap!!.rootNode!!.subscribeNodeRichContentChanged(this)
         } else {
@@ -65,9 +65,9 @@ class MainActivity : FragmentActivity() {
                     // now set up the view
                     val finalRootNode = rootNode
                     runOnUiThread {
-                        horizontalMindmapView!!.setMindmap(mindmap)
+                        horizontalMindmapView!!.mindmap = mindmap
                         // by default, the root node is the deepest node that is expanded
-                        horizontalMindmapView!!.setDeepestSelectedMindmapNode(finalRootNode)
+                        horizontalMindmapView!!.deepestSelectedMindmapNode = finalRootNode
                         horizontalMindmapView!!.onRootNodeLoaded()
                     }
                 }

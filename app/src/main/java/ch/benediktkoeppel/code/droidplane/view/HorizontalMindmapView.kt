@@ -1,83 +1,73 @@
-package ch.benediktkoeppel.code.droidplane.view;
+package ch.benediktkoeppel.code.droidplane.view
 
-import android.app.Activity;
-import android.app.AlertDialog;
-import android.content.Context;
-import android.os.Handler;
-import android.text.Html;
-import android.util.Log;
-import android.view.GestureDetector;
-import android.view.GestureDetector.SimpleOnGestureListener;
-import android.view.MotionEvent;
-import android.view.View;
-import android.view.View.OnTouchListener;
-import android.view.ViewGroup;
-import android.widget.AdapterView;
-import android.widget.AdapterView.OnItemClickListener;
-import android.widget.EditText;
-import android.widget.HorizontalScrollView;
-import android.widget.LinearLayout;
-import android.widget.ListView;
-import android.widget.TextView;
+import android.app.Activity
+import android.app.AlertDialog.Builder
+import android.content.Context
+import android.content.DialogInterface
+import android.os.Handler
+import android.text.Html
+import android.util.Log
+import android.view.GestureDetector
+import android.view.GestureDetector.SimpleOnGestureListener
+import android.view.MotionEvent
+import android.view.View
+import android.view.View.OnTouchListener
+import android.view.ViewGroup
+import android.widget.AdapterView
+import android.widget.AdapterView.OnItemClickListener
+import android.widget.EditText
+import android.widget.HorizontalScrollView
+import android.widget.LinearLayout
+import android.widget.ListView
+import android.widget.TextView.BufferType.EDITABLE
+import ch.benediktkoeppel.code.droidplane.MainActivity
+import ch.benediktkoeppel.code.droidplane.MainApplication
+import ch.benediktkoeppel.code.droidplane.R
+import ch.benediktkoeppel.code.droidplane.helper.AndroidHelper.getActivity
+import ch.benediktkoeppel.code.droidplane.model.Mindmap
+import ch.benediktkoeppel.code.droidplane.model.MindmapNode
+import java.util.Collections
+import kotlin.math.abs
 
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
-
-import ch.benediktkoeppel.code.droidplane.MainActivity;
-import ch.benediktkoeppel.code.droidplane.MainApplication;
-import ch.benediktkoeppel.code.droidplane.R;
-import ch.benediktkoeppel.code.droidplane.helper.AndroidHelper;
-import ch.benediktkoeppel.code.droidplane.model.Mindmap;
-import ch.benediktkoeppel.code.droidplane.model.MindmapNode;
-
-public class HorizontalMindmapView extends HorizontalScrollView implements OnTouchListener, OnItemClickListener {
-
+class HorizontalMindmapView(private val mainActivity: MainActivity) : HorizontalScrollView(mainActivity), OnTouchListener, OnItemClickListener {
     /**
      * HorizontalScrollView can only have one view, so we need to add a LinearLayout underneath it, and then stuff
      * all NodeColumns into this linearLayout.
      */
-    private final LinearLayout linearLayout;
+    private val linearLayout: LinearLayout
 
     /**
      * nodeColumns holds the list of columns that are displayed in this HorizontalScrollView.
      */
-    private final List<NodeColumn> nodeColumns;
+
+    // TODO: why does the view need access to the mainActivity?
+
+    // list where all columns are stored
+    private val nodeColumns: MutableList<NodeColumn> = ArrayList()
 
     /**
      * Gesture detector
      */
-    private final GestureDetector gestureDetector;
-
-    /**
-     * Constants to determine the minimum swipe distance and speed
-     */
-    private static final int SWIPE_THRESHOLD_VELOCITY = 300;
+    private val gestureDetector: GestureDetector
 
     /**
      * This translates ListViews to NodeColumns. We need this because the OnItemClicked Events come with a ListView
      * (i.e. the ListView which was clicked) as parent, but we need to find out which NodeColumn was clicked. This
      * would have been a simple cast if NodeColumn extended ListView, but we extend LinearLayout and wrap the ListView.
      */
-    private final Map<ListView, NodeColumn> listViewToNodeColumn = new HashMap<>();
+    private val listViewToNodeColumn: MutableMap<ListView?, NodeColumn> = HashMap()
 
-    private Mindmap mindmap;
-
-    private final MainActivity mainActivity;
+    var mindmap: Mindmap? = null
 
     /**
      * The deepest selected mindmap node
      */
-    private MindmapNode deepestSelectedMindmapNode;
-
+    var deepestSelectedMindmapNode: MindmapNode? = null
 
     // Search state
-    private String lastSearchString;
-    private List<MindmapNode> searchResultNodes = List.of();
-    private int currentSearchResultIndex;
+    private var lastSearchString: String? = null
+    private var searchResultNodes = listOf<MindmapNode>()
+    private var currentSearchResultIndex = 0
 
     /**
      * Setting up a HorizontalMindmapView. We initialize the nodeColumns, define the layout parameters for the
@@ -85,58 +75,40 @@ public class HorizontalMindmapView extends HorizontalScrollView implements OnTou
      *
      * @param mainActivity the Application Context
      */
-    public HorizontalMindmapView(MainActivity mainActivity) {
-
-        super(mainActivity);
-
-        // TODO: why does the view need access to the mainActivity?
-        this.mainActivity = mainActivity;
-
-        // list where all columns are stored
-        nodeColumns = new ArrayList<>();
-
+    init {
         // set the layout for the HorizontalScrollView itself
-        setLayoutParams(new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT));
+        layoutParams = LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT)
 
         // create the layout parameters for a new LinearLayout
-        int height = LayoutParams.MATCH_PARENT;
-        int width = LayoutParams.MATCH_PARENT;
-        ViewGroup.LayoutParams linearLayoutParams = new ViewGroup.LayoutParams(width, height);
+        val height = LayoutParams.MATCH_PARENT
+        val width = LayoutParams.MATCH_PARENT
+        val linearLayoutParams = ViewGroup.LayoutParams(width, height)
 
         // create a LinearLayout in this HorizontalScrollView. All NodeColumns will go into that LinearLayout.
-        linearLayout = new LinearLayout(mainActivity);
-        linearLayout.setLayoutParams(linearLayoutParams);
-        this.addView(linearLayout);
+        linearLayout = LinearLayout(mainActivity)
+        linearLayout.layoutParams = linearLayoutParams
+        this.addView(linearLayout)
 
         // add a new gesture controller
-        HorizontalMindmapViewGestureDetector horizontalMindmapViewGestureDetector =
-                new HorizontalMindmapViewGestureDetector();
-        gestureDetector = new GestureDetector(getContext(), horizontalMindmapViewGestureDetector);
+        val horizontalMindmapViewGestureDetector =
+            HorizontalMindmapViewGestureDetector()
+        gestureDetector = GestureDetector(context, horizontalMindmapViewGestureDetector)
 
         // register HorizontalMindmapView to receive all touch events on itself
-        setOnTouchListener(this);
+        setOnTouchListener(this)
 
         // fix the widths of all columns
-        resizeAllColumns(getContext());
-
-    }
-
-    public void setMindmap(Mindmap mindmap) {
-        this.mindmap = mindmap;
+        resizeAllColumns(context)
     }
 
     // TODO: comment missing
-    public void onRootNodeLoaded() {
-
+    fun onRootNodeLoaded() {
         // expand the selected node chain
-        downTo(getContext(), this.getDeepestSelectedMindmapNode(), true);
+
+        downTo(context, this.deepestSelectedMindmapNode, true)
 
         // and then scroll to the right
-        scrollToRight();
-    }
-
-    private MindmapNode getDeepestSelectedMindmapNode() {
-        return this.deepestSelectedMindmapNode;
+        scrollToRight()
     }
 
     /**
@@ -144,30 +116,28 @@ public class HorizontalMindmapView extends HorizontalScrollView implements OnTou
      *
      * @param nodeColumn the NodeColumn to add to the HorizontalMindmapView
      */
-    private void addColumn(NodeColumn nodeColumn) {
-
+    private fun addColumn(nodeColumn: NodeColumn) {
         // add the column to the layout
-        nodeColumns.add(nodeColumn);
+
+        nodeColumns.add(nodeColumn)
 
         // assert that the nodeColumns make a proper hierarchy, i.e. nodeColumn i's parent is nodeColumn i-1
-        MindmapNode previousParent = null;
-        for (NodeColumn column : nodeColumns) {
-            MindmapNode thisParent = column.getParentNode();
-            if (!Objects.equals(thisParent.parentNode, previousParent)) {
-                throw new IllegalStateException("Node column " + nodeColumn + " has a parent that doesn't match with the left column");
-            }
-            previousParent = thisParent;
+        var previousParent: MindmapNode? = null
+        for (column in nodeColumns) {
+            val thisParent = column.parentNode
+            check(thisParent!!.parentNode == previousParent) { "Node column $nodeColumn has a parent that doesn't match with the left column" }
+            previousParent = thisParent
         }
 
 
-        linearLayout.addView(nodeColumn, linearLayout.getChildCount());
-        Log.d(MainApplication.TAG, "linearLayout now has " + linearLayout.getChildCount() + " items");
+        linearLayout.addView(nodeColumn, linearLayout.childCount)
+        Log.d(MainApplication.TAG, "linearLayout now has " + linearLayout.childCount + " items")
 
         // register as onItemClickListener and onItemLongClickListener. This HorizontalMindmapView has to register
         // itself as onItemClickListener, it's not enough if the nodeColumn would handle this onItemClick events itself.
         // This is because we might have to remove columns (and add new columns) depending on where the user clicks,
         // which is the responsibility of this HorizontalMindmapView.
-        nodeColumn.setOnItemClickListener(this);
+        nodeColumn.setOnItemClickListener(this)
     }
 
     /**
@@ -176,50 +146,39 @@ public class HorizontalMindmapView extends HorizontalScrollView implements OnTou
      *
      * @return true if the key event is consumed by this method, false otherwise
      */
-    private void scrollToRight() {
-
+    private fun scrollToRight() {
         // a runnable that knows "this"
-        final class HorizontalMindmapViewRunnable implements Runnable {
 
-            HorizontalMindmapView horizontalMindmapView;
-
-            HorizontalMindmapViewRunnable(HorizontalMindmapView horizontalMindmapView) {
-
-                this.horizontalMindmapView = horizontalMindmapView;
-            }
-
-            @Override
-            public void run() {
-
-                horizontalMindmapView.fullScroll(FOCUS_RIGHT);
+        class HorizontalMindmapViewRunnable(var horizontalMindmapView: HorizontalMindmapView) : Runnable {
+            override fun run() {
+                horizontalMindmapView.fullScroll(FOCUS_RIGHT)
             }
         }
 
-        new Handler().postDelayed(new HorizontalMindmapViewRunnable(this), 100L);
+        Handler().postDelayed(HorizontalMindmapViewRunnable(this), 100L)
     }
 
     /**
      * Removes all columns from this HorizontalMindmapView
      */
-    private void removeAllColumns() {
-
+    private fun removeAllColumns() {
         // unselect all nodes
-        for (NodeColumn nodeColumn : nodeColumns) {
-            nodeColumn.deselectAllNodes();
+
+        for (nodeColumn in nodeColumns) {
+            nodeColumn.deselectAllNodes()
         }
 
         // then remove all columns
-        nodeColumns.clear();
-        linearLayout.removeAllViews();
+        nodeColumns.clear()
+        linearLayout.removeAllViews()
     }
 
     /**
      * Adjusts the width of all columns in the HorizontalMindmapView
      */
-    private void resizeAllColumns(Context context) {
-
-        for (NodeColumn nodeColumn : nodeColumns) {
-            nodeColumn.resizeColumnWidth(context);
+    private fun resizeAllColumns(context: Context) {
+        for (nodeColumn in nodeColumns) {
+            nodeColumn.resizeColumnWidth(context)
         }
     }
 
@@ -230,81 +189,70 @@ public class HorizontalMindmapView extends HorizontalScrollView implements OnTou
      *
      * @return True if a column was removed, false if no column was removed.
      */
-    private boolean removeRightmostColumn() {
-
+    private fun removeRightmostColumn(): Boolean {
         // only remove a column if we have at least 2 columns. If there is only one column, it will not be removed.
-        if (nodeColumns.size() >= 2) {
 
+        if (nodeColumns.size >= 2) {
             // the column to remove
-            NodeColumn rightmostColumn = nodeColumns.get(nodeColumns.size() - 1);
+
+            val rightmostColumn = nodeColumns[nodeColumns.size - 1]
 
             // remove it from the linear layout
-            linearLayout.removeView(rightmostColumn);
+            linearLayout.removeView(rightmostColumn)
 
             // remove it from the nodeColumns list
-            nodeColumns.remove(nodeColumns.size() - 1);
+            nodeColumns.removeAt(nodeColumns.size - 1)
 
             // then deselect all nodes on the now newly rightmost column and let the column redraw
-            nodeColumns.get(nodeColumns.size() - 1).deselectAllNodes();
+            nodeColumns[nodeColumns.size - 1].deselectAllNodes()
 
             // a column was removed, so we return true
-            return true;
-        }
-
-        // no column was removed, so we return false
-        else {
-            return false;
+            return true
+        } else {
+            return false
         }
     }
 
-    /**
-     * Returns the number of columns in the HorizontalMindmapView.
-     *
-     * @return
-     */
-    private int getNumberOfColumns() {
+    private val numberOfColumns: Int
+        /**
+         * Returns the number of columns in the HorizontalMindmapView.
+         *
+         * @return
+         */
+        get() = nodeColumns.size
 
-        return nodeColumns.size();
-    }
-
-    /**
-     * Returns the title of the parent node of the rightmost column. This is the same as the node name of the
-     * selected node from the 2nd-rightmost column. So this is the last node that the user has clicked. If the
-     * rightmost column has no parent, an empty string is returned.
-     *
-     * @return Title of the right most parent node or an empty string.
-     */
-    private String getTitleOfRightmostParent() {
-
-        if (!nodeColumns.isEmpty()) {
-
-            MindmapNode parent = nodeColumns.get(nodeColumns.size() - 1).getParentNode();
-            String text = parent.getNodeText();
-            if (text != null && !text.isEmpty()) {
-                return text;
-            } else if (parent.getRichTextContents() != null && !parent.getRichTextContents().isEmpty()) {
-                String richTextContent = parent.getRichTextContents().get(0);
-                return Html.fromHtml(richTextContent).toString();
+    private val titleOfRightmostParent: String
+        /**
+         * Returns the title of the parent node of the rightmost column. This is the same as the node name of the
+         * selected node from the 2nd-rightmost column. So this is the last node that the user has clicked. If the
+         * rightmost column has no parent, an empty string is returned.
+         *
+         * @return Title of the right most parent node or an empty string.
+         */
+        get() {
+            if (!nodeColumns.isEmpty()) {
+                val parent = nodeColumns[nodeColumns.size - 1].parentNode
+                val text = parent!!.getNodeText()
+                if (text != null && !text.isEmpty()) {
+                    return text
+                } else if (parent.richTextContents != null && !parent.richTextContents.isEmpty()) {
+                    val richTextContent = parent.richTextContents[0]
+                    return Html.fromHtml(richTextContent).toString()
+                } else {
+                    return ""
+                }
             } else {
-                return "";
+                Log.d(MainApplication.TAG, "getTitleOfRightmostParent returned \"\" because nodeColumns is empty")
+                return ""
             }
-
         }
-
-        // there were no columns
-        else {
-            Log.d(MainApplication.TAG, "getTitleOfRightmostParent returned \"\" because nodeColumns is empty");
-            return "";
-        }
-    }
 
     /**
      * Remove all columns at the right of the specified column.
      *
      * @param nodeColumn
      */
-    private void removeAllColumnsRightOf(NodeColumn nodeColumn) {
-
+    private fun removeAllColumnsRightOf(nodeColumn: NodeColumn?) {
         // we go from right to left, from the end of nodeColumns back to one
         // element after nodeColumn
         //
@@ -320,39 +268,38 @@ public class HorizontalMindmapView extends HorizontalScrollView implements OnTou
         //
         // so at the end, we have
         // nodeColumns = [ col1, col2 ];
-        for (int i = nodeColumns.size() - 1; i >= nodeColumns.lastIndexOf(nodeColumn) + 1; i--) {
 
+        for (i in nodeColumns.size - 1 downTo nodeColumns.lastIndexOf(nodeColumn) + 1) {
             // remove this column
-            removeRightmostColumn();
+
+            removeRightmostColumn()
         }
     }
 
     /**
      * Navigates to the top of the Mindmap
      */
-    public void top() {
-
+    fun top() {
         // remove all ListView layouts in linearLayout parent_list_view
-        removeAllColumns();
+
+        removeAllColumns()
 
         // go down into the root node
-        down(getContext(), mindmap.rootNode);
+        down(context, mindmap!!.rootNode!!)
     }
 
     /**
      * Navigates back up one level in the Mindmap, if possible (otherwise does nothing)
      */
-    public void up() {
-
-        up(false);
+    fun up() {
+        up(false)
     }
 
     /**
      * Navigates back up one level in the Mindmap. If we already display the root node, the application will finish
      */
-    public void upOrClose() {
-
-        up(true);
+    fun upOrClose() {
+        up(true)
     }
 
     /**
@@ -361,21 +308,19 @@ public class HorizontalMindmapView extends HorizontalScrollView implements OnTou
      *
      * @param force
      */
-    private void up(boolean force) {
-
-        boolean wasColumnRemoved = removeRightmostColumn();
+    private fun up(force: Boolean) {
+        val wasColumnRemoved = removeRightmostColumn()
 
         // close the application if no column was removed, and the force switch was on
         if (!wasColumnRemoved && force) {
-            AndroidHelper.INSTANCE.getActivity(getContext(), Activity.class).finish();
+            getActivity(context, Activity::class.java)!!.finish()
         }
 
         // enable the up navigation with the Home (app) button (top left corner)
-        enableHomeButtonIfEnoughColumns(getContext());
+        enableHomeButtonIfEnoughColumns(context)
 
         // get the title of the parent of the rightmost column (i.e. the selected node in the 2nd-rightmost column)
-        setApplicationTitle(getContext());
-
+        setApplicationTitle(context)
     }
 
     /**
@@ -384,42 +329,41 @@ public class HorizontalMindmapView extends HorizontalScrollView implements OnTou
      *
      * @param node
      */
-    private void down(Context context, MindmapNode node) {
-
+    private fun down(context: Context, node: MindmapNode) {
         // add a new column for this node and add it to the HorizontalMindmapView
-        NodeColumn nodeColumn;
-        synchronized (node) {
+
+        var nodeColumn: NodeColumn
+        synchronized(node) {
             if (node.parentNode != null) {
-                synchronized (node.parentNode) {
-                    nodeColumn = new NodeColumn(getContext(), node);
-                    addColumn(nodeColumn);
+                synchronized(node.parentNode) {
+                    nodeColumn = NodeColumn(getContext(), node)
+                    addColumn(nodeColumn)
                 }
             } else {
-                nodeColumn = new NodeColumn(getContext(), node);
-                addColumn(nodeColumn);
+                nodeColumn = NodeColumn(getContext(), node)
+                addColumn(nodeColumn)
             }
         }
 
         // keep track of which list view belongs to which node column. This is necessary because onItemClick will get a
         // ListView (the one that was clicked), and we need to know which NodeColumn this is.
-        ListView nodeColumnListView = nodeColumn.getListView();
-        listViewToNodeColumn.put(nodeColumnListView, nodeColumn);
+        val nodeColumnListView = nodeColumn.listView
+        listViewToNodeColumn[nodeColumnListView] = nodeColumn
 
         // then scroll all the way to the right
-        scrollToRight();
+        scrollToRight()
 
         // enable the up navigation with the Home (app) button (top left corner)
-        enableHomeButtonIfEnoughColumns(context);
+        enableHomeButtonIfEnoughColumns(context)
 
         // get the title of the parent of the rightmost column (i.e. the selected node in the 2nd-rightmost column)
-        setApplicationTitle(context);
+        setApplicationTitle(context)
 
         // mark node as selected
-        node.setSelected(true);
+        node.isSelected = true
 
         // keep track in the mind map which node is currently selected
-        this.setDeepestSelectedMindmapNode(node);
-
+        this.deepestSelectedMindmapNode = node
     }
 
     /**
@@ -427,64 +371,63 @@ public class HorizontalMindmapView extends HorizontalScrollView implements OnTou
      * @param context
      * @param node
      */
-    public void downTo(Context context, MindmapNode node, boolean openLast) {
-
+    fun downTo(context: Context, node: MindmapNode?, openLast: Boolean) {
         // first navigate back to the top (essentially closing all other nodes)
-        top();
+
+        top()
 
         // go upwards from the target node, and keep track of each node leading down to the target node
-        List<MindmapNode> nodeHierarchy = new ArrayList<>();
-        MindmapNode tmpNode = node;
-        while (tmpNode.parentNode != null) {   // TODO: this gives a NPE when rotating the device
-            nodeHierarchy.add(tmpNode);
-            tmpNode = tmpNode.parentNode;
+        val nodeHierarchy: MutableList<MindmapNode> = ArrayList()
+        var tmpNode = node
+        while (tmpNode!!.parentNode != null) {   // TODO: this gives a NPE when rotating the device
+            nodeHierarchy.add(tmpNode)
+            tmpNode = tmpNode.parentNode
         }
 
         // reverse the list, so that we start with the root node
-        Collections.reverse(nodeHierarchy);
+        Collections.reverse(nodeHierarchy)
 
         // descent from the root node down to the target node
-        for (MindmapNode mindmapNode : nodeHierarchy) {
-            mindmapNode.setSelected(true);
-            scrollTo(mindmapNode);
-            if ((mindmapNode != node || openLast) && mindmapNode.getNumChildMindmapNodes() > 0) {
-                down(context, mindmapNode);
+        for (mindmapNode in nodeHierarchy) {
+            mindmapNode.isSelected = true
+            scrollTo(mindmapNode)
+            if ((mindmapNode != node || openLast) && mindmapNode.numChildMindmapNodes > 0) {
+                down(context, mindmapNode)
             }
         }
+    }
 
-    }
-    
-    private void scrollTo(MindmapNode node) {
+    private fun scrollTo(node: MindmapNode) {
         if (nodeColumns.isEmpty()) {
-            return;
+            return
         }
-        var lastCol = nodeColumns.get(nodeColumns.size() - 1);
-        lastCol.scrollTo(node);
+        val lastCol = nodeColumns[nodeColumns.size - 1]
+        lastCol.scrollTo(node)
     }
-    
-    
+
     /**
      * Sets the application title to the name of the parent node of the rightmost column, which is the most recently
      * clicked node.
      */
-    public void setApplicationTitle(Context context) {
-
+    fun setApplicationTitle(context: Context?) {
         // TODO: this needs to update when richtext content is loaded
 
         // get the title of the parent of the rightmost column (i.e. the
         // selected node in the 2nd-rightmost column)
         // set the application title to this nodeTitle. If the nodeTitle is
         // empty, we set the default Application title
-        String nodeTitle = getTitleOfRightmostParent();
-        Log.d(MainApplication.TAG, "nodeTitle = " + nodeTitle);
-        if (nodeTitle == null || nodeTitle.equals("")) {
-            Log.d(MainApplication.TAG, "Setting application title to default string: " +
-                                       getResources().getString(R.string.app_name));
-            AndroidHelper.INSTANCE.getActivity(context, Activity.class).setTitle(R.string.app_name);
 
+        val nodeTitle = titleOfRightmostParent
+        Log.d(MainApplication.TAG, "nodeTitle = $nodeTitle")
+        if (nodeTitle == null || nodeTitle == "") {
+            Log.d(
+                MainApplication.TAG, "Setting application title to default string: " +
+                    resources.getString(R.string.app_name)
+            )
+            getActivity(context, Activity::class.java)!!.setTitle(R.string.app_name)
         } else {
-            Log.d(MainApplication.TAG, "Setting application title to node name: " + nodeTitle);
-            AndroidHelper.INSTANCE.getActivity(context, Activity.class).setTitle(nodeTitle);
+            Log.d(MainApplication.TAG, "Setting application title to node name: $nodeTitle")
+            getActivity(context, Activity::class.java)!!.title = nodeTitle
             // TODO: java.lang.NullPointerException: Attempt to invoke virtual method 'void android.app.Activity.setTitle(java.lang.CharSequence)' on a null object reference
         }
     }
@@ -493,17 +436,16 @@ public class HorizontalMindmapView extends HorizontalScrollView implements OnTou
      * Enables the Home button in the application if we have enough columns, i.e. if "Up" will remove a column.
      */
     // TODO: the view should not do this
-    public void enableHomeButtonIfEnoughColumns(Context context) {
+    fun enableHomeButtonIfEnoughColumns(context: Context?) {
         // if we only have one column (i.e. this is the root node), then we
         // disable the home button
-        int numberOfColumns = getNumberOfColumns();
+        val numberOfColumns = numberOfColumns
         if (numberOfColumns >= 2) {
-            AndroidHelper.INSTANCE.getActivity(context, MainActivity.class).enableHomeButton();
+            getActivity(context, MainActivity::class.java)!!.enableHomeButton()
         } else {
-            AndroidHelper.INSTANCE.getActivity(context, MainActivity.class).disableHomeButton();
+            getActivity(context, MainActivity::class.java)!!.disableHomeButton()
         }
     }
-
 
     /* (non-Javadoc)
      *
@@ -513,46 +455,35 @@ public class HorizontalMindmapView extends HorizontalScrollView implements OnTou
      * @see android.widget.AdapterView.OnItemClickListener#onItemClick(android.widget.AdapterView, android.view.View,
      * int, long)
      */
-    @Override
-    public void onItemClick(AdapterView<?> parent, View view, int position, long id) {
-
+    override fun onItemClick(parent: AdapterView<*>?, view: View, position: Int, id: Long) {
         // the clicked column parent is the ListView in which the user clicked. Because NodeColumn does not extend
         // ListView (it only wraps a ListView), we have to find out which NodeColumn it was. We can do so because
         // NodeColumn.getNodeColumnFromListView uses a static HashMap to do the translation.
-        NodeColumn clickedNodeColumn = listViewToNodeColumn.get(parent);
+
+        val clickedNodeColumn = listViewToNodeColumn[parent]
 
         // remove all columns right of the column which was clicked
-        removeAllColumnsRightOf(clickedNodeColumn);
+        removeAllColumnsRightOf(clickedNodeColumn)
 
         // then get the clicked node
-        MindmapNodeLayout clickedNode = clickedNodeColumn.getNodeAtPosition(position);
+        val clickedNode = clickedNodeColumn!!.getNodeAtPosition(position)
 
         // if the clicked node has child nodes, we set it to selected and drill down
-        if (clickedNode.mindmapNode.getNumChildMindmapNodes() > 0) {
-
+        if (clickedNode.mindmapNode!!.numChildMindmapNodes > 0) {
             // give it a special color
-            clickedNodeColumn.setItemColor(position);
+
+            clickedNodeColumn.setItemColor(position)
 
             // and drill down
-            down(mainActivity, clickedNode.mindmapNode);
-        }
-
-        // if the clicked node has a link (and is a leaf), open the link
-        else if (clickedNode.mindmapNode.link != null) {
-            clickedNode.openLink(mainActivity);
-        }
-
-        // if the clicked node has a rich text content (and is a leaf), open the rich text
-        else if (clickedNode.mindmapNode.getRichTextContents() != null && !clickedNode.mindmapNode.getRichTextContents().isEmpty()) {
-            clickedNode.openRichText(mainActivity);
-        }
-
-        // otherwise (no children) then we just update the application title to the new parent node
-        else {
-            setApplicationTitle(getContext());
+            down(mainActivity, clickedNode.mindmapNode)
+        } else if (clickedNode.mindmapNode.link != null) {
+            clickedNode.openLink(mainActivity)
+        } else if (clickedNode.mindmapNode.richTextContents != null && !clickedNode.mindmapNode.richTextContents.isEmpty()) {
+            clickedNode.openRichText(mainActivity)
+        } else {
+            setApplicationTitle(context)
         }
     }
-
 
     /*
      * (non-Javadoc)
@@ -562,61 +493,49 @@ public class HorizontalMindmapView extends HorizontalScrollView implements OnTou
      *
      * @see android.view.View.OnTouchListener#onTouch(android.view.View, android.view.MotionEvent)
      */
-    @Override
-    public boolean onTouch(View view, MotionEvent event) {
-
+    override fun onTouch(view: View, event: MotionEvent): Boolean {
         // first, we let the gestureDetector examine the event. It will process the event if it was a gesture, i.e.
         // if it was fast enough to trigger a Fling. If it handled the event, we don't process it further. This
         // gesture can be triggered if the user moves the finger fast enough. He does not necessarily have to move so
         // far that the next column is mostly visible.
+
         if (gestureDetector.onTouchEvent(event)) {
-            Log.d(MainApplication.TAG, "Touch event was processed by HorizontalMindmapView (gesture)");
-            return true;
-        }
-
-        // If it was not a gesture (i.e. the user moved his finger too slow), we simply snap to the next closest
-        // column border.
-        else if (event.getAction() == MotionEvent.ACTION_UP || event.getAction() == MotionEvent.ACTION_CANCEL) {
-
+            Log.d(MainApplication.TAG, "Touch event was processed by HorizontalMindmapView (gesture)")
+            return true
+        } else if (event.action == MotionEvent.ACTION_UP || event.action == MotionEvent.ACTION_CANCEL) {
             // now we need to find out where the HorizontalMindmapView is horizontally scrolled
-            int scrollX = getScrollX();
-            Log.d(MainApplication.TAG, "HorizontalMindmapView is scrolled horizontally to " + scrollX);
+
+            val scrollX = scrollX
+            Log.d(MainApplication.TAG, "HorizontalMindmapView is scrolled horizontally to $scrollX")
 
             // get the leftmost column that is still (partially) visible
-            NodeColumn leftmostVisibleColumn = getLeftmostVisibleColumn();
+            val leftmostVisibleColumn = getLeftmostVisibleColumn()
 
             // get the number of visible pixels of this column
-            int numVisiblePixelsOnColumn = getVisiblePixelOfLeftmostColumn();
+            val numVisiblePixelsOnColumn = getVisiblePixelOfLeftmostColumn()
 
             // if we couldn't find a column, we could not process this event. I'm not sure how this might ever happen
             if (leftmostVisibleColumn == null) {
-                Log.e(MainApplication.TAG, "No leftmost visible column was detected. Not sure how this could happen!");
-                return false;
+                Log.e(MainApplication.TAG, "No leftmost visible column was detected. Not sure how this could happen!")
+                return false
             }
 
             // and then determine if the leftmost visible column shows more than 50% of its full width if it shows
             // more than 50%, then we scroll to the left, so that we can see it fully
-            if (numVisiblePixelsOnColumn < leftmostVisibleColumn.getWidth() / 2) {
-                Log.d(MainApplication.TAG, "Scrolling to the left, so that we can see the column fully");
-                smoothScrollTo(scrollX + numVisiblePixelsOnColumn, 0);
-            }
-
-            // if it shows less than 50%, then we scroll to the right, so that is not visible anymore
-            else {
-                Log.d(MainApplication.TAG, "Scrolling to the right, so that the column is not visible anymore");
-                smoothScrollTo(scrollX + numVisiblePixelsOnColumn - leftmostVisibleColumn.getWidth(), 0);
+            if (numVisiblePixelsOnColumn < leftmostVisibleColumn.width / 2) {
+                Log.d(MainApplication.TAG, "Scrolling to the left, so that we can see the column fully")
+                smoothScrollTo(scrollX + numVisiblePixelsOnColumn, 0)
+            } else {
+                Log.d(MainApplication.TAG, "Scrolling to the right, so that the column is not visible anymore")
+                smoothScrollTo(scrollX + numVisiblePixelsOnColumn - leftmostVisibleColumn.width, 0)
             }
 
             // we have processed this event
-            Log.d(MainApplication.TAG, "Touch event was processed by HorizontalMindmapView (no gesture)");
-            return true;
-
-        }
-
-        // if we did not process the event ourself we let the caller know
-        else {
-            Log.d(MainApplication.TAG, "Touch event was not processed by HorizontalMindmapView");
-            return false;
+            Log.d(MainApplication.TAG, "Touch event was processed by HorizontalMindmapView (no gesture)")
+            return true
+        } else {
+            Log.d(MainApplication.TAG, "Touch event was not processed by HorizontalMindmapView")
+            return false
         }
     }
 
@@ -625,86 +544,84 @@ public class HorizontalMindmapView extends HorizontalScrollView implements OnTou
      *
      * @return NodeColumn
      */
-    private NodeColumn getLeftmostVisibleColumn() {
+    private fun getLeftmostVisibleColumn(): NodeColumn?{
+            // how much we are horizontally scrolled
+            val scrollX = scrollX
 
-        // how much we are horizontally scrolled
-        int scrollX = getScrollX();
+            // how many columns fit into less than scrollX space? as soon as sumColumnWdiths > scrollX, we have just
+            // added the first visible column at the left.
+            var sumColumnWidths = 0
+            var leftmostVisibleColumn: NodeColumn? = null
+            for (i in nodeColumns.indices) {
+                sumColumnWidths += nodeColumns[i].width
 
-        // how many columns fit into less than scrollX space? as soon as sumColumnWdiths > scrollX, we have just
-        // added the first visible column at the left.
-        int sumColumnWidths = 0;
-        NodeColumn leftmostVisibleColumn = null;
-        for (int i = 0; i < nodeColumns.size(); i++) {
-            sumColumnWidths += nodeColumns.get(i).getWidth();
-
-            // if the sum of all columns so far exceeds scrollX, the current NodeColumn is (at least a little bit)
-            // visible
-            if (sumColumnWidths >= scrollX) {
-                leftmostVisibleColumn = nodeColumns.get(i);
-                break;
+                // if the sum of all columns so far exceeds scrollX, the current NodeColumn is (at least a little bit)
+                // visible
+                if (sumColumnWidths >= scrollX) {
+                    leftmostVisibleColumn = nodeColumns[i]
+                    break
+                }
             }
-        }
 
-        return leftmostVisibleColumn;
-    }
+            return leftmostVisibleColumn
+        }
 
     /**
      * Get the number of pixels that are visible on the leftmost column.
      *
      * @return
      */
-    private int getVisiblePixelOfLeftmostColumn() {
+    fun getVisiblePixelOfLeftmostColumn(): Int{
+            // how much we are horizontally scrolled
+            val scrollX = scrollX
 
-        // how much we are horizontally scrolled
-        int scrollX = getScrollX();
+            // how many columns fit into less than scrollX space? as soon as
+            // sumColumnWdiths > scrollX, we have just added the first visible
+            // column at the left.
+            var sumColumnWidths = 0
+            var numVisiblePixelsOnColumn = 0
+            for (i in nodeColumns.indices) {
+                sumColumnWidths += nodeColumns[i].width
 
-        // how many columns fit into less than scrollX space? as soon as
-        // sumColumnWdiths > scrollX, we have just added the first visible
-        // column at the left.
-        int sumColumnWidths = 0;
-        int numVisiblePixelsOnColumn = 0;
-        for (int i = 0; i < nodeColumns.size(); i++) {
-            sumColumnWidths += nodeColumns.get(i).getWidth();
-
-            // if the sum of all columns so far exceeds scrollX, the current NodeColumn is (at least a little bit)
-            // visible
-            if (sumColumnWidths >= scrollX) {
-                // how many pixels are visible of this column?
-                numVisiblePixelsOnColumn = sumColumnWidths - scrollX;
-                break;
+                // if the sum of all columns so far exceeds scrollX, the current NodeColumn is (at least a little bit)
+                // visible
+                if (sumColumnWidths >= scrollX) {
+                    // how many pixels are visible of this column?
+                    numVisiblePixelsOnColumn = sumColumnWidths - scrollX
+                    break
+                }
             }
+
+            return numVisiblePixelsOnColumn
         }
 
-        return numVisiblePixelsOnColumn;
-    }
-    
-    /** Shows a dialog to input the search string and fires the search. */
-    public void startSearch() {
-        AlertDialog.Builder alert = new AlertDialog.Builder(getContext());
-        alert.setTitle("Search");
+    /** Shows a dialog to input the search string and fires the search.  */
+    fun startSearch() {
+        val alert = Builder(context)
+        alert.setTitle("Search")
 
-        EditText input = new EditText(getContext());
-        input.setText(lastSearchString, TextView.BufferType.EDITABLE);
-        input.setHint("Search");
+        val input = EditText(context)
+        input.setText(lastSearchString, EDITABLE)
+        input.hint = "Search"
 
-        alert.setView(input);
-        alert.setPositiveButton("Search", (dialog, which) -> search(input.getText().toString()));
-        alert.create().show();
+        alert.setView(input)
+        alert.setPositiveButton("Search") { dialog: DialogInterface?, which: Int -> search(input.text.toString()) }
+        alert.create().show()
     }
 
-    /** Performs the search, stores the result, and selects the first matching node. */
-    private void search(String searchString) {
-        lastSearchString = searchString;
-        MindmapNode searchRoot = nodeColumns.get(nodeColumns.size() - 1).getParentNode();
-        searchResultNodes = searchRoot.search(searchString);
-        currentSearchResultIndex = 0;
-        showCurrentSearchResult();
+    /** Performs the search, stores the result, and selects the first matching node.  */
+    private fun search(searchString: String) {
+        lastSearchString = searchString
+        val searchRoot = nodeColumns[nodeColumns.size - 1].parentNode
+        searchResultNodes = searchRoot!!.search(searchString)
+        currentSearchResultIndex = 0
+        showCurrentSearchResult()
     }
-    
-    /** Selects the current search result node. */
-    private void showCurrentSearchResult() {
-        if (currentSearchResultIndex >= 0 && currentSearchResultIndex < searchResultNodes.size()) {
-            downTo(getContext(), searchResultNodes.get(currentSearchResultIndex), false);
+
+    /** Selects the current search result node.  */
+    private fun showCurrentSearchResult() {
+        if (currentSearchResultIndex >= 0 && currentSearchResultIndex < searchResultNodes.size) {
+            downTo(context, searchResultNodes[currentSearchResultIndex], false)
         }
         // Shows/hides the next/prev buttons
         // FIXME findViewById doesn't work, looks like you need to call invalidateOptionsMenu()
@@ -712,41 +629,34 @@ public class HorizontalMindmapView extends HorizontalScrollView implements OnTou
 //        findViewById(R.id.search_prev).setVisibility(currentSearchResultIndex > 0 ? VISIBLE : GONE);
 //        findViewById(R.id.search_next).setVisibility(currentSearchResultIndex < searchResultNodes.size() - 1 ? VISIBLE : GONE);
     }
-    
-    /** Selects the next search result node. */
-    public void searchNext() {
-        if (currentSearchResultIndex < searchResultNodes.size() - 1) {
-            currentSearchResultIndex++;
-            showCurrentSearchResult();
+
+    /** Selects the next search result node.  */
+    fun searchNext() {
+        if (currentSearchResultIndex < searchResultNodes.size - 1) {
+            currentSearchResultIndex++
+            showCurrentSearchResult()
         }
     }
-    
-    /** Selects the previous search result node. */
-    public void searchPrevious() {
+
+    /** Selects the previous search result node.  */
+    fun searchPrevious() {
         if (currentSearchResultIndex > 0) {
-            currentSearchResultIndex--;
-            showCurrentSearchResult();
+            currentSearchResultIndex--
+            showCurrentSearchResult()
         }
     }
 
-    public void setDeepestSelectedMindmapNode(MindmapNode deepestSelectedMindmapNode) {
-        this.deepestSelectedMindmapNode = deepestSelectedMindmapNode;
-    }
-
-    public void notifyNodeContentChanged(Context context) {
-        setApplicationTitle(context);
+    fun notifyNodeContentChanged(context: Context?) {
+        setApplicationTitle(context)
     }
 
     /**
      * The HorizontalMindmapViewGestureDetector should detect the onFling event. However, it never receives the
      * onDown event, so when it gets the onFling the event1 is empty, and we can't detect the fling properly.
      */
-    private class HorizontalMindmapViewGestureDetector extends SimpleOnGestureListener {
-
-        @Override
-        public boolean onDown(MotionEvent e) {
-
-            return true;
+    private inner class HorizontalMindmapViewGestureDetector : SimpleOnGestureListener() {
+        override fun onDown(e: MotionEvent): Boolean {
+            return true
         }
 
         /*
@@ -760,54 +670,52 @@ public class HorizontalMindmapView extends HorizontalScrollView implements OnTou
          * @see android.view.GestureDetector.SimpleOnGestureListener#onFling(android .view.MotionEvent, android.view
          * .MotionEvent, float, float)
          */
-        @Override
-        public boolean onFling(MotionEvent event1, MotionEvent event2, float velocityX, float velocityY) {
-
+        override fun onFling(event1: MotionEvent?, event2: MotionEvent, velocityX: Float, velocityY: Float): Boolean {
             try {
-
                 // how much we are horizontally scrolled
-                int scrollX = getScrollX();
-                Log.d(MainApplication.TAG, "Velocity = " + velocityX);
+
+                val scrollX = scrollX
+                Log.d(MainApplication.TAG, "Velocity = $velocityX")
 
                 // get the leftmost column that is still (partially) visible
-                NodeColumn leftmostVisibleColumn = getLeftmostVisibleColumn();
+                val leftmostVisibleColumn: NodeColumn? = getLeftmostVisibleColumn()
 
-                // get the number of visible pixels of this column
-                int numVisiblePixelsOnColumn = getVisiblePixelOfLeftmostColumn();
+                // get the number of visible pixels of this columkkkn
+                val numVisiblePixelsOnColumn: Int = getVisiblePixelOfLeftmostColumn()
 
                 // if we have moved at least the SWIPE_MIN_DISTANCE to the right and at faster than
                 // SWIPE_THRESHOLD_VELOCITY
-                if (velocityX < 0 && Math.abs(velocityX) > SWIPE_THRESHOLD_VELOCITY) {
-
+                if (velocityX < 0 && abs(velocityX.toDouble()) > SWIPE_THRESHOLD_VELOCITY) {
                     // scroll to the target column
-                    smoothScrollTo(scrollX + numVisiblePixelsOnColumn, 0);
 
-                    Log.d(MainApplication.TAG, "processed the Fling to Right gesture");
-                    return true;
-                }
+                    smoothScrollTo(scrollX + numVisiblePixelsOnColumn, 0)
 
-                // the same as above but from to the left
-                else if (velocityX > 0 && Math.abs(velocityX) > SWIPE_THRESHOLD_VELOCITY) {
-
+                    Log.d(MainApplication.TAG, "processed the Fling to Right gesture")
+                    return true
+                } else if (velocityX > 0 && abs(velocityX.toDouble()) > SWIPE_THRESHOLD_VELOCITY) {
                     // scroll to the target column
                     // scrolls in the wrong direction
-                    smoothScrollTo(scrollX + numVisiblePixelsOnColumn - leftmostVisibleColumn.getWidth(), 0);
 
-                    Log.d(MainApplication.TAG, "processed the Fling to Left gesture");
-                    return true;
+                    smoothScrollTo(scrollX + numVisiblePixelsOnColumn - (leftmostVisibleColumn?.width?:0), 0)
+
+                    Log.d(MainApplication.TAG, "processed the Fling to Left gesture")
+                    return true
+                } else {
+                    Log.d(MainApplication.TAG, "Fling was no real fling")
+                    return false
                 }
-
-                // we did not process this gesture
-                else {
-                    Log.d(MainApplication.TAG, "Fling was no real fling");
-                    return false;
-                }
-
-            } catch (Exception e) {
-                Log.d(MainApplication.TAG, "A whole lot of stuff could have gone wrong here");
-                e.printStackTrace();
-                return false;
+            } catch (e: Exception) {
+                Log.d(MainApplication.TAG, "A whole lot of stuff could have gone wrong here")
+                e.printStackTrace()
+                return false
             }
         }
+    }
+
+    companion object {
+        /**
+         * Constants to determine the minimum swipe distance and speed
+         */
+        private const val SWIPE_THRESHOLD_VELOCITY = 300
     }
 }
