@@ -54,21 +54,21 @@ class MainActivity : FragmentActivity() {
 
         // then populate view with mindmap
         // if we already have a loaded mindmap, use this; otherwise load from the intent
-        if (mindmap!!.isLoaded) {
-            horizontalMindmapView!!.mindmap = mindmap
-            horizontalMindmapView!!.deepestSelectedMindmapNode = mindmap!!.rootNode
-            horizontalMindmapView!!.onRootNodeLoaded()
-            mindmap!!.rootNode!!.subscribeNodeRichContentChanged(this)
+        if (mindmap?.isLoaded == true) {
+            horizontalMindmapView?.mindmap = mindmap
+            horizontalMindmapView?.deepestSelectedMindmapNode = mindmap?.rootNode
+            horizontalMindmapView?.onRootNodeLoaded()
+            mindmap?.rootNode?.subscribeNodeRichContentChanged(this)
         } else {
             val onRootNodeLoadedListener: OnRootNodeLoadedListener = object : OnRootNodeLoadedListener {
                 override fun rootNodeLoaded(mindmap: Mindmap?, rootNode: MindmapNode?) {
                     // now set up the view
                     val finalRootNode = rootNode
                     runOnUiThread {
-                        horizontalMindmapView!!.mindmap = mindmap
+                        horizontalMindmapView?.mindmap = mindmap
                         // by default, the root node is the deepest node that is expanded
-                        horizontalMindmapView!!.deepestSelectedMindmapNode = finalRootNode
-                        horizontalMindmapView!!.onRootNodeLoaded()
+                        horizontalMindmapView?.deepestSelectedMindmapNode = finalRootNode
+                        horizontalMindmapView?.onRootNodeLoaded()
                     }
                 }
             }
@@ -93,10 +93,10 @@ class MainActivity : FragmentActivity() {
         (findViewById<View>(R.id.layout_wrapper) as LinearLayout).addView(horizontalMindmapView)
 
         // enable the up navigation with the Home (app) button (top left corner)
-        horizontalMindmapView!!.enableHomeButtonIfEnoughColumns(this)
+        horizontalMindmapView?.enableHomeButtonIfEnoughColumns(this)
 
         // get the title of the parent of the rightmost column (i.e. the selected node in the 2nd-rightmost column)
-        horizontalMindmapView!!.setApplicationTitle(this)
+        horizontalMindmapView?.setApplicationTitle(this)
     }
 
     /**
@@ -134,7 +134,7 @@ class MainActivity : FragmentActivity() {
      * @see android.app.Activity#onBackPressed()
      */
     override fun onBackPressed() {
-        horizontalMindmapView!!.upOrClose()
+        horizontalMindmapView?.upOrClose()
     }
 
     /*
@@ -147,8 +147,8 @@ class MainActivity : FragmentActivity() {
      */
     override fun onOptionsItemSelected(item: MenuItem): Boolean {
         when (item.itemId) {
-            R.id.up -> horizontalMindmapView!!.up()
-            R.id.top -> horizontalMindmapView!!.top()
+            R.id.up -> horizontalMindmapView?.up()
+            R.id.top -> horizontalMindmapView?.top()
             R.id.help -> {
                 // create a new intent (without URI)
                 val helpIntent = Intent(this, MainActivity::class.java)
@@ -157,10 +157,10 @@ class MainActivity : FragmentActivity() {
             }
 
             R.id.open -> performFileSearch()
-            android.R.id.home -> horizontalMindmapView!!.up()
-            R.id.search -> horizontalMindmapView!!.startSearch()
-            R.id.search_next -> horizontalMindmapView!!.searchNext()
-            R.id.search_prev -> horizontalMindmapView!!.searchPrevious()
+            android.R.id.home -> horizontalMindmapView?.up()
+            R.id.search -> horizontalMindmapView?.startSearch()
+            R.id.search_next -> horizontalMindmapView?.searchNext()
+            R.id.search_prev -> horizontalMindmapView?.searchPrevious()
         }
 
         return true
@@ -182,8 +182,8 @@ class MainActivity : FragmentActivity() {
         // of the item in our mindmapNodeLayouts list
 
         // MindmapNodeLayout extends LinearView, so we can cast targetView back to MindmapNodeLayout
-        val mindmapNodeLayout = contextMenuInfo!!.targetView as MindmapNodeLayout
-        Log.d(MainApplication.TAG, "mindmapNodeLayout.text = " + mindmapNodeLayout.mindmapNode!!.getNodeText())
+        val mindmapNodeLayout = contextMenuInfo?.targetView as MindmapNodeLayout
+        Log.d(MainApplication.TAG, "mindmapNodeLayout.text = " + mindmapNodeLayout.mindmapNode?.getNodeText())
 
         Log.d(MainApplication.TAG, "contextMenuInfo.position = " + contextMenuInfo.position)
         Log.d(MainApplication.TAG, "item.getTitle() = " + item.title)
@@ -194,19 +194,19 @@ class MainActivity : FragmentActivity() {
                     Log.d(MainApplication.TAG, "Copying text to clipboard")
                     val clipboardManager = getSystemService(CLIPBOARD_SERVICE) as ClipboardManager
 
-                    val clipData = ClipData.newPlainText("node", mindmapNodeLayout.mindmapNode.getNodeText())
+                    val clipData = ClipData.newPlainText("node", mindmapNodeLayout.mindmapNode?.getNodeText())
                     clipboardManager.setPrimaryClip(clipData)
                 }
 
                 R.id.contextopenlink -> {
-                    Log.d(MainApplication.TAG, "Opening node link " + mindmapNodeLayout.mindmapNode.link)
+                    Log.d(MainApplication.TAG, "Opening node link " + mindmapNodeLayout.mindmapNode?.link)
                     mindmapNodeLayout.openLink(this)
                 }
 
                 R.id.openrichtext -> {
                     Log.d(
                         MainApplication.TAG,
-                        "Opening rich text of node " + mindmapNodeLayout.mindmapNode.richTextContents
+                        "Opening rich text of node " + mindmapNodeLayout.mindmapNode?.richTextContents
                     )
                     mindmapNodeLayout.openRichText(this)
                 }
@@ -216,8 +216,8 @@ class MainActivity : FragmentActivity() {
 
             MindmapNodeLayout.CONTEXT_MENU_ARROWLINK_GROUP_ID -> {
                 val nodeNumericId = item.itemId
-                val nodeByNumericID = mindmap!!.getNodeByNumericID(nodeNumericId)
-                horizontalMindmapView!!.downTo(this, nodeByNumericID, true)
+                val nodeByNumericID = mindmap?.getNodeByNumericID(nodeNumericId)
+                horizontalMindmapView?.downTo(this, nodeByNumericID, true)
             }
         }
 
@@ -289,15 +289,15 @@ class MainActivity : FragmentActivity() {
     }
 
     private fun updateLoadingIndicatorOnUiThread() {
-        if (menu != null && menu!!.findItem(R.id.mindmap_loading) != null) {
-            val mindmapLoadingIndicator = menu!!.findItem(R.id.mindmap_loading)
+        if (menu != null && menu?.findItem(R.id.mindmap_loading) != null) {
+            val mindmapLoadingIndicator = menu?.findItem(R.id.mindmap_loading)
 
-            runOnUiThread { mindmapLoadingIndicator.setVisible(mindmapIsLoading) }
+            runOnUiThread { mindmapLoadingIndicator?.setVisible(mindmapIsLoading) }
         }
     }
 
     fun notifyNodeRichContentChanged() {
-        horizontalMindmapView!!.notifyNodeContentChanged(this)
+        horizontalMindmapView?.notifyNodeContentChanged(this)
     }
 
     companion object {

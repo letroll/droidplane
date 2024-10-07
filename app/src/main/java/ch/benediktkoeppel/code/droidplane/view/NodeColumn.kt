@@ -37,6 +37,7 @@ class NodeColumn : LinearLayout, OnCreateContextMenuListener {
     /**
      * The list of all MindmapNodeLayouts which we display in this column
      */
+    //TODO replace arraylist by mutablelist
     private var mindmapNodeLayouts: ArrayList<MindmapNodeLayout>? = null
 
     /**
@@ -89,7 +90,7 @@ class NodeColumn : LinearLayout, OnCreateContextMenuListener {
         mindmapNodeLayouts = ArrayList()
         val mindmapNodes: List<MindmapNode> = parent.childMindmapNodes
         for (mindmapNode in mindmapNodes) {
-            mindmapNodeLayouts!!.add(MindmapNodeLayout(context, mindmapNode))
+            mindmapNodeLayouts?.add(MindmapNodeLayout(context, mindmapNode))
         }
 
         // define the layout of this LinearView
@@ -108,25 +109,25 @@ class NodeColumn : LinearLayout, OnCreateContextMenuListener {
         val listViewHeight = LayoutParams.MATCH_PARENT
         val listViewWidth = LayoutParams.MATCH_PARENT
         val listViewLayout = ViewGroup.LayoutParams(listViewWidth, listViewHeight)
-        listView!!.layoutParams = listViewLayout
-        listView!!.setBackgroundColor(context.resources.getColor(android.R.color.background_light))
+        listView?.layoutParams = listViewLayout
+        listView?.setBackgroundColor(context.resources.getColor(android.R.color.background_light))
 
         // create adapter (i.e. data provider) for the column
-        adapter = MindmapNodeAdapter(getContext(), R.layout.mindmap_node_list_item, mindmapNodeLayouts!!)
+        adapter = MindmapNodeAdapter(getContext(), R.layout.mindmap_node_list_item, mindmapNodeLayouts)
 
         // add the content adapter
-        listView!!.adapter = adapter
+        listView?.adapter = adapter
 
         // call NodeColumn's onCreateContextMenu when a context menu for one of the listView items should be generated
-        listView!!.setOnCreateContextMenuListener(this)
+        listView?.setOnCreateContextMenuListener(this)
 
         // add the listView to the linearView
         this.addView(listView)
     }
 
     fun notifyNewMindmapNode(mindmapNode: MindmapNode) {
-        mindmapNodeLayouts!!.add(MindmapNodeLayout(context, mindmapNode))
-        adapter!!.notifyDataSetChanged()
+        mindmapNodeLayouts?.add(MindmapNodeLayout(context, mindmapNode))
+        adapter?.notifyDataSetChanged()
     }
 
     // TODO we need a new notifier, if the node itself has updated (if text was updated, or icon was updated)
@@ -148,13 +149,15 @@ class NodeColumn : LinearLayout, OnCreateContextMenuListener {
      */
     fun deselectAllNodes() {
         // deselect all nodes
-        for (mindmapNodeLayout in mindmapNodeLayouts!!) {
+        mindmapNodeLayouts?.let {
+            for (mindmapNodeLayout in it) {
             val mindmapNode = mindmapNodeLayout.mindmapNode
-            mindmapNode!!.isSelected = false
+            mindmapNode?.isSelected = false
         }
 
-        // then notify about the GUI change
-        adapter!!.notifyDataSetChanged()
+            // then notify about the GUI change
+            adapter?.notifyDataSetChanged()
+        }
     }
 
     /**
@@ -170,21 +173,23 @@ class NodeColumn : LinearLayout, OnCreateContextMenuListener {
      * @param position the position from which the MindmapNodeLayout should be returned
      * @return MindmapNodeLayout
      */
-    fun getNodeAtPosition(position: Int): MindmapNodeLayout {
-        return mindmapNodeLayouts!![position]
+    fun getNodeAtPosition(position: Int): MindmapNodeLayout? {
+        return mindmapNodeLayouts?.get(position)
     }
 
     private fun getPositionOf(node: MindmapNode): Int {
-        for (i in mindmapNodeLayouts!!.indices) {
-            if (mindmapNodeLayouts!![i].mindmapNode == node) {
-                return i
+        mindmapNodeLayouts?.let {
+            for (i in it.indices) {
+                if (it[i].mindmapNode == node) {
+                    return i
+                }
             }
         }
         return 0
     }
 
     fun scrollTo(node: MindmapNode) {
-        post { listView!!.smoothScrollToPosition(getPositionOf(node)) }
+        post { listView?.smoothScrollToPosition(getPositionOf(node)) }
     }
 
     /**
@@ -194,16 +199,17 @@ class NodeColumn : LinearLayout, OnCreateContextMenuListener {
      */
     fun setItemColor(position: Int) {
         // deselect all nodes
+        mindmapNodeLayouts?.let {
+            for (i in it.indices) {
+                it[i].isSelected = false
+            }
 
-        for (i in mindmapNodeLayouts!!.indices) {
-            mindmapNodeLayouts!![i].isSelected = false
+            // then select node at position
+            it[position].isSelected = true
+
+            // then notify about the GUI change
+            adapter?.notifyDataSetChanged()
         }
-
-        // then select node at position
-        mindmapNodeLayouts!![position].isSelected = true
-
-        // then notify about the GUI change
-        adapter!!.notifyDataSetChanged()
     }
 
     /**
@@ -215,7 +221,7 @@ class NodeColumn : LinearLayout, OnCreateContextMenuListener {
      * @param listener
      */
     fun setOnItemClickListener(listener: OnItemClickListener?) {
-        listView!!.onItemClickListener = listener
+        listView?.onItemClickListener = listener
     }
 
     /* (non-Javadoc)
@@ -232,10 +238,12 @@ class NodeColumn : LinearLayout, OnCreateContextMenuListener {
         val contextMenuInfo = menuInfo as AdapterContextMenuInfo
 
         // get the clicked node
-        val clickedNode = mindmapNodeLayouts!![contextMenuInfo.position]
+        mindmapNodeLayouts?.let {
+            val clickedNode = it[contextMenuInfo.position]
 
-        // forward the event to the clicked node
-        clickedNode.onCreateContextMenu(menu, v, menuInfo)
+            // forward the event to the clicked node
+            clickedNode.onCreateContextMenu(menu, v, menuInfo)
+        }
     }
 
     companion object {

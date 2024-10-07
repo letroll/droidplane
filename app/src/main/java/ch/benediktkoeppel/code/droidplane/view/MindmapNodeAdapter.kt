@@ -9,8 +9,7 @@ import android.widget.ArrayAdapter
 /**
  * The MindmapNodeAdapter is the data provider for the NodeColumn (respectively its ListView).
  */
-internal class MindmapNodeAdapter(context: Context, textViewResourceId: Int, mindmapNodeLayouts: List<MindmapNodeLayout>) : ArrayAdapter<MindmapNodeLayout?>(context, textViewResourceId, mindmapNodeLayouts) {
-    private val mindmapNodeLayouts: List<MindmapNodeLayout> = mindmapNodeLayouts
+internal class MindmapNodeAdapter(context: Context, textViewResourceId: Int, private val mindmapNodeLayouts: List<MindmapNodeLayout>?) : ArrayAdapter<MindmapNodeLayout?>(context, textViewResourceId, mindmapNodeLayouts?: emptyList()) {
 
     /* (non-Javadoc)
      * getView is responsible to return a view for each individual element in the ListView
@@ -25,11 +24,11 @@ internal class MindmapNodeAdapter(context: Context, textViewResourceId: Int, min
         // because these are genuine Mindmap nodes. Recycling the view here would show one node twice in the tree,
         // while leaving out the actual node we should display.
 
-        val view = mindmapNodeLayouts[position]
+        val view = mindmapNodeLayouts?.get(position)
 
         // tell the node to refresh it's view
-        view.refreshView()
-
-        return view
+        view?.refreshView()
+        //TODO check if used
+        return view!!
     }
 }

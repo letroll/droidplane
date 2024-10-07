@@ -293,7 +293,7 @@ class MindmapNode(
 
     fun notifySubscribersAddedChildMindmapNode(mindmapNode: MindmapNode) {
         if (this.subscribedNodeColumn != null) {
-            subscribedNodeColumn!!.get()!!.notifyNewMindmapNode(mindmapNode)
+            subscribedNodeColumn?.get()?.notifyNewMindmapNode(mindmapNode)
         }
     }
 
@@ -303,7 +303,7 @@ class MindmapNode(
 
     fun notifySubscribersNodeRichContentChanged() {
         if (this.subscribedMainActivity != null) {
-            subscribedMainActivity!!.get()!!.notifyNodeRichContentChanged()
+            subscribedMainActivity?.get()?.notifyNodeRichContentChanged()
         }
     }
 
@@ -322,7 +322,7 @@ class MindmapNode(
 
     fun notifySubscribersNodeStyleChanged() {
         if (this.subscribedNodeLayout != null) {
-            subscribedNodeLayout!!.get()!!.notifyNodeStyleChanged()
+            subscribedNodeLayout?.get()?.notifyNodeStyleChanged()
         }
     }
 
@@ -337,7 +337,7 @@ class MindmapNode(
     /** Depth-first search in the core text of the nodes in this sub-tree.  */ // TODO: this doesn't work while mindmap is still loading
     fun search(searchString: String): List<MindmapNode> {
         val res = ArrayList<MindmapNode>()
-        if (getNodeText()!!.uppercase(Locale.getDefault()).contains(searchString.uppercase(Locale.getDefault()))) { // TODO: npe here when text is null, because text is a rich text
+        if (getNodeText()?.uppercase(Locale.getDefault())?.contains(searchString.uppercase(Locale.getDefault())) == true) { // TODO: npe here when text is null, because text is a rich text
             res.add(this)
         }
         for (child in childMindmapNodes) {

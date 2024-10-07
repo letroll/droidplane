@@ -359,12 +359,15 @@ class AsyncMindmapLoaderTask(
         while (!stack.isEmpty()) {
             val node = stack.pop()
 
-            idAndNode.add(Pair(node!!.id, node))
-            numericIdAndNode.add(Pair(node.numericId, node))
+            idAndNode.add(Pair(node?.id, node))
+            node?.let {
+                numericIdAndNode.add(Pair(node.numericId, node))
 
-            for (mindmapNode in node.childMindmapNodes) {
-                stack.push(mindmapNode)
+                for (mindmapNode in node.childMindmapNodes) {
+                    stack.push(mindmapNode)
+                }
             }
+
         }
 
         val newNodesById: MutableMap<String, MindmapNode> = HashMap(idAndNode.size)
@@ -381,17 +384,20 @@ class AsyncMindmapLoaderTask(
     }
 
     private fun fillArrowLinks() {
-        val nodesById = mindmap.mindmapIndexes!!.nodesByIdIndex
-
-        for (nodeId in nodesById.keys) {
+        val nodesById = mindmap.mindmapIndexes?.nodesByIdIndex
+        nodesById?.let {
+            for (nodeId in nodesById.keys) {
             val mindmapNode = nodesById[nodeId]
-            for (linkDestinationId in mindmapNode!!.arrowLinkDestinationIds) {
-                val destinationNode = nodesById[linkDestinationId]
-                if (destinationNode != null) {
-                    mindmapNode.arrowLinkDestinationNodes.add(destinationNode)
-                    destinationNode.arrowLinkIncomingNodes.add(mindmapNode)
+                mindmapNode?.arrowLinkDestinationIds?.let {
+                    for (linkDestinationId in it) {
+                        val destinationNode = nodesById[linkDestinationId]
+                        if (destinationNode != null) {
+                            mindmapNode.arrowLinkDestinationNodes.add(destinationNode)
+                            destinationNode.arrowLinkIncomingNodes.add(mindmapNode)
+                        }
+                    }
                 }
-            }
+        }
         }
     }
 

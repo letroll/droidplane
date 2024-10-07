@@ -125,7 +125,7 @@ class HorizontalMindmapView(private val mainActivity: MainActivity) : Horizontal
         var previousParent: MindmapNode? = null
         for (column in nodeColumns) {
             val thisParent = column.parentNode
-            check(thisParent!!.parentNode == previousParent) { "Node column $nodeColumn has a parent that doesn't match with the left column" }
+            check(thisParent?.parentNode == previousParent) { "Node column $nodeColumn has a parent that doesn't match with the left column" }
             previousParent = thisParent
         }
 
@@ -232,10 +232,10 @@ class HorizontalMindmapView(private val mainActivity: MainActivity) : Horizontal
         get() {
             if (!nodeColumns.isEmpty()) {
                 val parent = nodeColumns[nodeColumns.size - 1].parentNode
-                val text = parent!!.getNodeText()
+                val text = parent?.getNodeText()
                 if (text != null && !text.isEmpty()) {
                     return text
-                } else if (parent.richTextContents != null && !parent.richTextContents.isEmpty()) {
+                } else if (parent?.richTextContents != null && !parent.richTextContents.isEmpty()) {
                     val richTextContent = parent.richTextContents[0]
                     return Html.fromHtml(richTextContent).toString()
                 } else {
@@ -285,7 +285,9 @@ class HorizontalMindmapView(private val mainActivity: MainActivity) : Horizontal
         removeAllColumns()
 
         // go down into the root node
-        down(context, mindmap!!.rootNode!!)
+        mindmap?.rootNode?.let {
+            down(context, it)
+        }
     }
 
     /**
@@ -313,7 +315,7 @@ class HorizontalMindmapView(private val mainActivity: MainActivity) : Horizontal
 
         // close the application if no column was removed, and the force switch was on
         if (!wasColumnRemoved && force) {
-            getActivity(context, Activity::class.java)!!.finish()
+            getActivity(context, Activity::class.java)?.finish()
         }
 
         // enable the up navigation with the Home (app) button (top left corner)
@@ -379,7 +381,7 @@ class HorizontalMindmapView(private val mainActivity: MainActivity) : Horizontal
         // go upwards from the target node, and keep track of each node leading down to the target node
         val nodeHierarchy: MutableList<MindmapNode> = ArrayList()
         var tmpNode = node
-        while (tmpNode!!.parentNode != null) {   // TODO: this gives a NPE when rotating the device
+        while (tmpNode?.parentNode != null) {   // TODO: this gives a NPE when rotating the device
             nodeHierarchy.add(tmpNode)
             tmpNode = tmpNode.parentNode
         }
@@ -424,10 +426,10 @@ class HorizontalMindmapView(private val mainActivity: MainActivity) : Horizontal
                 MainApplication.TAG, "Setting application title to default string: " +
                     resources.getString(R.string.app_name)
             )
-            getActivity(context, Activity::class.java)!!.setTitle(R.string.app_name)
+            getActivity(context, Activity::class.java)?.setTitle(R.string.app_name)
         } else {
             Log.d(MainApplication.TAG, "Setting application title to node name: $nodeTitle")
-            getActivity(context, Activity::class.java)!!.title = nodeTitle
+            getActivity(context, Activity::class.java)?.title = nodeTitle
             // TODO: java.lang.NullPointerException: Attempt to invoke virtual method 'void android.app.Activity.setTitle(java.lang.CharSequence)' on a null object reference
         }
     }
@@ -441,9 +443,9 @@ class HorizontalMindmapView(private val mainActivity: MainActivity) : Horizontal
         // disable the home button
         val numberOfColumns = numberOfColumns
         if (numberOfColumns >= 2) {
-            getActivity(context, MainActivity::class.java)!!.enableHomeButton()
+            getActivity(context, MainActivity::class.java)?.enableHomeButton()
         } else {
-            getActivity(context, MainActivity::class.java)!!.disableHomeButton()
+            getActivity(context, MainActivity::class.java)?.disableHomeButton()
         }
     }
 
@@ -466,22 +468,26 @@ class HorizontalMindmapView(private val mainActivity: MainActivity) : Horizontal
         removeAllColumnsRightOf(clickedNodeColumn)
 
         // then get the clicked node
-        val clickedNode = clickedNodeColumn!!.getNodeAtPosition(position)
+        val clickedNode = clickedNodeColumn?.getNodeAtPosition(position)
 
         // if the clicked node has child nodes, we set it to selected and drill down
-        if (clickedNode.mindmapNode!!.numChildMindmapNodes > 0) {
-            // give it a special color
+        clickedNode?.let {
+            if ((clickedNode.mindmapNode?.numChildMindmapNodes ?: 0) > 0) {
+                // give it a special color
 
-            clickedNodeColumn.setItemColor(position)
+                clickedNodeColumn.setItemColor(position)
 
-            // and drill down
-            down(mainActivity, clickedNode.mindmapNode)
-        } else if (clickedNode.mindmapNode.link != null) {
-            clickedNode.openLink(mainActivity)
-        } else if (clickedNode.mindmapNode.richTextContents != null && !clickedNode.mindmapNode.richTextContents.isEmpty()) {
-            clickedNode.openRichText(mainActivity)
-        } else {
-            setApplicationTitle(context)
+                // and drill down
+                clickedNode.mindmapNode?.let {
+                    down(mainActivity, it)
+                }
+            } else if (clickedNode.mindmapNode?.link != null) {
+                clickedNode.openLink(mainActivity)
+            } else if (clickedNode.mindmapNode?.richTextContents?.isNotEmpty() == true) {
+                clickedNode.openRichText(mainActivity)
+            } else {
+                setApplicationTitle(context)
+            }
         }
     }
 
@@ -613,7 +619,7 @@ class HorizontalMindmapView(private val mainActivity: MainActivity) : Horizontal
     private fun search(searchString: String) {
         lastSearchString = searchString
         val searchRoot = nodeColumns[nodeColumns.size - 1].parentNode
-        searchResultNodes = searchRoot!!.search(searchString)
+        searchResultNodes = searchRoot?.search(searchString)?: emptyList()
         currentSearchResultIndex = 0
         showCurrentSearchResult()
     }

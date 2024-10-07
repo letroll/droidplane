@@ -21,7 +21,7 @@ class RichTextViewActivity : Activity() {
         // > as the end of the content and the remaining text used as a document fragment
         // > identifier.
         val richTextContent = intent.getStringExtra("richTextContent")
-        val encodedContent = Base64.encodeToString(richTextContent!!.toByteArray(), Base64.NO_PADDING)
+        val encodedContent = Base64.encodeToString(richTextContent?.toByteArray(), Base64.NO_PADDING)
 
         // set data of web view
         val webView = findViewById<WebView>(R.id.webview)

@@ -46,11 +46,7 @@ class Mindmap : ViewModel() {
      * @param id
      * @return
      */
-    fun getNodeByID(id: String?): MindmapNode? {
-        return mindmapIndexes!!.nodesByIdIndex[id]
-    }
+    fun getNodeByID(id: String?): MindmapNode? = mindmapIndexes?.nodesByIdIndex?.get(id)
 
-    fun getNodeByNumericID(numericId: Int?): MindmapNode? {
-        return mindmapIndexes!!.nodesByNumericIndex[numericId]
-    }
+    fun getNodeByNumericID(numericId: Int?): MindmapNode? = mindmapIndexes?.nodesByNumericIndex?.get(numericId)
 }
