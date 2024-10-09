@@ -449,7 +449,7 @@ class HorizontalMindmapView(private val mainActivity: MainActivity) : Horizontal
         }
     }
 
-    /* (non-Javadoc)
+    /**
      *
      * Handler when one of the ListItem's item is clicked Find the node which was clicked, and redraw the screen with
      * this node as new parent if the clicked node has no child, then we stop here
@@ -491,8 +491,8 @@ class HorizontalMindmapView(private val mainActivity: MainActivity) : Horizontal
         }
     }
 
-    /*
-     * (non-Javadoc)
+    /**
+     *
      *
      * Will be called whenever the HorizontalScrollView is touched. We have to capture the move left and right events
      * here, and snap to the appropriate column borders.
@@ -665,9 +665,7 @@ class HorizontalMindmapView(private val mainActivity: MainActivity) : Horizontal
             return true
         }
 
-        /*
-         * (non-Javadoc)
-         *
+        /**
          * onFling is called whenever a Fling (a fast swipe) event is detected. However, for some reason, our onDown
          * method is never called, and the onFling method never gets a valid event1 (it's always null). So instead of
          * relying on event1 and event2 (and determine the distance the finger moved), we only consider the velocity

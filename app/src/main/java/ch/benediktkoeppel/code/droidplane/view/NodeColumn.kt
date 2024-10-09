@@ -224,7 +224,7 @@ class NodeColumn : LinearLayout, OnCreateContextMenuListener {
         listView?.onItemClickListener = listener
     }
 
-    /* (non-Javadoc)
+    /**
      *
      * This is called when a context menu for one of the list items is generated.
      *
@@ -242,7 +242,7 @@ class NodeColumn : LinearLayout, OnCreateContextMenuListener {
             val clickedNode = it[contextMenuInfo.position]
 
             // forward the event to the clicked node
-            clickedNode.onCreateContextMenu(menu, v, menuInfo)
+            clickedNode.onCreateContextMenu(menu)
         }
     }
 

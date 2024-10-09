@@ -11,7 +11,7 @@ import android.widget.ArrayAdapter
  */
 internal class MindmapNodeAdapter(context: Context, textViewResourceId: Int, private val mindmapNodeLayouts: List<MindmapNodeLayout>?) : ArrayAdapter<MindmapNodeLayout?>(context, textViewResourceId, mindmapNodeLayouts?: emptyList()) {
 
-    /* (non-Javadoc)
+    /**
      * getView is responsible to return a view for each individual element in the ListView
      * @param int position: the position in the mindmapNodes array, for which we need to generate a view
      * @param View convertView: the view we should recycle

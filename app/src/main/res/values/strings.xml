@@ -11,6 +11,7 @@
     <string name="noicon">no icon</string>
     <string name="novalidfile">Please start DroidPlane by opening a *.mm file"</string>
     <string name="copynodetext">Copy Node Text</string>
+    <string name="editnodetext">Edit Node Text</string>
     <string name="openlink">Open Link</string>
     <string name="openrichtext">Open Rich Text Content</string>
     <string name="help">Help</string>

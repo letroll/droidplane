@@ -41,8 +41,19 @@ Thumbs.db
 .idea/datasources.xml
 .idea/dataSources.ids
 .idea/libraries/
+.idea/appInsightsSettings.xml
+.idea/compiler.xml
+.idea/deploymentTargetSelector.xml
+.idea/caches/deviceStreaming.xml
+.idea/gradle.xml
+.idea/kotlinc.xml
+.idea/migrations.xml
+.idea/misc.xml
+.idea/runConfigurations.xml
+.idea/vcs.xml
 
 *.swp
 
 # Mindmap backup files
 .backup
+

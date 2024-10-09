@@ -5,6 +5,10 @@ import android.app.AlertDialog.Builder
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Intent
+import android.content.Intent.ACTION_EDIT
+import android.content.Intent.ACTION_OPEN_DOCUMENT
+import android.content.Intent.ACTION_VIEW
+import android.content.Intent.CATEGORY_OPENABLE
 import android.os.Bundle
 import android.util.Log
 import android.view.Menu
@@ -12,8 +16,11 @@ import android.view.MenuItem
 import android.view.View
 import android.widget.AdapterView.AdapterContextMenuInfo
 import android.widget.LinearLayout
+import androidx.activity.compose.setContent
+import androidx.compose.material3.Text
+import androidx.compose.runtime.collectAsState
 import androidx.fragment.app.FragmentActivity
-import androidx.lifecycle.ViewModelProviders
+import androidx.lifecycle.ViewModelProvider
 import ch.benediktkoeppel.code.droidplane.controller.AsyncMindmapLoaderTask
 import ch.benediktkoeppel.code.droidplane.controller.OnRootNodeLoadedListener
 import ch.benediktkoeppel.code.droidplane.model.Mindmap
@@ -45,12 +52,16 @@ class MainActivity : FragmentActivity() {
 
         // enable the Android home button
         enableHomeButton()
+//        setContent {
+//            val state = mindmap?.state?.collectAsState()
+//            Text("test")
+//        }
 
         // set up horizontal mindmap view first
         setUpHorizontalMindmapView()
 
         // get the Mindmap ViewModel
-        mindmap = ViewModelProviders.of(this).get(Mindmap::class.java)
+        mindmap = ViewModelProvider(this)[Mindmap::class.java]
 
         // then populate view with mindmap
         // if we already have a loaded mindmap, use this; otherwise load from the intent
@@ -74,6 +85,7 @@ class MainActivity : FragmentActivity() {
             }
 
             // load the file asynchronously
+            mindmap?.loadMindMap(isAnExternalMindMapEdit())
             mindmap?.let {
                 AsyncMindmapLoaderTask(
                     this,
@@ -85,12 +97,14 @@ class MainActivity : FragmentActivity() {
         }
     }
 
+    private fun isAnExternalMindMapEdit():Boolean = ACTION_EDIT == intent.action || ACTION_VIEW == intent.action || ACTION_OPEN_DOCUMENT == intent.action
+
     private fun setUpHorizontalMindmapView() {
         // create a new HorizontalMindmapView
 
         horizontalMindmapView = HorizontalMindmapView(this)
 
-        (findViewById<View>(R.id.layout_wrapper) as LinearLayout).addView(horizontalMindmapView)
+        (findViewById<View>(R.id.layout_wrapper) as LinearLayout?)?.addView(horizontalMindmapView)
 
         // enable the up navigation with the Home (app) button (top left corner)
         horizontalMindmapView?.enableHomeButtonIfEnoughColumns(this)
@@ -117,7 +131,7 @@ class MainActivity : FragmentActivity() {
         bar?.setDisplayHomeAsUpEnabled(false)
     }
 
-    /* (non-Javadoc)
+    /**
      * Creates the options menu
      * @see android.app.Activity#onCreateOptionsMenu(android.view.Menu)
      */
@@ -129,17 +143,16 @@ class MainActivity : FragmentActivity() {
         return true
     }
 
-    /* (non-Javadoc)
+    /**
      * Handler for the back button, Navigate one level up, and stay at the root node
      * @see android.app.Activity#onBackPressed()
      */
     override fun onBackPressed() {
+        super.onBackPressed()
         horizontalMindmapView?.upOrClose()
     }
 
-    /*
-     * (non-Javadoc)
-     *
+    /**
      * Handler of all menu events Home button: navigate one level up, and exit the application if the home button is
      * pressed at the root node Menu Up: navigate one level up, and stay at the root node
      *
@@ -166,9 +179,7 @@ class MainActivity : FragmentActivity() {
         return true
     }
 
-    /*
-     * (non-Javadoc)
-     *
+    /**
      * It looks like the onContextItemSelected has to be overwritten in a class extending Activity. It was not
      * possible to have this callback in the NodeColumn. As a result, we have to find out here again where the event
      * happened
@@ -196,6 +207,11 @@ class MainActivity : FragmentActivity() {
 
                     val clipData = ClipData.newPlainText("node", mindmapNodeLayout.mindmapNode?.getNodeText())
                     clipboardManager.setPrimaryClip(clipData)
+                }
+
+                R.id.contextedittext -> {
+                    //TODO edit feature
+                    mindmapNodeLayout.mindmapNode?.getNodeText()
                 }
 
                 R.id.contextopenlink -> {
@@ -246,11 +262,11 @@ class MainActivity : FragmentActivity() {
         // ACTION_OPEN_DOCUMENT is the intent to choose a file via the system's file
         // browser.
 
-        val intent = Intent(Intent.ACTION_OPEN_DOCUMENT)
+        val intent = Intent(ACTION_OPEN_DOCUMENT)
 
         // Filter to only show results that can be "opened", such as a
         // file (as opposed to a list of contacts or timezones)
-        intent.addCategory(Intent.CATEGORY_OPENABLE)
+        intent.addCategory(CATEGORY_OPENABLE)
         intent.setType("*/*")
 
         startActivityForResult(intent, READ_REQUEST_CODE)
@@ -275,7 +291,7 @@ class MainActivity : FragmentActivity() {
                 // create a new intent (with URI) to open this document
                 val openFileIntent = Intent(this, MainActivity::class.java)
                 openFileIntent.setData(uri)
-                openFileIntent.setAction(Intent.ACTION_OPEN_DOCUMENT)
+                openFileIntent.setAction(ACTION_OPEN_DOCUMENT)
                 startActivity(openFileIntent)
             }
         }

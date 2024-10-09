@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <item name="contextcopy" type="id" />
+    <item name="contextedittext" type="id" />
     <item name="contextopenlink" type="id" />
     <item name="openrichtext" type="id" />
     

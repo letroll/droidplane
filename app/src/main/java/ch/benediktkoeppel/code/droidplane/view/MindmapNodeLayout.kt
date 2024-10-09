@@ -10,9 +10,7 @@ import android.text.SpannableString
 import android.text.style.StyleSpan
 import android.util.Log
 import android.view.ContextMenu
-import android.view.ContextMenu.ContextMenuInfo
 import android.view.Gravity
-import android.view.View
 import android.webkit.MimeTypeMap
 import android.widget.AbsListView
 import android.widget.ImageView
@@ -174,10 +172,8 @@ class MindmapNodeLayout : LinearLayout {
      * events per se, because the NodeColumn first has to decide for which MindmapNode the event applies.
      *
      * @param menu
-     * @param v
-     * @param menuInfo
      */
-    fun onCreateContextMenu(menu: ContextMenu, v: View?, menuInfo: ContextMenuInfo?) {
+    public override fun onCreateContextMenu(menu: ContextMenu) {
         // build the menu
 
         menu.setHeaderTitle(mindmapNode?.getNodeText())
@@ -187,6 +183,9 @@ class MindmapNodeLayout : LinearLayout {
 
         // allow copying the node text
         menu.add(CONTEXT_MENU_NORMAL_GROUP_ID, R.id.contextcopy, 0, R.string.copynodetext)
+
+        menu.add(CONTEXT_MENU_NORMAL_GROUP_ID, R.id.contextedittext, 0, R.string.editnodetext)
+
 
         // add menu to open link, if the node has a hyperlink
         if (mindmapNode?.link != null) {
