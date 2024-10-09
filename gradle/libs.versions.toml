@@ -1,0 +1,24 @@
+[versions]
+constraintlayout = "2.1.4"
+kotlin = "2.0.20"
+legacySupportV4 = "1.0.0"
+lifecycleExtensions = "2.2.0"
+lifecycleViewmodelKtx = "2.8.6"
+lombok = "1.18.34"
+
+[libraries]
+androidx-constraintlayout = { module = "androidx.constraintlayout:constraintlayout", version.ref = "constraintlayout" }
+androidx-legacy-support-v4 = { module = "androidx.legacy:legacy-support-v4", version.ref = "legacySupportV4" }
+androidx-lifecycle-extensions = { module = "androidx.lifecycle:lifecycle-extensions", version.ref = "lifecycleExtensions" }
+androidx-lifecycle-viewmodel-ktx = { module = "androidx.lifecycle:lifecycle-viewmodel-ktx", version.ref = "lifecycleViewmodelKtx" }
+androidx-material3 = { module = "androidx.compose.material3:material3" }
+androidx-ui-test-junit4 = { module = "androidx.compose.ui:ui-test-junit4" }
+androidx-ui-test-manifest = { module = "androidx.compose.ui:ui-test-manifest" }
+androidx-ui-tooling = { module = "androidx.compose.ui:ui-tooling" }
+androidx-ui-tooling-preview = { module = "androidx.compose.ui:ui-tooling-preview" }
+lombok = { module = "org.projectlombok:lombok", version.ref = "lombok" }
+
+[plugins]
+
+# Add this line
+compose-compiler = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
