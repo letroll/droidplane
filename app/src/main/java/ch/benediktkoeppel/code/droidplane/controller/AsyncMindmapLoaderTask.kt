@@ -7,14 +7,12 @@ import android.util.Log
 import android.util.Pair
 import ch.benediktkoeppel.code.droidplane.MainActivity
 import ch.benediktkoeppel.code.droidplane.MainApplication
-import ch.benediktkoeppel.code.droidplane.R
 import ch.benediktkoeppel.code.droidplane.model.Mindmap
 import ch.benediktkoeppel.code.droidplane.model.MindmapIndexes
 import ch.benediktkoeppel.code.droidplane.model.MindmapNode
 import org.xmlpull.v1.XmlPullParser
 import org.xmlpull.v1.XmlPullParserException
 import org.xmlpull.v1.XmlPullParserFactory
-import java.io.FileNotFoundException
 import java.io.IOException
 import java.io.InputStream
 import java.util.Stack
@@ -22,6 +20,7 @@ import java.util.Stack
 class AsyncMindmapLoaderTask(
 // TODO: why is MainActivty needed here?
     private val mainActivity: MainActivity,
+    private val mm: InputStream? = null,
     private val onRootNodeLoadedListener: OnRootNodeLoadedListener,
     private val mindmap: Mindmap,
     private val intent: Intent
@@ -30,46 +29,7 @@ class AsyncMindmapLoaderTask(
 
     override fun doInBackground(vararg p0: String?): Any? {
         // prepare loading of the Mindmap file
-
-        var mm: InputStream? = null
-
-        // determine whether we are started from the EDIT or VIEW intent, or whether we are started from the
-        // launcher started from ACTION_EDIT/VIEW intent
-        if ((Intent.ACTION_EDIT == action || Intent.ACTION_VIEW == action) ||
-            Intent.ACTION_OPEN_DOCUMENT == action
-        ) {
-            Log.d(MainApplication.TAG, "started from ACTION_EDIT/VIEW intent")
-
-            // get the URI to the target document (the Mindmap we are opening) and open the InputStream
-            val uri = intent.data
-            if (uri != null) {
-                val cr = mainActivity.contentResolver
-                try {
-                    mm = cr.openInputStream(uri)
-                } catch (e: FileNotFoundException) {
-                    mainActivity.abortWithPopup(R.string.filenotfound)
-                    e.printStackTrace()
-                }
-            } else {
-                mainActivity.abortWithPopup(R.string.novalidfile)
-            }
-
-            // store the Uri. Next time the MainActivity is started, we'll
-            // check whether the Uri has changed (-> load new document) or
-            // remained the same (-> reuse previous document)
-            mindmap.uri = uri
-        } else {
-            Log.d(MainApplication.TAG, "started from app launcher intent")
-
-            // display the default Mindmap "example.mm", from the resources
-            mm = mainActivity.applicationContext.resources.openRawResource(R.raw.example)
-        }
-
-        // load the mindmap
-        Log.d(MainApplication.TAG, "InputStream fetched, now starting to load document")
-
         loadDocument(mm)
-
         return null
     }
 

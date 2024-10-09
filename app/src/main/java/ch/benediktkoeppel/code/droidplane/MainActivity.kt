@@ -16,9 +16,6 @@ import android.view.MenuItem
 import android.view.View
 import android.widget.AdapterView.AdapterContextMenuInfo
 import android.widget.LinearLayout
-import androidx.activity.compose.setContent
-import androidx.compose.material3.Text
-import androidx.compose.runtime.collectAsState
 import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.ViewModelProvider
 import ch.benediktkoeppel.code.droidplane.controller.AsyncMindmapLoaderTask
@@ -27,6 +24,8 @@ import ch.benediktkoeppel.code.droidplane.model.Mindmap
 import ch.benediktkoeppel.code.droidplane.model.MindmapNode
 import ch.benediktkoeppel.code.droidplane.view.HorizontalMindmapView
 import ch.benediktkoeppel.code.droidplane.view.MindmapNodeLayout
+import java.io.FileNotFoundException
+import java.io.InputStream
 
 /**
  * The MainActivity can be started from the App Launcher, or with a File Open intent. If the MainApplication was
@@ -84,19 +83,48 @@ class MainActivity : FragmentActivity() {
                 }
             }
 
-            // load the file asynchronously
-            mindmap?.loadMindMap(isAnExternalMindMapEdit())
-            mindmap?.let {
+            mindmap?.apply {
+                // load the file asynchronously
+                if(isAnExternalMindMapEdit()){
+                    uri = intent.data
+                }
+//                getDocumentInputStream(isAnExternalMindMapEdit())
+
+                loadMindMap(isAnExternalMindMapEdit())
                 AsyncMindmapLoaderTask(
-                    this,
+                    this@MainActivity,
+                    getDocumentInputStream(isAnExternalMindMapEdit()) ,
                     onRootNodeLoadedListener,
-                    it,
+                    this,
                     intent
                 ).execute()
             }
         }
     }
 
+    private fun getDocumentInputStream(isAnExternalMindMapEdit: Boolean): InputStream? {
+        return if(isAnExternalMindMapEdit) {
+            val uri = intent.data
+            if (uri != null) {
+                val cr = contentResolver
+                try {
+                    cr.openInputStream(uri)
+                } catch (e: FileNotFoundException) {
+                    abortWithPopup(R.string.filenotfound)
+                    e.printStackTrace()
+                    null
+                }
+            } else {
+                abortWithPopup(R.string.novalidfile)
+                null
+            }
+        }else{
+            resources.openRawResource(R.raw.example)
+        }
+    }
+
+    // determine whether we are started from the EDIT or VIEW intent, or whether we are started from the
+    // launcher started from ACTION_EDIT/VIEW intent
     private fun isAnExternalMindMapEdit():Boolean = ACTION_EDIT == intent.action || ACTION_VIEW == intent.action || ACTION_OPEN_DOCUMENT == intent.action
 
     private fun setUpHorizontalMindmapView() {
