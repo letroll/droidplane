@@ -18,7 +18,10 @@ import android.widget.AdapterView.AdapterContextMenuInfo
 import android.widget.LinearLayout
 import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.ViewModelProvider
-import ch.benediktkoeppel.code.droidplane.controller.AsyncMindmapLoaderTask
+import ch.benediktkoeppel.code.droidplane.controller.NodeChange.AddedChild
+import ch.benediktkoeppel.code.droidplane.controller.NodeChange.NodeStyleChanged
+import ch.benediktkoeppel.code.droidplane.controller.NodeChange.RichContentChanged
+import ch.benediktkoeppel.code.droidplane.controller.NodeChange.SubscribeNodeRichContentChanged
 import ch.benediktkoeppel.code.droidplane.controller.OnRootNodeLoadedListener
 import ch.benediktkoeppel.code.droidplane.model.Mindmap
 import ch.benediktkoeppel.code.droidplane.model.MindmapNode
@@ -88,16 +91,45 @@ class MainActivity : FragmentActivity() {
                 if(isAnExternalMindMapEdit()){
                     uri = intent.data
                 }
+
+                setMindmapIsLoading(true)
 //                getDocumentInputStream(isAnExternalMindMapEdit())
 
-                loadMindMap(isAnExternalMindMapEdit())
-                AsyncMindmapLoaderTask(
-                    this@MainActivity,
+                loadMindMap(
                     getDocumentInputStream(isAnExternalMindMapEdit()) ,
                     onRootNodeLoadedListener,
                     this,
-                    intent
-                ).execute()
+                    onLoadFinish = {
+                        isLoaded = true
+                        setMindmapIsLoading(false)
+                    }
+                    ,
+                    onNodeChange = { nodeChange->
+                        when(nodeChange) {
+                            is AddedChild -> {
+                                runOnUiThread {
+                                    nodeChange.parentNode.notifySubscribersAddedChildMindmapNode(nodeChange.childNode)
+                                }
+                            }
+
+                            is RichContentChanged -> {
+                                runOnUiThread {
+                                    nodeChange.node.notifySubscribersNodeRichContentChanged()
+                                }
+                            }
+
+                            is NodeStyleChanged -> {
+                                runOnUiThread {
+                                    nodeChange.node.notifySubscribersNodeStyleChanged()
+                                }
+                            }
+
+                            is SubscribeNodeRichContentChanged -> {
+                                nodeChange.node.subscribeNodeRichContentChanged(this@MainActivity)
+                            }
+                        }
+                    }
+                )
             }
         }
     }
