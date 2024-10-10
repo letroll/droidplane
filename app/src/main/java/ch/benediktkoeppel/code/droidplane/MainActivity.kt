@@ -16,17 +16,22 @@ import android.view.MenuItem
 import android.view.View
 import android.widget.AdapterView.AdapterContextMenuInfo
 import android.widget.LinearLayout
+import androidx.activity.compose.setContent
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.material3.Text
+import androidx.compose.runtime.collectAsState
 import androidx.fragment.app.FragmentActivity
-import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.lifecycleScope
 import ch.benediktkoeppel.code.droidplane.controller.NodeChange.AddedChild
 import ch.benediktkoeppel.code.droidplane.controller.NodeChange.NodeStyleChanged
 import ch.benediktkoeppel.code.droidplane.controller.NodeChange.RichContentChanged
 import ch.benediktkoeppel.code.droidplane.controller.NodeChange.SubscribeNodeRichContentChanged
 import ch.benediktkoeppel.code.droidplane.controller.OnRootNodeLoadedListener
-import ch.benediktkoeppel.code.droidplane.model.Mindmap
 import ch.benediktkoeppel.code.droidplane.model.MindmapNode
 import ch.benediktkoeppel.code.droidplane.view.HorizontalMindmapView
 import ch.benediktkoeppel.code.droidplane.view.MindmapNodeLayout
+import kotlinx.coroutines.launch
+import org.koin.androidx.viewmodel.ext.android.viewModel
 import java.io.FileNotFoundException
 import java.io.InputStream
 
@@ -38,47 +43,64 @@ import java.io.InputStream
  * before the screen rotate.
  */
 class MainActivity : FragmentActivity() {
-    private var mindmap: Mindmap? = null
 
-    /**
-     * HorizontalMindmapView that contains all NodeColumns
-     */
+    private val viewModel: MainViewModel by viewModel()
+
     var horizontalMindmapView: HorizontalMindmapView? = null
         private set
     private var menu: Menu? = null
-    private var mindmapIsLoading = false
 
     public override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
-        // enable the Android home button
-        enableHomeButton()
-//        setContent {
-//            val state = mindmap?.state?.collectAsState()
-//            Text("test")
-//        }
+        /*
+        feature de la bar
+        * affichage du titre plus icon et éventuellement du back
+        * ouverture du champ de recherche
+        * occurance suivante
+        * occurance précédente
+        * up
+        * top
+        * open
+        * help
 
-        // set up horizontal mindmap view first
+         */
+
+        setContent {
+            val state = viewModel.state.collectAsState()
+            Text("test")
+        }
+
+        // enable the Android home button
+//        enableHomeButton()
+
+        // set up horizontal viewModel view first
         setUpHorizontalMindmapView()
 
-        // get the Mindmap ViewModel
-        mindmap = ViewModelProvider(this)[Mindmap::class.java]
+        // get the MainViewModel ViewModel
+//        viewModel = ViewModelProvider(this)[MainViewModel::class.java]
 
-        // then populate view with mindmap
-        // if we already have a loaded mindmap, use this; otherwise load from the intent
-        if (mindmap?.isLoaded == true) {
-            horizontalMindmapView?.mindmap = mindmap
-            horizontalMindmapView?.deepestSelectedMindmapNode = mindmap?.rootNode
+        lifecycleScope.launch {
+            viewModel.state.collect { newState ->
+                menu?.findItem(R.id.mindmap_loading)?.setVisible(newState.loading)
+            }
+        }
+
+        // then populate view with viewModel
+        // if we already have a loaded viewModel, use this; otherwise load from the intent
+        if (viewModel.isLoaded) {
+            horizontalMindmapView?.viewModel = viewModel
+            horizontalMindmapView?.deepestSelectedMindmapNode = viewModel.rootNode
             horizontalMindmapView?.onRootNodeLoaded()
-            mindmap?.rootNode?.subscribeNodeRichContentChanged(this)
+            viewModel.rootNode?.subscribeNodeRichContentChanged(this)
         } else {
             val onRootNodeLoadedListener: OnRootNodeLoadedListener = object : OnRootNodeLoadedListener {
-                override fun rootNodeLoaded(mindmap: Mindmap?, rootNode: MindmapNode?) {
+                override fun rootNodeLoaded(viewModel: MainViewModel, rootNode: MindmapNode?) {
                     // now set up the view
                     val finalRootNode = rootNode
                     runOnUiThread {
-                        horizontalMindmapView?.mindmap = mindmap
+                        horizontalMindmapView?.viewModel = viewModel
                         // by default, the root node is the deepest node that is expanded
                         horizontalMindmapView?.deepestSelectedMindmapNode = finalRootNode
                         horizontalMindmapView?.onRootNodeLoaded()
@@ -86,10 +108,10 @@ class MainActivity : FragmentActivity() {
                 }
             }
 
-            mindmap?.apply {
+            viewModel.apply {
                 // load the file asynchronously
                 if(isAnExternalMindMapEdit()){
-                    uri = intent.data
+                    currentMindMapUri = intent.data
                 }
 
                 setMindmapIsLoading(true)
@@ -130,6 +152,24 @@ class MainActivity : FragmentActivity() {
                         }
                     }
                 )
+            }
+        }
+
+        registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+            if (result.resultCode == RESULT_OK) {
+                // The document selected by the user won't be returned in the intent. Instead, a URI to that document
+                // will be contained in the return intent provided to this method as a parameter. Pull that URI using
+                // resultData.getData().
+                result.data?.let {
+                    val uri = it.data
+                    Log.i(MainApplication.TAG, "Uri: " + uri.toString())
+
+                    // create a new intent (with URI) to open this document
+                    val openFileIntent = Intent(this, MainActivity::class.java)
+                    openFileIntent.setData(uri)
+                    openFileIntent.setAction(ACTION_OPEN_DOCUMENT)
+                    startActivity(openFileIntent)
+                }
             }
         }
     }
@@ -199,7 +239,6 @@ class MainActivity : FragmentActivity() {
         val inflater = menuInflater
         inflater.inflate(R.menu.main, menu)
         this.menu = menu
-        updateLoadingIndicatorOnUiThread()
         return true
     }
 
@@ -246,7 +285,7 @@ class MainActivity : FragmentActivity() {
      *
      * @see android.app.Activity#onContextItemSelected(android.view.MenuItem)
      */
-    @Suppress("deprecation") @SuppressLint("NewApi") override fun onContextItemSelected(item: MenuItem): Boolean {
+    override fun onContextItemSelected(item: MenuItem): Boolean {
         val contextMenuInfo = item.menuInfo as AdapterContextMenuInfo?
 
         // contextMenuInfo.position is the position in the ListView where the context menu was loaded, i.e. the index
@@ -292,7 +331,7 @@ class MainActivity : FragmentActivity() {
 
             MindmapNodeLayout.CONTEXT_MENU_ARROWLINK_GROUP_ID -> {
                 val nodeNumericId = item.itemId
-                val nodeByNumericID = mindmap?.getNodeByNumericID(nodeNumericId)
+                val nodeByNumericID = viewModel.getNodeByNumericID(nodeNumericId)
                 horizontalMindmapView?.downTo(this, nodeByNumericID, true)
             }
         }
@@ -305,11 +344,11 @@ class MainActivity : FragmentActivity() {
      *
      * @param stringResourceId
      */
-    fun abortWithPopup(stringResourceId: Int) {
+    private fun abortWithPopup(stringResourceId: Int) {
         val builder = Builder(this)
         builder.setMessage(stringResourceId)
         builder.setCancelable(true)
-        builder.setPositiveButton(R.string.ok) { dialog, which -> finish() }
+        builder.setPositiveButton(R.string.ok) { _, _ -> finish() }
 
         val alert = builder.create()
         alert.show()
@@ -318,7 +357,7 @@ class MainActivity : FragmentActivity() {
     /**
      * Fires an intent to spin up the "file chooser" UI and select an image.
      */
-    fun performFileSearch() {
+    private fun performFileSearch() {
         // ACTION_OPEN_DOCUMENT is the intent to choose a file via the system's file
         // browser.
 
@@ -330,46 +369,6 @@ class MainActivity : FragmentActivity() {
         intent.setType("*/*")
 
         startActivityForResult(intent, READ_REQUEST_CODE)
-    }
-
-    public override fun onActivityResult(
-        requestCode: Int, resultCode: Int,
-        resultData: Intent?
-    ) {
-        // The ACTION_OPEN_DOCUMENT intent was sent with the request code READ_REQUEST_CODE. If the request code seen
-        // here doesn't match, it's the response to some other intent, and the code below shouldn't run at all.
-
-        super.onActivityResult(requestCode, resultCode, resultData)
-        if (requestCode == READ_REQUEST_CODE && resultCode == RESULT_OK) {
-            // The document selected by the user won't be returned in the intent. Instead, a URI to that document
-            // will be contained in the return intent provided to this method as a parameter. Pull that URI using
-            // resultData.getData().
-            if (resultData != null) {
-                val uri = resultData.data
-                Log.i(MainApplication.TAG, "Uri: " + uri.toString())
-
-                // create a new intent (with URI) to open this document
-                val openFileIntent = Intent(this, MainActivity::class.java)
-                openFileIntent.setData(uri)
-                openFileIntent.setAction(ACTION_OPEN_DOCUMENT)
-                startActivity(openFileIntent)
-            }
-        }
-    }
-
-    fun setMindmapIsLoading(mindmapIsLoading: Boolean) {
-        this.mindmapIsLoading = mindmapIsLoading
-
-        // update the loading indicator in the menu
-        updateLoadingIndicatorOnUiThread()
-    }
-
-    private fun updateLoadingIndicatorOnUiThread() {
-        if (menu != null && menu?.findItem(R.id.mindmap_loading) != null) {
-            val mindmapLoadingIndicator = menu?.findItem(R.id.mindmap_loading)
-
-            runOnUiThread { mindmapLoadingIndicator?.setVisible(mindmapIsLoading) }
-        }
     }
 
     fun notifyNodeRichContentChanged() {

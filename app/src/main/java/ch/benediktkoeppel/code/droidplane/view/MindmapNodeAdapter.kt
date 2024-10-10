@@ -21,7 +21,7 @@ internal class MindmapNodeAdapter(context: Context, textViewResourceId: Int, pri
     @SuppressLint("InlinedApi") override fun getView(position: Int, convertView: View?, parent: ViewGroup): View {
         // when convertView != null, we should take the convertView and update it appropriately. Android is
         // optimizing the performance and thus recycling GUI elements. However, we don't want to recycle anything,
-        // because these are genuine Mindmap nodes. Recycling the view here would show one node twice in the tree,
+        // because these are genuine MainViewModel nodes. Recycling the view here would show one node twice in the tree,
         // while leaving out the actual node we should display.
 
         val view = mindmapNodeLayouts?.get(position)

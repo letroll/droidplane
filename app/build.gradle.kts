@@ -40,18 +40,23 @@ dependencies {
     implementation(libs.androidx.constraintlayout)
     annotationProcessor(libs.lombok)
 
-    implementation(libs.androidx.material3)
-
     val composeBom = platform("androidx.compose:compose-bom:2024.09.03")
     implementation(composeBom)
     testImplementation(composeBom)
     androidTestImplementation(composeBom)
-
     implementation(libs.androidx.activity.compose)
-
-    // Android Studio Preview support
     implementation(libs.androidx.ui.tooling.preview)
     debugImplementation(libs.androidx.ui.tooling)
+
+    implementation(libs.androidx.material3)
+
+    implementation(project.dependencies.platform(libs.koin.bom))
+    implementation(libs.koin.android)
+    implementation(libs.koin.core)
+    implementation(libs.koin.compose)
+    implementation(libs.koin.compose.viewmodel)
+    implementation(libs.koin.compose.viewmodel.navigation)
+
 
     // UI Tests
     androidTestImplementation(libs.androidx.ui.test.junit4)

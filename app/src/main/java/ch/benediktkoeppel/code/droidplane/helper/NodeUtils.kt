@@ -2,7 +2,7 @@ package ch.benediktkoeppel.code.droidplane.helper
 
 import android.net.Uri
 import android.util.Pair
-import ch.benediktkoeppel.code.droidplane.model.Mindmap
+import ch.benediktkoeppel.code.droidplane.MainViewModel
 import ch.benediktkoeppel.code.droidplane.model.MindmapIndexes
 import ch.benediktkoeppel.code.droidplane.model.MindmapNode
 import org.xmlpull.v1.XmlPullParser
@@ -98,7 +98,7 @@ object NodeUtils {
     fun loadAndIndexNodesByIds(root: MindmapNode?): MindmapIndexes {
         // TODO: check if this optimization was necessary - otherwise go back to old implementation
 
-        // TODO: this causes us to load all mindmap nodes, defeating the lazy loading in ch.benediktkoeppel.code.droidplane.model.MindmapNode.getChildNodes
+        // TODO: this causes us to load all viewModel nodes, defeating the lazy loading in ch.benediktkoeppel.code.droidplane.model.MindmapNode.getChildNodes
 
         val stack = Stack<MindmapNode?>()
         stack.push(root)
@@ -135,7 +135,7 @@ object NodeUtils {
         return MindmapIndexes(newNodesById, newNodesByNumericId)
     }
 
-    fun parseNodeTag(mindmap: Mindmap, xpp: XmlPullParser, parentNode: MindmapNode?): MindmapNode {
+    fun parseNodeTag(viewModel: MainViewModel, xpp: XmlPullParser, parentNode: MindmapNode?): MindmapNode {
         val id = xpp.getAttributeValue(null, "ID")
         val numericId = try {
             id.replace("\\D+".toRegex(), "").toInt()
@@ -156,7 +156,7 @@ object NodeUtils {
         // get tree ID (of cloned node)
         val treeIdAttribute = xpp.getAttributeValue(null, "TREE_ID")
 
-        val newMindmapNode = MindmapNode(mindmap, parentNode, id, numericId, text, link, treeIdAttribute)
+        val newMindmapNode = MindmapNode(viewModel, parentNode, id, numericId, text, link, treeIdAttribute)
         return newMindmapNode
     }
 }

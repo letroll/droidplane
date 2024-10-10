@@ -150,8 +150,8 @@ class MindmapNodeLayout : LinearLayout {
     }
 
     /**
-     * Mindmap icons have names such as 'button-ok', but resources have to have names with pattern [a-z0-9_.]. This
-     * method translates the Mindmap icon names to Android resource names.
+     * MainViewModel icons have names such as 'button-ok', but resources have to have names with pattern [a-z0-9_.]. This
+     * method translates the MainViewModel icon names to Android resource names.
      *
      * @param iconName the icon name as it is specified in the XML
      * @return the name of the corresponding android resource icon
@@ -231,13 +231,13 @@ class MindmapNodeLayout : LinearLayout {
 
         val fragment = mindmapNode?.link?.fragment
 
-        val linkedInternal = mindmapNode?.mindmap?.getNodeByID(fragment)
+        val linkedInternal = mindmapNode?.viewModel?.getNodeByID(fragment)
 
         if (linkedInternal != null) {
             Log.d(MainApplication.TAG, "Opening internal node, $linkedInternal, with ID: $fragment")
 
-            // the internal linked node might be anywhere in the mindmap, i.e. on a completely separate branch than
-            // we are on currently. We need to go to the Top, and then descend into the mindmap to reach the right
+            // the internal linked node might be anywhere in the viewModel, i.e. on a completely separate branch than
+            // we are on currently. We need to go to the Top, and then descend into the viewModel to reach the right
             // point
             val mindmapView = mainActivity.horizontalMindmapView
             mindmapView?.downTo(mainActivity, linkedInternal, true)
@@ -267,18 +267,18 @@ class MindmapNodeLayout : LinearLayout {
 
         // try to open as relative file
         try {
-            // get path of mindmap file
+            // get path of viewModel file
             val fileName: String?
             if (mindmapNode?.link?.path?.startsWith("/") == true) {
                 // absolute filename
                 fileName = mindmapNode.link.path
             } else {
-                // link is relative to mindmap file
+                // link is relative to viewModel file
 
-                val mindmapPath = mindmapNode?.mindmap?.uri?.path
-                Log.d(MainApplication.TAG, "Mindmap path $mindmapPath")
+                val mindmapPath = mindmapNode?.viewModel?.currentMindMapUri?.path
+                Log.d(MainApplication.TAG, "MainViewModel path $mindmapPath")
                 val mindmapDirectoryPath = mindmapPath?.substring(0, mindmapPath.lastIndexOf("/"))
-                Log.d(MainApplication.TAG, "Mindmap directory path $mindmapDirectoryPath")
+                Log.d(MainApplication.TAG, "MainViewModel directory path $mindmapDirectoryPath")
                 fileName = mindmapDirectoryPath + "/" + mindmapNode?.link?.path
             }
             val file = File(fileName)

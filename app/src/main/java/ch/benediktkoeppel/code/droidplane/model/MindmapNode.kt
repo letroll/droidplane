@@ -3,6 +3,7 @@ package ch.benediktkoeppel.code.droidplane.model
 import android.net.Uri
 import android.text.Html
 import ch.benediktkoeppel.code.droidplane.MainActivity
+import ch.benediktkoeppel.code.droidplane.MainViewModel
 import ch.benediktkoeppel.code.droidplane.view.MindmapNodeLayout
 import ch.benediktkoeppel.code.droidplane.view.NodeColumn
 import java.lang.ref.WeakReference
@@ -15,9 +16,9 @@ import java.util.Locale
 //@Builder
 class MindmapNode(
     /**
-     * The mindmap, in which this node is
+     * The viewModel, in which this node is
      */
-    val mindmap: Mindmap,
+    val viewModel: MainViewModel,
     /**
      * The Parent MindmapNode
      */
@@ -120,9 +121,9 @@ class MindmapNode(
      *
      * @param node
      */
-    //    public MindmapNode(Node node, MindmapNode parentNode, Mindmap mindmap) {
+    //    public MindmapNode(Node node, MindmapNode parentNode, MainViewModel viewModel) {
     //
-    //        this.mindmap = mindmap;
+    //        this.viewModel = viewModel;
     //
     //        // store the parentNode
     //        this.parentNode = parentNode;
@@ -245,7 +246,7 @@ class MindmapNode(
 
         if (treeIdAttribute != null && treeIdAttribute != "") {
             // TODO this now fails when loading, because the background indexing is not done yet - so we maybe should mark this as "pending", and put it into a queue, to be updated once the linked node is there
-            val linkedNode = mindmap.getNodeByID(treeIdAttribute)
+            val linkedNode = viewModel.getNodeByID(treeIdAttribute)
             if (linkedNode != null) {
                 return linkedNode.getNodeText()
             }
@@ -334,7 +335,7 @@ class MindmapNode(
         arrowLinkDestinationIds.add(destinationId)
     }
 
-    /** Depth-first search in the core text of the nodes in this sub-tree.  */ // TODO: this doesn't work while mindmap is still loading
+    /** Depth-first search in the core text of the nodes in this sub-tree.  */ // TODO: this doesn't work while viewModel is still loading
     fun search(searchString: String): List<MindmapNode> {
         val res = ArrayList<MindmapNode>()
         if (getNodeText()?.uppercase(Locale.getDefault())?.contains(searchString.uppercase(Locale.getDefault())) == true) { // TODO: npe here when text is null, because text is a rich text

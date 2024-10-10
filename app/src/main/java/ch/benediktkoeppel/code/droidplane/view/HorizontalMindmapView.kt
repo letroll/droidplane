@@ -24,7 +24,7 @@ import ch.benediktkoeppel.code.droidplane.MainActivity
 import ch.benediktkoeppel.code.droidplane.MainApplication
 import ch.benediktkoeppel.code.droidplane.R
 import ch.benediktkoeppel.code.droidplane.helper.AndroidHelper.getActivity
-import ch.benediktkoeppel.code.droidplane.model.Mindmap
+import ch.benediktkoeppel.code.droidplane.MainViewModel
 import ch.benediktkoeppel.code.droidplane.model.MindmapNode
 import java.util.Collections
 import kotlin.math.abs
@@ -57,10 +57,10 @@ class HorizontalMindmapView(private val mainActivity: MainActivity) : Horizontal
      */
     private val listViewToNodeColumn: MutableMap<ListView?, NodeColumn> = HashMap()
 
-    var mindmap: Mindmap? = null
+    var viewModel: MainViewModel? = null
 
     /**
-     * The deepest selected mindmap node
+     * The deepest selected viewModel node
      */
     var deepestSelectedMindmapNode: MindmapNode? = null
 
@@ -277,7 +277,7 @@ class HorizontalMindmapView(private val mainActivity: MainActivity) : Horizontal
     }
 
     /**
-     * Navigates to the top of the Mindmap
+     * Navigates to the top of the MainViewModel
      */
     fun top() {
         // remove all ListView layouts in linearLayout parent_list_view
@@ -285,27 +285,27 @@ class HorizontalMindmapView(private val mainActivity: MainActivity) : Horizontal
         removeAllColumns()
 
         // go down into the root node
-        mindmap?.rootNode?.let {
+        viewModel?.rootNode?.let {
             down(context, it)
         }
     }
 
     /**
-     * Navigates back up one level in the Mindmap, if possible (otherwise does nothing)
+     * Navigates back up one level in the MainViewModel, if possible (otherwise does nothing)
      */
     fun up() {
         up(false)
     }
 
     /**
-     * Navigates back up one level in the Mindmap. If we already display the root node, the application will finish
+     * Navigates back up one level in the MainViewModel. If we already display the root node, the application will finish
      */
     fun upOrClose() {
         up(true)
     }
 
     /**
-     * Navigates back up one level in the Mindmap, if possible. If force is true, the application closes if we can't
+     * Navigates back up one level in the MainViewModel, if possible. If force is true, the application closes if we can't
      * go further up
      *
      * @param force
@@ -369,7 +369,7 @@ class HorizontalMindmapView(private val mainActivity: MainActivity) : Horizontal
     }
 
     /**
-     * Navigate down the Mindmap to the specified node, opening each of it's parent nodes along the way.
+     * Navigate down the MainViewModel to the specified node, opening each of it's parent nodes along the way.
      * @param context
      * @param node
      */

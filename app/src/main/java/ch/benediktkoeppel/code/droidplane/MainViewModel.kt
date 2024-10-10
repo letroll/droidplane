@@ -1,11 +1,9 @@
-package ch.benediktkoeppel.code.droidplane.model
+package ch.benediktkoeppel.code.droidplane
 
 import android.net.Uri
 import android.util.Log
-import androidx.compose.runtime.MutableState
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import ch.benediktkoeppel.code.droidplane.MainApplication
 import ch.benediktkoeppel.code.droidplane.controller.NodeChange
 import ch.benediktkoeppel.code.droidplane.controller.NodeChange.AddedChild
 import ch.benediktkoeppel.code.droidplane.controller.NodeChange.NodeStyleChanged
@@ -14,6 +12,8 @@ import ch.benediktkoeppel.code.droidplane.controller.NodeChange.SubscribeNodeRic
 import ch.benediktkoeppel.code.droidplane.controller.OnRootNodeLoadedListener
 import ch.benediktkoeppel.code.droidplane.helper.NodeUtils
 import ch.benediktkoeppel.code.droidplane.helper.NodeUtils.fillArrowLinks
+import ch.benediktkoeppel.code.droidplane.model.MindmapIndexes
+import ch.benediktkoeppel.code.droidplane.model.MindmapNode
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
@@ -24,9 +24,9 @@ import java.io.InputStream
 import java.util.Stack
 
 /**
- * Mindmap handles the loading and storing of a mind map document.
+ * MainViewModel handles the loading and storing of a mind map document.
  */
-class Mindmap : ViewModel() {
+class MainViewModel : ViewModel() {
    data class State(val loading:Boolean){
        internal companion object{
            internal fun defaults() = State(
@@ -35,40 +35,16 @@ class Mindmap : ViewModel() {
        }
    }
     private val _state: MutableStateFlow<State> = MutableStateFlow(State.defaults())
-    public val state: StateFlow<State> = _state
+    val state: StateFlow<State> = _state
 
-    /**
-     * Returns the Uri which is currently loaded in document.
-     *
-     * @return Uri
-     */
-    /**
-     * Set the Uri after loading a new document.
-     *
-     * @param uri
-     */
-    /**
-     * The currently loaded Uri
-     */
-    @JvmField var uri: Uri? = null
-
-    /**
-     * Returns the root node of the currently loaded mind map
-     *
-     * @return the root node
-     */
-    /**
-     * The root node of the document.
-     */
-    @JvmField var rootNode: MindmapNode? = null
+    var currentMindMapUri: Uri? = null
+    var rootNode: MindmapNode? = null
 
     /**
      * A map that resolves node IDs to Node objects
      */
-    @JvmField var mindmapIndexes: MindmapIndexes? = null
-
-    // whether the mindmap has finished loading
-    @JvmField var isLoaded: Boolean = false
+    var mindmapIndexes: MindmapIndexes? = null
+    var isLoaded: Boolean = false
 
     /**
      * Returns the node for a given Node ID
@@ -80,6 +56,14 @@ class Mindmap : ViewModel() {
 
     fun getNodeByNumericID(numericId: Int?): MindmapNode? = mindmapIndexes?.nodesByNumericIndex?.get(numericId)
 
+
+    fun setMindmapIsLoading(mindmapIsLoading: Boolean) {
+        _state.update {
+            it.copy(
+                loading = mindmapIsLoading
+            )
+        }
+    }
     /**
      * Loads a mind map (*.mm) XML document into its internal DOM tree
      *
@@ -88,7 +72,7 @@ class Mindmap : ViewModel() {
     fun loadMindMap(
         mm: InputStream? = null,
         onRootNodeLoadedListener: OnRootNodeLoadedListener,
-        mindmap: Mindmap,
+        viewModel: MainViewModel,
         onNodeChange:(nodeChange: NodeChange) -> Unit,
         onLoadFinish:()->Unit,
         //TOPO remove lambda and use state
@@ -123,7 +107,7 @@ class Mindmap : ViewModel() {
                                 parentNode = nodeStack.peek()
                             }
 
-                            val newMindmapNode = NodeUtils.parseNodeTag(mindmap,xpp, parentNode)
+                            val newMindmapNode = NodeUtils.parseNodeTag(viewModel,xpp, parentNode)
                             nodeStack.push(newMindmapNode)
                             numNodes += 1
 
@@ -132,8 +116,8 @@ class Mindmap : ViewModel() {
                             // if we don't have a parent node, then this is the root node
                             if (parentNode == null) {
                                 rootNode = newMindmapNode
-                                mindmap.rootNode = rootNode
-                                onRootNodeLoadedListener.rootNodeLoaded(mindmap, rootNode)
+                                viewModel.rootNode = rootNode
+                                onRootNodeLoadedListener.rootNodeLoaded(viewModel, rootNode)
                             } else {
                                 parentNode.addChildMindmapNode(newMindmapNode)
                                 if (parentNode.hasAddedChildMindmapNodeSubscribers()) {
@@ -163,7 +147,7 @@ class Mindmap : ViewModel() {
                             } else {
                                 val richTextContent = NodeUtils.loadRichContentNodes(xpp)
 
-                                // if we have no parent node, something went seriously wrong - we can't have a richcontent that is not part of a mindmap node
+                                // if we have no parent node, something went seriously wrong - we can't have a richcontent that is not part of a viewModel node
                                 check(!nodeStack.empty()) { "Received richtext without a parent node" }
 
                                 val parentNode = nodeStack.peek()
@@ -177,7 +161,7 @@ class Mindmap : ViewModel() {
                         } else if (xpp.name == "font") {
                             val boldAttribute = xpp.getAttributeValue(null, "BOLD")
 
-                            // if we have no parent node, something went seriously wrong - we can't have a font node that is not part of a mindmap node
+                            // if we have no parent node, something went seriously wrong - we can't have a font node that is not part of a viewModel node
                             check(!nodeStack.empty()) { "Received richtext without a parent node" }
                             val parentNode = nodeStack.peek()
 
@@ -197,7 +181,7 @@ class Mindmap : ViewModel() {
                         } else if (xpp.name == "icon" && xpp.getAttributeValue(null, "BUILTIN") != null) {
                             val iconName = xpp.getAttributeValue(null, "BUILTIN")
 
-                            // if we have no parent node, something went seriously wrong - we can't have icons that is not part of a mindmap node
+                            // if we have no parent node, something went seriously wrong - we can't have icons that is not part of a viewModel node
                             check(!nodeStack.empty()) { "Received icon without a parent node" }
 
                             val parentNode = nodeStack.peek()
@@ -210,7 +194,7 @@ class Mindmap : ViewModel() {
                         } else if (xpp.name == "arrowlink") {
                             val destinationId = xpp.getAttributeValue(null, "DESTINATION")
 
-                            // if we have no parent node, something went seriously wrong - we can't have icons that is not part of a mindmap node
+                            // if we have no parent node, something went seriously wrong - we can't have icons that is not part of a viewModel node
                             check(!nodeStack.empty()) { "Received arrowlink without a parent node" }
 
                             val parentNode = nodeStack.peek()
@@ -224,7 +208,7 @@ class Mindmap : ViewModel() {
                             completedMindmapNode.loaded = true
                         }
                     } else if (eventType == XmlPullParser.TEXT) {
-                        // do we have TEXT nodes in the mindmap at all?
+                        // do we have TEXT nodes in the viewModel at all?
                     } else {
                         throw IllegalStateException("Received unknown event $eventType")
                     }
@@ -244,18 +228,18 @@ class Mindmap : ViewModel() {
 
             // load all nodes of root node into simplified MindmapNode, and index them by ID for faster lookup
             val mindmapIndexes = NodeUtils.loadAndIndexNodesByIds(rootNode)
-            mindmap.mindmapIndexes = mindmapIndexes
+            viewModel.mindmapIndexes = mindmapIndexes
 
             // Nodes can refer to other nodes with arrowlinks. We want to have the link on both ends of the link, so we can
             // now set the corresponding links
-            fillArrowLinks(mindmap.mindmapIndexes?.nodesByIdIndex)
+            fillArrowLinks(viewModel.mindmapIndexes?.nodesByIdIndex)
 
 //        val loadDocumentEndTime = System.currentTimeMillis()
             Log.d(MainApplication.TAG, "Document loaded")
 
             //long numNodes = document.getElementsByTagName("node").getLength();
 
-            // now the full mindmap is loaded
+            // now the full viewModel is loaded
             onLoadFinish()
         }
     }
