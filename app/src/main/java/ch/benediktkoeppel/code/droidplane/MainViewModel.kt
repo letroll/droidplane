@@ -27,15 +27,18 @@ import java.util.Stack
  * MainViewModel handles the loading and storing of a mind map document.
  */
 class MainViewModel : ViewModel() {
-   data class State(val loading:Boolean){
+   data class MainUiState(
+       val loading:Boolean,
+//       val nodes:List<>
+   ){
        internal companion object{
-           internal fun defaults() = State(
+           internal fun defaults() = MainUiState(
                loading = true
            )
        }
    }
-    private val _state: MutableStateFlow<State> = MutableStateFlow(State.defaults())
-    val state: StateFlow<State> = _state
+    private val _uiState: MutableStateFlow<MainUiState> = MutableStateFlow(MainUiState.defaults())
+    val uiState: StateFlow<MainUiState> = _uiState
 
     var currentMindMapUri: Uri? = null
     var rootNode: MindmapNode? = null
@@ -44,7 +47,6 @@ class MainViewModel : ViewModel() {
      * A map that resolves node IDs to Node objects
      */
     var mindmapIndexes: MindmapIndexes? = null
-    var isLoaded: Boolean = false
 
     /**
      * Returns the node for a given Node ID
@@ -58,7 +60,7 @@ class MainViewModel : ViewModel() {
 
 
     fun setMindmapIsLoading(mindmapIsLoading: Boolean) {
-        _state.update {
+        _uiState.update {
             it.copy(
                 loading = mindmapIsLoading
             )
@@ -70,15 +72,14 @@ class MainViewModel : ViewModel() {
      * @param inputStream the inputStream to load
      */
     fun loadMindMap(
-        mm: InputStream? = null,
+        inputStream: InputStream? = null,
         onRootNodeLoadedListener: OnRootNodeLoadedListener,
         viewModel: MainViewModel,
         onNodeChange:(nodeChange: NodeChange) -> Unit,
-        onLoadFinish:()->Unit,
-        //TOPO remove lambda and use state
+        //TODO remove lambda and use state
     ) {
         viewModelScope.launch {
-           _state.update {
+           _uiState.update {
                it.copy(
                    loading = true
                )
@@ -93,7 +94,7 @@ class MainViewModel : ViewModel() {
                 val factory = XmlPullParserFactory.newInstance()
                 factory.isNamespaceAware = true
                 val xpp = factory.newPullParser()
-                xpp.setInput(mm, "UTF-8")
+                xpp.setInput(inputStream, "UTF-8")
 
                 // stream parse the XML
                 var eventType = xpp.eventType
@@ -107,7 +108,7 @@ class MainViewModel : ViewModel() {
                                 parentNode = nodeStack.peek()
                             }
 
-                            val newMindmapNode = NodeUtils.parseNodeTag(viewModel,xpp, parentNode)
+                            val newMindmapNode = NodeUtils.parseNodeTag(xpp, parentNode)
                             nodeStack.push(newMindmapNode)
                             numNodes += 1
 
@@ -227,8 +228,7 @@ class MainViewModel : ViewModel() {
             // TODO: can we do this as we stream through the XML above?
 
             // load all nodes of root node into simplified MindmapNode, and index them by ID for faster lookup
-            val mindmapIndexes = NodeUtils.loadAndIndexNodesByIds(rootNode)
-            viewModel.mindmapIndexes = mindmapIndexes
+            viewModel.mindmapIndexes = NodeUtils.loadAndIndexNodesByIds(rootNode)
 
             // Nodes can refer to other nodes with arrowlinks. We want to have the link on both ends of the link, so we can
             // now set the corresponding links
@@ -238,9 +238,7 @@ class MainViewModel : ViewModel() {
             Log.d(MainApplication.TAG, "Document loaded")
 
             //long numNodes = document.getElementsByTagName("node").getLength();
-
-            // now the full viewModel is loaded
-            onLoadFinish()
+            setMindmapIsLoading(false)
         }
     }
 }

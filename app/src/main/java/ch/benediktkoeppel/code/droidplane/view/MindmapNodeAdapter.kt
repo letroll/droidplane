@@ -9,7 +9,15 @@ import android.widget.ArrayAdapter
 /**
  * The MindmapNodeAdapter is the data provider for the NodeColumn (respectively its ListView).
  */
-internal class MindmapNodeAdapter(context: Context, textViewResourceId: Int, private val mindmapNodeLayouts: List<MindmapNodeLayout>?) : ArrayAdapter<MindmapNodeLayout?>(context, textViewResourceId, mindmapNodeLayouts?: emptyList()) {
+internal class MindmapNodeAdapter(
+    context: Context,
+    textViewResourceId: Int,
+    private val mindmapNodeLayouts: List<MindmapNodeLayout>?,
+) : ArrayAdapter<MindmapNodeLayout?>(
+    context,
+    textViewResourceId,
+    mindmapNodeLayouts ?: emptyList()
+) {
 
     /**
      * getView is responsible to return a view for each individual element in the ListView

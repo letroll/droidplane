@@ -13,7 +13,10 @@ import android.widget.AdapterView.AdapterContextMenuInfo
 import android.widget.AdapterView.OnItemClickListener
 import android.widget.LinearLayout
 import android.widget.ListView
+import androidx.core.view.get
+import androidx.core.view.indices
 import ch.benediktkoeppel.code.droidplane.MainApplication
+import ch.benediktkoeppel.code.droidplane.MainViewModel
 import ch.benediktkoeppel.code.droidplane.R
 import ch.benediktkoeppel.code.droidplane.model.MindmapNode
 
@@ -33,12 +36,12 @@ class NodeColumn : LinearLayout, OnCreateContextMenuListener {
      */
     val parentNode: MindmapNode?
     private val context: Context
+    var viewModel: MainViewModel? = null
 
     /**
      * The list of all MindmapNodeLayouts which we display in this column
      */
-    //TODO replace arraylist by mutablelist
-    private var mindmapNodeLayouts: ArrayList<MindmapNodeLayout>? = null
+    private var mindmapNodeLayouts= mutableListOf<MindmapNodeLayout>()
 
     /**
      * The adapter for this column
@@ -79,27 +82,30 @@ class NodeColumn : LinearLayout, OnCreateContextMenuListener {
      * @param context
      * @param parent
      */
-    constructor(context: Context, parent: MindmapNode) : super(context) {
+    constructor(
+        context: Context,
+        parent: MindmapNode,
+        viewModel: MainViewModel,
+    ) : super(context) {
         this.context = context
-
+        this.viewModel = viewModel
         this.parentNode = parent
 
         parent.subscribe(this)
 
         // create list items for each child node
-        mindmapNodeLayouts = ArrayList()
         val mindmapNodes: List<MindmapNode> = parent.childMindmapNodes
         for (mindmapNode in mindmapNodes) {
-            mindmapNodeLayouts?.add(MindmapNodeLayout(context, mindmapNode))
+            mindmapNodeLayouts.add(MindmapNodeLayout(context, mindmapNode, viewModel))
         }
 
         // define the layout of this LinearView
         val linearViewHeight = LayoutParams.MATCH_PARENT
-        val linearViewWidth = getOptimalColumnWidth(context)
+        val linearViewWidth = getOptimalColumnWidth()
         val linearViewLayout = LayoutParams(linearViewWidth, linearViewHeight)
         layoutParams = linearViewLayout
         setPadding(0, 0, 1, 0)
-        setBackgroundColor(context.resources.getColor(android.R.color.darker_gray))
+        setBackgroundColor(resources.getColor(android.R.color.darker_gray))
 
         // create a ListView
         listView = ListView(context)
@@ -110,10 +116,10 @@ class NodeColumn : LinearLayout, OnCreateContextMenuListener {
         val listViewWidth = LayoutParams.MATCH_PARENT
         val listViewLayout = ViewGroup.LayoutParams(listViewWidth, listViewHeight)
         listView?.layoutParams = listViewLayout
-        listView?.setBackgroundColor(context.resources.getColor(android.R.color.background_light))
+        listView?.setBackgroundColor(resources.getColor(android.R.color.background_light))
 
         // create adapter (i.e. data provider) for the column
-        adapter = MindmapNodeAdapter(getContext(), R.layout.mindmap_node_list_item, mindmapNodeLayouts)
+        adapter = MindmapNodeAdapter(context, R.layout.mindmap_node_list_item, mindmapNodeLayouts)
 
         // add the content adapter
         listView?.adapter = adapter
@@ -126,7 +132,9 @@ class NodeColumn : LinearLayout, OnCreateContextMenuListener {
     }
 
     fun notifyNewMindmapNode(mindmapNode: MindmapNode) {
-        mindmapNodeLayouts?.add(MindmapNodeLayout(context, mindmapNode))
+        viewModel?.let {
+            mindmapNodeLayouts.add(MindmapNodeLayout(context, mindmapNode, it))
+        }
         adapter?.notifyDataSetChanged()
     }
 
@@ -149,22 +157,19 @@ class NodeColumn : LinearLayout, OnCreateContextMenuListener {
      */
     fun deselectAllNodes() {
         // deselect all nodes
-        mindmapNodeLayouts?.let {
-            for (mindmapNodeLayout in it) {
-            val mindmapNode = mindmapNodeLayout.mindmapNode
-            mindmapNode?.isSelected = false
+        for (mindmapNodeLayout in mindmapNodeLayouts) {
+            mindmapNodeLayout.mindmapNode?.isSelected = false
         }
 
-            // then notify about the GUI change
-            adapter?.notifyDataSetChanged()
-        }
+        // then notify about the GUI change
+        adapter?.notifyDataSetChanged()
     }
 
     /**
      * Resizes the column to its optimal column width
      */
-    fun resizeColumnWidth(context: Context) {
-        setWidth(getOptimalColumnWidth(context))
+    fun resizeColumnWidth() {
+        setWidth(getOptimalColumnWidth())
     }
 
     /**
@@ -173,16 +178,12 @@ class NodeColumn : LinearLayout, OnCreateContextMenuListener {
      * @param position the position from which the MindmapNodeLayout should be returned
      * @return MindmapNodeLayout
      */
-    fun getNodeAtPosition(position: Int): MindmapNodeLayout? {
-        return mindmapNodeLayouts?.get(position)
-    }
+    fun getNodeAtPosition(position: Int): MindmapNodeLayout = mindmapNodeLayouts[position]
 
     private fun getPositionOf(node: MindmapNode): Int {
-        mindmapNodeLayouts?.let {
-            for (i in it.indices) {
-                if (it[i].mindmapNode == node) {
-                    return i
-                }
+        for (i in mindmapNodeLayouts.indices) {
+            if (mindmapNodeLayouts[i].mindmapNode == node) {
+                return i
             }
         }
         return 0
@@ -238,39 +239,34 @@ class NodeColumn : LinearLayout, OnCreateContextMenuListener {
         val contextMenuInfo = menuInfo as AdapterContextMenuInfo
 
         // get the clicked node
-        mindmapNodeLayouts?.let {
-            val clickedNode = it[contextMenuInfo.position]
+        val clickedNode = mindmapNodeLayouts[contextMenuInfo.position]
 
-            // forward the event to the clicked node
-            clickedNode.onCreateContextMenu(menu)
-        }
+        // forward the event to the clicked node
+        clickedNode.onCreateContextMenu(menu)
     }
 
-    companion object {
-        /**
-         * Calculates the column width which this column should have
-         *
-         * @return
-         */
-        private fun getOptimalColumnWidth(context: Context): Int {
-            // and R.integer.horizontally_visible_panes defines how many columns should be visible side by side
-            // so we need 1/(horizontally_visible_panes) * displayWidth as column width
+    /**
+     * Calculates the column width which this column should have
+     *
+     * @return
+     */
+    private fun getOptimalColumnWidth(): Int {
+        // and R.integer.horizontally_visible_panes defines how many columns should be visible side by side
+        // so we need 1/(horizontally_visible_panes) * displayWidth as column width
 
-            val resources = context.resources
-            val horizontallyVisiblePanes = resources.getInteger(R.integer.horizontally_visible_panes)
-            val display = (context.getSystemService(Context.WINDOW_SERVICE) as WindowManager).defaultDisplay
-            val displayWidth: Int
+        val horizontallyVisiblePanes = resources.getInteger(R.integer.horizontally_visible_panes)
+        val display = (context.getSystemService(Context.WINDOW_SERVICE) as WindowManager).defaultDisplay
+        val displayWidth: Int
 
-            // get the Display width
-            val displaySize = Point()
-            display.getSize(displaySize)
-            displayWidth = displaySize.x
-            val columnWidth = displayWidth / horizontallyVisiblePanes
+        // get the Display width
+        val displaySize = Point()
+        display.getSize(displaySize)
+        displayWidth = displaySize.x
+        val columnWidth = displayWidth / horizontallyVisiblePanes
 
-            Log.d(MainApplication.TAG, "Calculated column width = $columnWidth")
+        Log.d(MainApplication.TAG, "Calculated column width = $columnWidth")
 
-            return columnWidth
-        }
+        return columnWidth
     }
 }
 

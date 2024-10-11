@@ -2,7 +2,6 @@ package ch.benediktkoeppel.code.droidplane.view
 
 import android.app.Activity
 import android.app.AlertDialog.Builder
-import android.content.Context
 import android.content.DialogInterface
 import android.os.Handler
 import android.text.Html
@@ -25,11 +24,16 @@ import ch.benediktkoeppel.code.droidplane.MainApplication
 import ch.benediktkoeppel.code.droidplane.R
 import ch.benediktkoeppel.code.droidplane.helper.AndroidHelper.getActivity
 import ch.benediktkoeppel.code.droidplane.MainViewModel
+import ch.benediktkoeppel.code.droidplane.helper.NodeUtils
+import ch.benediktkoeppel.code.droidplane.helper.NodeUtils.openRichText
 import ch.benediktkoeppel.code.droidplane.model.MindmapNode
-import java.util.Collections
 import kotlin.math.abs
 
-class HorizontalMindmapView(private val mainActivity: MainActivity) : HorizontalScrollView(mainActivity), OnTouchListener, OnItemClickListener {
+class HorizontalMindmapView(
+    private val mainActivity: MainActivity,
+    val onToolbarTitleUpdate: (String) -> Unit,
+    val enableBackPress: (Boolean) -> Unit,
+) : HorizontalScrollView(mainActivity), OnTouchListener, OnItemClickListener {
     /**
      * HorizontalScrollView can only have one view, so we need to add a LinearLayout underneath it, and then stuff
      * all NodeColumns into this linearLayout.
@@ -43,7 +47,7 @@ class HorizontalMindmapView(private val mainActivity: MainActivity) : Horizontal
     // TODO: why does the view need access to the mainActivity?
 
     // list where all columns are stored
-    private val nodeColumns: MutableList<NodeColumn> = ArrayList()
+    private val nodeColumns: MutableList<NodeColumn> = mutableListOf()
 
     /**
      * Gesture detector
@@ -57,7 +61,7 @@ class HorizontalMindmapView(private val mainActivity: MainActivity) : Horizontal
      */
     private val listViewToNodeColumn: MutableMap<ListView?, NodeColumn> = HashMap()
 
-    var viewModel: MainViewModel? = null
+    var mainViewModel: MainViewModel? = null
 
     /**
      * The deepest selected viewModel node
@@ -98,14 +102,14 @@ class HorizontalMindmapView(private val mainActivity: MainActivity) : Horizontal
         setOnTouchListener(this)
 
         // fix the widths of all columns
-        resizeAllColumns(context)
+        resizeAllColumns()
     }
 
     // TODO: comment missing
     fun onRootNodeLoaded() {
         // expand the selected node chain
 
-        downTo(context, this.deepestSelectedMindmapNode, true)
+        downTo(this.deepestSelectedMindmapNode, true)
 
         // and then scroll to the right
         scrollToRight()
@@ -176,9 +180,9 @@ class HorizontalMindmapView(private val mainActivity: MainActivity) : Horizontal
     /**
      * Adjusts the width of all columns in the HorizontalMindmapView
      */
-    private fun resizeAllColumns(context: Context) {
+    private fun resizeAllColumns() {
         for (nodeColumn in nodeColumns) {
-            nodeColumn.resizeColumnWidth(context)
+            nodeColumn.resizeColumnWidth()
         }
     }
 
@@ -230,12 +234,12 @@ class HorizontalMindmapView(private val mainActivity: MainActivity) : Horizontal
          * @return Title of the right most parent node or an empty string.
          */
         get() {
-            if (!nodeColumns.isEmpty()) {
+            if (nodeColumns.isNotEmpty()) {
                 val parent = nodeColumns[nodeColumns.size - 1].parentNode
-                val text = parent?.getNodeText()
-                if (text != null && !text.isEmpty()) {
+                val text = mainViewModel?.let { parent?.getNodeText(it) }
+                if (!text.isNullOrEmpty()) {
                     return text
-                } else if (parent?.richTextContents != null && !parent.richTextContents.isEmpty()) {
+                } else if (parent?.richTextContents != null && parent.richTextContents.isNotEmpty()) {
                     val richTextContent = parent.richTextContents[0]
                     return Html.fromHtml(richTextContent).toString()
                 } else {
@@ -285,8 +289,8 @@ class HorizontalMindmapView(private val mainActivity: MainActivity) : Horizontal
         removeAllColumns()
 
         // go down into the root node
-        viewModel?.rootNode?.let {
-            down(context, it)
+        mainViewModel?.rootNode?.let {
+            down(it)
         }
     }
 
@@ -319,10 +323,10 @@ class HorizontalMindmapView(private val mainActivity: MainActivity) : Horizontal
         }
 
         // enable the up navigation with the Home (app) button (top left corner)
-        enableHomeButtonIfEnoughColumns(context)
+        enableHomeButtonIfEnoughColumns()
 
         // get the title of the parent of the rightmost column (i.e. the selected node in the 2nd-rightmost column)
-        setApplicationTitle(context)
+        setApplicationTitle()
     }
 
     /**
@@ -331,55 +335,60 @@ class HorizontalMindmapView(private val mainActivity: MainActivity) : Horizontal
      *
      * @param node
      */
-    private fun down(context: Context, node: MindmapNode) {
+    private fun down(node: MindmapNode) {
         // add a new column for this node and add it to the HorizontalMindmapView
-
-        var nodeColumn: NodeColumn
         synchronized(node) {
-            if (node.parentNode != null) {
-                synchronized(node.parentNode) {
-                    nodeColumn = NodeColumn(getContext(), node)
+            val nodeColumn: NodeColumn
+            mainViewModel?.let { vm->
+                if (node.parentNode != null) {
+                    synchronized(node.parentNode) {
+                        nodeColumn = NodeColumn(context, node, vm)
+                        addColumn(nodeColumn)
+
+                        // keep track of which list view belongs to which node column. This is necessary because onItemClick will get a
+                        // ListView (the one that was clicked), and we need to know which NodeColumn this is.
+                        val nodeColumnListView = nodeColumn.listView
+                        listViewToNodeColumn[nodeColumnListView] = nodeColumn
+                    }
+                } else {
+                    nodeColumn = NodeColumn(context, node, vm)
                     addColumn(nodeColumn)
+
+                    // keep track of which list view belongs to which node column. This is necessary because onItemClick will get a
+                    // ListView (the one that was clicked), and we need to know which NodeColumn this is.
+                    val nodeColumnListView = nodeColumn.listView
+                    listViewToNodeColumn[nodeColumnListView] = nodeColumn
                 }
-            } else {
-                nodeColumn = NodeColumn(getContext(), node)
-                addColumn(nodeColumn)
             }
+
+            // then scroll all the way to the right
+            scrollToRight()
+
+            // enable the up navigation with the Home (app) button (top left corner)
+            enableHomeButtonIfEnoughColumns()
+
+            // get the title of the parent of the rightmost column (i.e. the selected node in the 2nd-rightmost column)
+            setApplicationTitle()
+
+            // mark node as selected
+            node.isSelected = true
+
+            // keep track in the mind map which node is currently selected
+            this.deepestSelectedMindmapNode = node
         }
-
-        // keep track of which list view belongs to which node column. This is necessary because onItemClick will get a
-        // ListView (the one that was clicked), and we need to know which NodeColumn this is.
-        val nodeColumnListView = nodeColumn.listView
-        listViewToNodeColumn[nodeColumnListView] = nodeColumn
-
-        // then scroll all the way to the right
-        scrollToRight()
-
-        // enable the up navigation with the Home (app) button (top left corner)
-        enableHomeButtonIfEnoughColumns(context)
-
-        // get the title of the parent of the rightmost column (i.e. the selected node in the 2nd-rightmost column)
-        setApplicationTitle(context)
-
-        // mark node as selected
-        node.isSelected = true
-
-        // keep track in the mind map which node is currently selected
-        this.deepestSelectedMindmapNode = node
     }
 
     /**
      * Navigate down the MainViewModel to the specified node, opening each of it's parent nodes along the way.
-     * @param context
      * @param node
      */
-    fun downTo(context: Context, node: MindmapNode?, openLast: Boolean) {
+    fun downTo(node: MindmapNode?, openLast: Boolean) {
         // first navigate back to the top (essentially closing all other nodes)
 
         top()
 
         // go upwards from the target node, and keep track of each node leading down to the target node
-        val nodeHierarchy: MutableList<MindmapNode> = ArrayList()
+        val nodeHierarchy: MutableList<MindmapNode> = mutableListOf()
         var tmpNode = node
         while (tmpNode?.parentNode != null) {   // TODO: this gives a NPE when rotating the device
             nodeHierarchy.add(tmpNode)
@@ -387,14 +396,14 @@ class HorizontalMindmapView(private val mainActivity: MainActivity) : Horizontal
         }
 
         // reverse the list, so that we start with the root node
-        Collections.reverse(nodeHierarchy)
+        nodeHierarchy.reverse()
 
         // descent from the root node down to the target node
         for (mindmapNode in nodeHierarchy) {
             mindmapNode.isSelected = true
             scrollTo(mindmapNode)
             if ((mindmapNode != node || openLast) && mindmapNode.numChildMindmapNodes > 0) {
-                down(context, mindmapNode)
+                down(mindmapNode)
             }
         }
     }
@@ -411,9 +420,8 @@ class HorizontalMindmapView(private val mainActivity: MainActivity) : Horizontal
      * Sets the application title to the name of the parent node of the rightmost column, which is the most recently
      * clicked node.
      */
-    fun setApplicationTitle(context: Context?) {
+    fun setApplicationTitle() {
         // TODO: this needs to update when richtext content is loaded
-
         // get the title of the parent of the rightmost column (i.e. the
         // selected node in the 2nd-rightmost column)
         // set the application title to this nodeTitle. If the nodeTitle is
@@ -421,32 +429,28 @@ class HorizontalMindmapView(private val mainActivity: MainActivity) : Horizontal
 
         val nodeTitle = titleOfRightmostParent
         Log.d(MainApplication.TAG, "nodeTitle = $nodeTitle")
-        if (nodeTitle == null || nodeTitle == "") {
-            Log.d(
-                MainApplication.TAG, "Setting application title to default string: " +
-                    resources.getString(R.string.app_name)
-            )
-            getActivity(context, Activity::class.java)?.setTitle(R.string.app_name)
-        } else {
-            Log.d(MainApplication.TAG, "Setting application title to node name: $nodeTitle")
-            getActivity(context, Activity::class.java)?.title = nodeTitle
-            // TODO: java.lang.NullPointerException: Attempt to invoke virtual method 'void android.app.Activity.setTitle(java.lang.CharSequence)' on a null object reference
-        }
+        onToolbarTitleUpdate(
+            if (nodeTitle.isEmpty()) {
+                Log.d(
+                    MainApplication.TAG, "Setting application title to default string: " +
+                        resources.getString(R.string.app_name)
+                )
+                context.getString(R.string.app_name)
+            } else {
+                Log.d(MainApplication.TAG, "Setting application title to node name: $nodeTitle")
+                nodeTitle
+            }
+        )
     }
 
     /**
      * Enables the Home button in the application if we have enough columns, i.e. if "Up" will remove a column.
      */
-    // TODO: the view should not do this
-    fun enableHomeButtonIfEnoughColumns(context: Context?) {
+    // TODO: the view should not do this, use view state for that in activity
+    fun enableHomeButtonIfEnoughColumns() {
         // if we only have one column (i.e. this is the root node), then we
         // disable the home button
-        val numberOfColumns = numberOfColumns
-        if (numberOfColumns >= 2) {
-            getActivity(context, MainActivity::class.java)?.enableHomeButton()
-        } else {
-            getActivity(context, MainActivity::class.java)?.disableHomeButton()
-        }
+        enableBackPress(numberOfColumns >= 2)
     }
 
     /**
@@ -471,22 +475,20 @@ class HorizontalMindmapView(private val mainActivity: MainActivity) : Horizontal
         val clickedNode = clickedNodeColumn?.getNodeAtPosition(position)
 
         // if the clicked node has child nodes, we set it to selected and drill down
-        clickedNode?.let {
-            if ((clickedNode.mindmapNode?.numChildMindmapNodes ?: 0) > 0) {
-                // give it a special color
-
+        clickedNode?.apply {
+            if ((mindmapNode?.numChildMindmapNodes ?: 0) > 0) {
                 clickedNodeColumn.setItemColor(position)
 
                 // and drill down
-                clickedNode.mindmapNode?.let {
-                    down(mainActivity, it)
+                mindmapNode?.let {
+                    down(it)
                 }
-            } else if (clickedNode.mindmapNode?.link != null) {
-                clickedNode.openLink(mainActivity)
-            } else if (clickedNode.mindmapNode?.richTextContents?.isNotEmpty() == true) {
-                clickedNode.openRichText(mainActivity)
+            } else if (mindmapNode?.link != null) {
+                NodeUtils.openLink(mindmapNode, mainActivity)
+            } else if (mindmapNode?.richTextContents?.isNotEmpty() == true) {
+                openRichText(mindmapNode, mainActivity)
             } else {
-                setApplicationTitle(context)
+                setApplicationTitle()
             }
         }
     }
@@ -550,56 +552,56 @@ class HorizontalMindmapView(private val mainActivity: MainActivity) : Horizontal
      *
      * @return NodeColumn
      */
-    private fun getLeftmostVisibleColumn(): NodeColumn?{
-            // how much we are horizontally scrolled
-            val scrollX = scrollX
+    private fun getLeftmostVisibleColumn(): NodeColumn? {
+        // how much we are horizontally scrolled
+        val scrollX = scrollX
 
-            // how many columns fit into less than scrollX space? as soon as sumColumnWdiths > scrollX, we have just
-            // added the first visible column at the left.
-            var sumColumnWidths = 0
-            var leftmostVisibleColumn: NodeColumn? = null
-            for (i in nodeColumns.indices) {
-                sumColumnWidths += nodeColumns[i].width
+        // how many columns fit into less than scrollX space? as soon as sumColumnWdiths > scrollX, we have just
+        // added the first visible column at the left.
+        var sumColumnWidths = 0
+        var leftmostVisibleColumn: NodeColumn? = null
+        for (i in nodeColumns.indices) {
+            sumColumnWidths += nodeColumns[i].width
 
-                // if the sum of all columns so far exceeds scrollX, the current NodeColumn is (at least a little bit)
-                // visible
-                if (sumColumnWidths >= scrollX) {
-                    leftmostVisibleColumn = nodeColumns[i]
-                    break
-                }
+            // if the sum of all columns so far exceeds scrollX, the current NodeColumn is (at least a little bit)
+            // visible
+            if (sumColumnWidths >= scrollX) {
+                leftmostVisibleColumn = nodeColumns[i]
+                break
             }
-
-            return leftmostVisibleColumn
         }
+
+        return leftmostVisibleColumn
+    }
 
     /**
      * Get the number of pixels that are visible on the leftmost column.
      *
      * @return
      */
-    fun getVisiblePixelOfLeftmostColumn(): Int{
-            // how much we are horizontally scrolled
-            val scrollX = scrollX
+    fun getVisiblePixelOfLeftmostColumn(): Int {
+        // how much we are horizontally scrolled
+        val scrollX = scrollX
 
-            // how many columns fit into less than scrollX space? as soon as
-            // sumColumnWdiths > scrollX, we have just added the first visible
-            // column at the left.
-            var sumColumnWidths = 0
-            var numVisiblePixelsOnColumn = 0
-            for (i in nodeColumns.indices) {
-                sumColumnWidths += nodeColumns[i].width
+        // how many columns fit into less than scrollX space? as soon as
+        // sumColumnWdiths > scrollX, we have just added the first visible
+        // column at the left.
+        var sumColumnWidths = 0
+        var numVisiblePixelsOnColumn = 0
+        for (i in nodeColumns.indices) {
+            sumColumnWidths += nodeColumns[i].width
 
-                // if the sum of all columns so far exceeds scrollX, the current NodeColumn is (at least a little bit)
-                // visible
-                if (sumColumnWidths >= scrollX) {
-                    // how many pixels are visible of this column?
-                    numVisiblePixelsOnColumn = sumColumnWidths - scrollX
-                    break
-                }
+            // if the sum of all columns so far exceeds scrollX, the current NodeColumn is (at least a little bit)
+            // visible
+            if (sumColumnWidths >= scrollX) {
+                // how many pixels are visible of this column?
+                numVisiblePixelsOnColumn = sumColumnWidths - scrollX
+                break
             }
-
-            return numVisiblePixelsOnColumn
         }
+
+        return numVisiblePixelsOnColumn
+    }
 
     /** Shows a dialog to input the search string and fires the search.  */
     fun startSearch() {
@@ -611,7 +613,7 @@ class HorizontalMindmapView(private val mainActivity: MainActivity) : Horizontal
         input.hint = "Search"
 
         alert.setView(input)
-        alert.setPositiveButton("Search") { dialog: DialogInterface?, which: Int -> search(input.text.toString()) }
+        alert.setPositiveButton("Search") { _: DialogInterface?, _: Int -> search(input.text.toString()) }
         alert.create().show()
     }
 
@@ -619,7 +621,7 @@ class HorizontalMindmapView(private val mainActivity: MainActivity) : Horizontal
     private fun search(searchString: String) {
         lastSearchString = searchString
         val searchRoot = nodeColumns[nodeColumns.size - 1].parentNode
-        searchResultNodes = searchRoot?.search(searchString)?: emptyList()
+        searchResultNodes = mainViewModel?.let { searchRoot?.search(searchString, it) } ?: emptyList()
         currentSearchResultIndex = 0
         showCurrentSearchResult()
     }
@@ -627,7 +629,7 @@ class HorizontalMindmapView(private val mainActivity: MainActivity) : Horizontal
     /** Selects the current search result node.  */
     private fun showCurrentSearchResult() {
         if (currentSearchResultIndex >= 0 && currentSearchResultIndex < searchResultNodes.size) {
-            downTo(context, searchResultNodes[currentSearchResultIndex], false)
+            downTo(searchResultNodes[currentSearchResultIndex], false)
         }
         // Shows/hides the next/prev buttons
         // FIXME findViewById doesn't work, looks like you need to call invalidateOptionsMenu()
@@ -652,12 +654,9 @@ class HorizontalMindmapView(private val mainActivity: MainActivity) : Horizontal
         }
     }
 
-    fun notifyNodeContentChanged(context: Context?) {
-        setApplicationTitle(context)
-    }
-
     /**
      * The HorizontalMindmapViewGestureDetector should detect the onFling event. However, it never receives the
+     *
      * onDown event, so when it gets the onFling the event1 is empty, and we can't detect the fling properly.
      */
     private inner class HorizontalMindmapViewGestureDetector : SimpleOnGestureListener() {
@@ -700,7 +699,7 @@ class HorizontalMindmapView(private val mainActivity: MainActivity) : Horizontal
                     // scroll to the target column
                     // scrolls in the wrong direction
 
-                    smoothScrollTo(scrollX + numVisiblePixelsOnColumn - (leftmostVisibleColumn?.width?:0), 0)
+                    smoothScrollTo(scrollX + numVisiblePixelsOnColumn - (leftmostVisibleColumn?.width ?: 0), 0)
 
                     Log.d(MainApplication.TAG, "processed the Fling to Left gesture")
                     return true

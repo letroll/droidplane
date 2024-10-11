@@ -1,27 +1,20 @@
 package ch.benediktkoeppel.code.droidplane.view
 
-import android.annotation.SuppressLint
-import android.content.ActivityNotFoundException
 import android.content.Context
-import android.content.Intent
 import android.graphics.Typeface
-import android.net.Uri
 import android.text.SpannableString
 import android.text.style.StyleSpan
 import android.util.Log
 import android.view.ContextMenu
 import android.view.Gravity
-import android.webkit.MimeTypeMap
 import android.widget.AbsListView
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
-import android.widget.Toast
-import ch.benediktkoeppel.code.droidplane.MainActivity
 import ch.benediktkoeppel.code.droidplane.MainApplication
+import ch.benediktkoeppel.code.droidplane.MainViewModel
 import ch.benediktkoeppel.code.droidplane.R
 import ch.benediktkoeppel.code.droidplane.model.MindmapNode
-import java.io.File
 
 /**
  * A MindmapNodeLayout is the UI (layout) part of a MindmapNode.
@@ -30,8 +23,9 @@ class MindmapNodeLayout : LinearLayout {
     /**
      * The MindmapNode, to which this layout belongs
      */
-    @JvmField val mindmapNode: MindmapNode?
+    val mindmapNode: MindmapNode?
 
+    var viewModel: MainViewModel?=null
     /**
      * The Android resource IDs of the icon
      */
@@ -43,7 +37,6 @@ class MindmapNodeLayout : LinearLayout {
      *
      * @param context
      */
-    @Deprecated("")
     constructor(context: Context?) : super(context) {
         mindmapNode = null
         require(isInEditMode) {
@@ -53,8 +46,13 @@ class MindmapNodeLayout : LinearLayout {
         }
     }
 
-    constructor(context: Context, mindmapNode: MindmapNode) : super(context) {
+    constructor(
+        context: Context,
+        mindmapNode: MindmapNode,
+        viewModel: MainViewModel,
+    ) : super(context) {
         this.mindmapNode = mindmapNode
+        this.viewModel = viewModel
         mindmapNode.subscribeNodeStyleChanged(this)
 
         // extract icons
@@ -62,11 +60,13 @@ class MindmapNodeLayout : LinearLayout {
         val packageName = context.packageName
 
         val iconNames = mindmapNode.iconNames
-        iconResourceIds = ArrayList()
+        iconResourceIds = mutableListOf()
         for (iconName in iconNames) {
-            val drawableName = getDrawableNameFromMindmapIcon(iconName, context)
+            val drawableName = getDrawableNameFromMindmapIcon(iconName)
             iconResourceIds?.add(resources.getIdentifier("@drawable/$drawableName", "id", packageName))
+            Log.e("toto", "construct" )
         }
+        Log.e("toto", "construct" )
 
         // set link icon if node has a link. The link icon will be the first icon shown
         if (mindmapNode.link != null) {
@@ -79,11 +79,12 @@ class MindmapNodeLayout : LinearLayout {
         }
     }
 
-    @SuppressLint("InlinedApi") fun refreshView() {
+    //TODO find why the first load donc show icon
+    fun refreshView() {
         // inflate the layout if we haven't done so yet
-
         inflate(context, R.layout.mindmap_node_list_item, this)
 
+        Log.e("toto","refreshView")
         // the mindmap_node_list_item consists of a ImageView (icon), a TextView (node text), and another TextView
         // ("+" button)
         val icon0View = findViewById<ImageView>(R.id.icon0)
@@ -103,13 +104,18 @@ class MindmapNodeLayout : LinearLayout {
             iconResourceIds?.get(1)?.let { icon1View.setImageResource(it) }
         } else {
             // no second icon, don't waste space
-
             icon1View.visibility = GONE
         }
 
         val textView = findViewById<TextView>(R.id.label)
         textView.setTextColor(context.resources.getColor(android.R.color.primary_text_light))
-        val spannableString = SpannableString(mindmapNode?.getNodeText())
+        val spannableString = SpannableString(
+            viewModel?.let {
+                mindmapNode?.getNodeText(
+                    viewModel = it
+                )
+            }
+        )
         if (mindmapNode?.isBold == true) {
             spannableString.setSpan(StyleSpan(Typeface.BOLD), 0, spannableString.length, 0)
         }
@@ -146,7 +152,7 @@ class MindmapNodeLayout : LinearLayout {
             AbsListView.LayoutParams.MATCH_PARENT,
             AbsListView.LayoutParams.WRAP_CONTENT
         )
-        gravity = Gravity.LEFT or Gravity.CENTER
+        gravity = Gravity.START or Gravity.CENTER
     }
 
     /**
@@ -156,12 +162,11 @@ class MindmapNodeLayout : LinearLayout {
      * @param iconName the icon name as it is specified in the XML
      * @return the name of the corresponding android resource icon
      */
-    private fun getDrawableNameFromMindmapIcon(iconName: String, context: Context): String {
-        val locale = context.resources.configuration.locale
+    private fun getDrawableNameFromMindmapIcon(iconName: String): String {
+        val locale = resources.configuration.locale
         var name = "icon_" + iconName.lowercase(locale).replace("[^a-z0-9_.]".toRegex(), "_")
         name = name.replace("_$".toRegex(), "")
-
-        Log.d(MainApplication.TAG, "converted icon name $iconName to $name")
+        Log.e(MainApplication.TAG, "converted icon name $iconName to $name")
 
         return name
     }
@@ -176,7 +181,7 @@ class MindmapNodeLayout : LinearLayout {
     public override fun onCreateContextMenu(menu: ContextMenu) {
         // build the menu
 
-        menu.setHeaderTitle(mindmapNode?.getNodeText())
+        menu.setHeaderTitle(viewModel?.let { mindmapNode?.getNodeText(it) })
         if ((iconResourceIds?.size ?: 0) > 0) {
             iconResourceIds?.first()?.let { menu.setHeaderIcon(it) }
         }
@@ -185,7 +190,6 @@ class MindmapNodeLayout : LinearLayout {
         menu.add(CONTEXT_MENU_NORMAL_GROUP_ID, R.id.contextcopy, 0, R.string.copynodetext)
 
         menu.add(CONTEXT_MENU_NORMAL_GROUP_ID, R.id.contextedittext, 0, R.string.editnodetext)
-
 
         // add menu to open link, if the node has a hyperlink
         if (mindmapNode?.link != null) {
@@ -200,129 +204,9 @@ class MindmapNodeLayout : LinearLayout {
         // add menu for each arrow link
         mindmapNode?.arrowLinks?.let { arrowLinks ->
             for (linkedNode in arrowLinks) {
-                menu.add(CONTEXT_MENU_ARROWLINK_GROUP_ID, linkedNode.numericId, 0, linkedNode.getNodeText())
+                menu.add(CONTEXT_MENU_ARROWLINK_GROUP_ID, linkedNode.numericId, 0, viewModel?.let { linkedNode.getNodeText(it) })
             }
         }
-    }
-
-    /**
-     * Opens the link of this node (if any)
-     */
-    fun openLink(mainActivity: MainActivity) {
-        // TODO: if link is internal, substring ID
-
-        Log.d(MainApplication.TAG, "Opening link (to string): " + mindmapNode?.link.toString())
-        Log.d(MainApplication.TAG, "Opening link (fragment, everything after '#'): " + mindmapNode?.link?.fragment)
-
-        // if the link has a "#ID123", it's an internal link within the document
-        if (mindmapNode?.link?.fragment != null && mindmapNode.link.fragment?.startsWith("ID") == true) {
-            openInternalFragmentLink(mainActivity)
-        } else {
-            openIntentLink(mainActivity)
-        }
-    }
-
-    /**
-     * Open this node's link as internal fragment
-     */
-    private fun openInternalFragmentLink(mainActivity: MainActivity) {
-        // internal link, so this.link is of the form "#ID_123234534" this.link.getFragment() should give everything
-        // after the "#" it is null if there is no "#", which should be the case for all other links
-
-        val fragment = mindmapNode?.link?.fragment
-
-        val linkedInternal = mindmapNode?.viewModel?.getNodeByID(fragment)
-
-        if (linkedInternal != null) {
-            Log.d(MainApplication.TAG, "Opening internal node, $linkedInternal, with ID: $fragment")
-
-            // the internal linked node might be anywhere in the viewModel, i.e. on a completely separate branch than
-            // we are on currently. We need to go to the Top, and then descend into the viewModel to reach the right
-            // point
-            val mindmapView = mainActivity.horizontalMindmapView
-            mindmapView?.downTo(mainActivity, linkedInternal, true)
-        } else {
-            Toast.makeText(
-                context,
-                "This internal link to ID $fragment seems to be broken.",
-                Toast.LENGTH_SHORT
-            ).show()
-        }
-    }
-
-    /**
-     * Open this node's link as intent
-     */
-    private fun openIntentLink(mainActivity: MainActivity) {
-        // try opening the link normally with an intent
-
-        try {
-            val openUriIntent = Intent(Intent.ACTION_VIEW)
-            openUriIntent.setData(mindmapNode?.link)
-            mainActivity.startActivity(openUriIntent)
-            return
-        } catch (e: ActivityNotFoundException) {
-            Log.d(MainApplication.TAG, "ActivityNotFoundException when opening link as normal intent")
-        }
-
-        // try to open as relative file
-        try {
-            // get path of viewModel file
-            val fileName: String?
-            if (mindmapNode?.link?.path?.startsWith("/") == true) {
-                // absolute filename
-                fileName = mindmapNode.link.path
-            } else {
-                // link is relative to viewModel file
-
-                val mindmapPath = mindmapNode?.viewModel?.currentMindMapUri?.path
-                Log.d(MainApplication.TAG, "MainViewModel path $mindmapPath")
-                val mindmapDirectoryPath = mindmapPath?.substring(0, mindmapPath.lastIndexOf("/"))
-                Log.d(MainApplication.TAG, "MainViewModel directory path $mindmapDirectoryPath")
-                fileName = mindmapDirectoryPath + "/" + mindmapNode?.link?.path
-            }
-            val file = File(fileName)
-            if (!file.exists()) {
-                Toast.makeText(context, "File $fileName does not exist.", Toast.LENGTH_SHORT).show()
-                Log.d(MainApplication.TAG, "File $fileName does not exist.")
-                return
-            }
-            if (!file.canRead()) {
-                Toast.makeText(context, "Can not read file $fileName.", Toast.LENGTH_SHORT).show()
-                Log.d(MainApplication.TAG, "Can not read file $fileName.")
-                return
-            }
-            Log.d(MainApplication.TAG, "Opening file " + Uri.fromFile(file))
-            // http://stackoverflow.com/a/3571239/1067124
-            var extension = ""
-            fileName?.let {
-                val i = fileName.lastIndexOf('.')
-                val p = fileName.lastIndexOf('/')
-                if (i > p) {
-                    extension = fileName.substring(i + 1)
-                }
-            }
-            val mime = MimeTypeMap.getSingleton().getMimeTypeFromExtension(extension)
-
-            val intent = Intent()
-            intent.setAction(Intent.ACTION_VIEW)
-            intent.setDataAndType(Uri.fromFile(file), mime)
-            mainActivity.startActivity(intent)
-        } catch (e1: Exception) {
-            Toast.makeText(context, "No application found to open " + mindmapNode?.link, Toast.LENGTH_SHORT).show()
-            e1.printStackTrace()
-        }
-    }
-
-    fun openRichText(mainActivity: MainActivity) {
-        val richTextContent = mindmapNode?.richTextContents?.get(0)
-        val intent = Intent(mainActivity, RichTextViewActivity::class.java)
-        intent.putExtra("richTextContent", richTextContent)
-        mainActivity.startActivity(intent)
-    }
-
-    fun notifyNodeStyleChanged() {
-        this.refreshView()
     }
 
     companion object {

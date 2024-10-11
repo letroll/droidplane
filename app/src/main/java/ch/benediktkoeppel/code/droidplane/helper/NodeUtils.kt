@@ -1,12 +1,24 @@
 package ch.benediktkoeppel.code.droidplane.helper
 
+import android.content.ActivityNotFoundException
+import android.content.Intent
+import android.content.Intent.ACTION_VIEW
 import android.net.Uri
+import android.util.Log
 import android.util.Pair
+import android.webkit.MimeTypeMap
+import android.widget.Toast
+import androidx.fragment.app.FragmentActivity
+import ch.benediktkoeppel.code.droidplane.MainActivity
+import ch.benediktkoeppel.code.droidplane.MainApplication
 import ch.benediktkoeppel.code.droidplane.MainViewModel
 import ch.benediktkoeppel.code.droidplane.model.MindmapIndexes
 import ch.benediktkoeppel.code.droidplane.model.MindmapNode
+import ch.benediktkoeppel.code.droidplane.view.HorizontalMindmapView
+import ch.benediktkoeppel.code.droidplane.view.RichTextViewActivity
 import org.xmlpull.v1.XmlPullParser
 import org.xmlpull.v1.XmlPullParserException
+import java.io.File
 import java.io.IOException
 import java.util.Stack
 
@@ -105,8 +117,8 @@ object NodeUtils {
 
         // try first to just extract all IDs and the respective node, and
         // only insert into the hashmap once we know the size of the hashmap
-        val idAndNode: MutableList<Pair<String, MindmapNode>> = ArrayList()
-        val numericIdAndNode: MutableList<Pair<Int, MindmapNode>> = ArrayList()
+        val idAndNode: MutableList<Pair<String, MindmapNode>> = mutableListOf()
+        val numericIdAndNode: MutableList<Pair<Int, MindmapNode>> = mutableListOf()
 
         while (!stack.isEmpty()) {
             val node = stack.pop()
@@ -135,7 +147,7 @@ object NodeUtils {
         return MindmapIndexes(newNodesById, newNodesByNumericId)
     }
 
-    fun parseNodeTag(viewModel: MainViewModel, xpp: XmlPullParser, parentNode: MindmapNode?): MindmapNode {
+    fun parseNodeTag(xpp: XmlPullParser, parentNode: MindmapNode?): MindmapNode {
         val id = xpp.getAttributeValue(null, "ID")
         val numericId = try {
             id.replace("\\D+".toRegex(), "").toInt()
@@ -156,7 +168,141 @@ object NodeUtils {
         // get tree ID (of cloned node)
         val treeIdAttribute = xpp.getAttributeValue(null, "TREE_ID")
 
-        val newMindmapNode = MindmapNode(viewModel, parentNode, id, numericId, text, link, treeIdAttribute)
+        val newMindmapNode = MindmapNode(parentNode, id, numericId, text, link, treeIdAttribute)
         return newMindmapNode
+    }
+
+
+    fun openRichText(
+        mindmapNode: MindmapNode,
+        activity: FragmentActivity,
+    ) {
+        val richTextContent = mindmapNode.richTextContents[0]
+        val intent = Intent(activity, RichTextViewActivity::class.java)
+        intent.putExtra("richTextContent", richTextContent)
+        activity.startActivity(intent)
+    }
+
+
+    /**
+     * Opens the link of this node (if any)
+     */
+    //TODO remove link to mainActivity
+    fun openLink(mindmapNode:MindmapNode?,mainActivity: MainActivity) {
+        // TODO: if link is internal, substring ID
+        Log.d(MainApplication.TAG, "Opening link (to string): " + mindmapNode?.link.toString())
+        Log.d(MainApplication.TAG, "Opening link (fragment, everything after '#'): " + mindmapNode?.link?.fragment)
+
+        // if the link has a "#ID123", it's an internal link within the document
+        if (mindmapNode?.link?.fragment != null && mindmapNode.link.fragment?.startsWith("ID") == true) {
+            openInternalFragmentLink(
+                mindmapNode = mindmapNode,
+                activity = mainActivity,
+                viewModel = mainActivity.viewModel,
+                horizontalMindmapView = mainActivity.horizontalMindmapView,
+            )
+        } else {
+
+            // link is relative to viewModel file
+            val mindmapPath = mainActivity.viewModel.currentMindMapUri?.path
+            Log.d(MainApplication.TAG, "MainViewModel path $mindmapPath")
+            val mindmapDirectoryPath = mindmapPath?.substring(0, mindmapPath.lastIndexOf("/"))
+            Log.d(MainApplication.TAG, "MainViewModel directory path $mindmapDirectoryPath")
+
+            openIntentLink(
+                mindmapNode = mindmapNode,
+                mindmapDirectoryPath = mindmapDirectoryPath,
+                activity = mainActivity
+            )
+        }
+    }
+
+    /**
+     * Open this node's link as internal fragment
+     */
+    private fun openInternalFragmentLink(
+        mindmapNode: MindmapNode?,
+        activity: FragmentActivity,
+        viewModel: MainViewModel,
+        horizontalMindmapView: HorizontalMindmapView?,
+    ) {
+        // internal link, so this.link is of the form "#ID_123234534" this.link.getFragment() should give everything
+        // after the "#" it is null if there is no "#", which should be the case for all other links
+        val fragment = mindmapNode?.link?.fragment
+        val linkedInternal = viewModel.getNodeByID(fragment)
+
+        if (linkedInternal != null) {
+            Log.d(MainApplication.TAG, "Opening internal node, $linkedInternal, with ID: $fragment")
+
+            // the internal linked node might be anywhere in the viewModel, i.e. on a completely separate branch than
+            // we are on currently. We need to go to the Top, and then descend into the viewModel to reach the right
+            // point
+            horizontalMindmapView?.downTo(linkedInternal, true)
+        } else {
+            Toast.makeText(
+                activity,
+                "This internal link to ID $fragment seems to be broken.",
+                Toast.LENGTH_SHORT
+            ).show()
+        }
+    }
+
+    /**
+     * Open this node's link as intent
+     */
+    fun openIntentLink(
+        mindmapNode: MindmapNode?,
+        mindmapDirectoryPath: String?,
+        activity: FragmentActivity,
+    ) {
+        // try opening the link normally with an intent
+        try {
+            val openUriIntent = Intent(ACTION_VIEW)
+            openUriIntent.setData(mindmapNode?.link)
+            activity.startActivity(openUriIntent)
+            return
+        } catch (e: ActivityNotFoundException) {
+            Log.d(MainApplication.TAG, "ActivityNotFoundException when opening link as normal intent")
+        }
+
+        // try to open as relative file
+        try {
+            val fileName: String? = if (mindmapNode?.link?.path?.startsWith("/") == true) {
+                // absolute filename
+                mindmapNode.link.path
+            } else {
+                mindmapDirectoryPath + "/" + mindmapNode?.link?.path
+            }
+            fileName?.let {
+                val file = File(fileName)
+                if (!file.exists()) {
+                    Toast.makeText(activity, "File $fileName does not exist.", Toast.LENGTH_SHORT).show()
+                    Log.d(MainApplication.TAG, "File $fileName does not exist.")
+                    return
+                }
+                if (!file.canRead()) {
+                    Toast.makeText(activity, "Can not read file $fileName.", Toast.LENGTH_SHORT).show()
+                    Log.d(MainApplication.TAG, "Can not read file $fileName.")
+                    return
+                }
+                Log.d(MainApplication.TAG, "Opening file " + Uri.fromFile(file))
+                // http://stackoverflow.com/a/3571239/1067124
+                var extension = ""
+                val i = fileName.lastIndexOf('.')
+                val p = fileName.lastIndexOf('/')
+                if (i > p) {
+                    extension = fileName.substring(i + 1)
+                }
+                val mime = MimeTypeMap.getSingleton().getMimeTypeFromExtension(extension)
+
+                val intent = Intent()
+                intent.setAction(ACTION_VIEW)
+                intent.setDataAndType(Uri.fromFile(file), mime)
+                activity.startActivity(intent)
+            }
+        } catch (e1: Exception) {
+            Toast.makeText(activity, "No application found to open " + mindmapNode?.link, Toast.LENGTH_SHORT).show()
+            e1.printStackTrace()
+        }
     }
 }
