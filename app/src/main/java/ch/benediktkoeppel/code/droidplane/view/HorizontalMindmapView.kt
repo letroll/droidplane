@@ -69,7 +69,7 @@ class HorizontalMindmapView(
     var deepestSelectedMindmapNode: MindmapNode? = null
 
     // Search state
-    private var lastSearchString: String? = null
+    private var lastSearchString: String = ""
     private var searchResultNodes = listOf<MindmapNode>()
     private var currentSearchResultIndex = 0
 
@@ -484,7 +484,16 @@ class HorizontalMindmapView(
                     down(it)
                 }
             } else if (mindmapNode?.link != null) {
-                NodeUtils.openLink(mindmapNode, mainActivity)
+
+
+                viewModel?.let { vm ->
+                    NodeUtils.openLink(
+                        mindmapNode,
+                        mainActivity,
+                        this@HorizontalMindmapView,
+                        vm
+                    )
+                }
             } else if (mindmapNode?.richTextContents?.isNotEmpty() == true) {
                 openRichText(mindmapNode, mainActivity)
             } else {

@@ -241,5 +241,14 @@ class MainViewModel : ViewModel() {
             setMindmapIsLoading(false)
         }
     }
+
+    fun getMindmapDirectoryPath():String?{
+        // link is relative to viewModel file
+        val mindmapPath = currentMindMapUri?.path
+        Log.d(MainApplication.TAG, "MainViewModel path $mindmapPath")
+        val mindmapDirectoryPath = mindmapPath?.substring(0, mindmapPath.lastIndexOf("/"))
+        Log.d(MainApplication.TAG, "MainViewModel directory path $mindmapDirectoryPath")
+        return  mindmapDirectoryPath
+    }
 }
 

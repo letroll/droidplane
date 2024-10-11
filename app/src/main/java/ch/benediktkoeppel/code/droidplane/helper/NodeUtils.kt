@@ -187,8 +187,13 @@ object NodeUtils {
     /**
      * Opens the link of this node (if any)
      */
-    //TODO remove link to mainActivity
-    fun openLink(mindmapNode:MindmapNode?,mainActivity: MainActivity) {
+    //TODO remove link to activity
+    fun openLink(
+        mindmapNode: MindmapNode?,
+        activity: FragmentActivity,
+        horizontalMindmapView: HorizontalMindmapView?,
+        viewModel: MainViewModel
+    ) {
         // TODO: if link is internal, substring ID
         Log.d(MainApplication.TAG, "Opening link (to string): " + mindmapNode?.link.toString())
         Log.d(MainApplication.TAG, "Opening link (fragment, everything after '#'): " + mindmapNode?.link?.fragment)
@@ -197,22 +202,15 @@ object NodeUtils {
         if (mindmapNode?.link?.fragment != null && mindmapNode.link.fragment?.startsWith("ID") == true) {
             openInternalFragmentLink(
                 mindmapNode = mindmapNode,
-                activity = mainActivity,
-                viewModel = mainActivity.viewModel,
-                horizontalMindmapView = mainActivity.horizontalMindmapView,
+                activity = activity,
+                viewModel = viewModel,
+                horizontalMindmapView = horizontalMindmapView,
             )
         } else {
-
-            // link is relative to viewModel file
-            val mindmapPath = mainActivity.viewModel.currentMindMapUri?.path
-            Log.d(MainApplication.TAG, "MainViewModel path $mindmapPath")
-            val mindmapDirectoryPath = mindmapPath?.substring(0, mindmapPath.lastIndexOf("/"))
-            Log.d(MainApplication.TAG, "MainViewModel directory path $mindmapDirectoryPath")
-
             openIntentLink(
                 mindmapNode = mindmapNode,
-                mindmapDirectoryPath = mindmapDirectoryPath,
-                activity = mainActivity
+                mindmapDirectoryPath = viewModel.getMindmapDirectoryPath(),
+                activity = activity
             )
         }
     }

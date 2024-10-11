@@ -327,7 +327,9 @@ class MainActivity : FragmentActivity() {
                     Log.d(MainApplication.TAG, "Opening node link " + mindmapNodeLayout.mindmapNode?.link)
                     NodeUtils.openLink(
                         mindmapNode = mindmapNodeLayout.mindmapNode,
-                        mainActivity = this
+                        activity = this,
+                        horizontalMindmapView = horizontalMindmapView,
+                        viewModel = viewModel,
                     )
                 }
 
