@@ -13,11 +13,11 @@ import java.util.Locale
  * A MindMapNode is a special type of DOM Node. A DOM Node can be converted to a MindMapNode if it has type ELEMENT,
  * and tag "node".
  */
-class MindmapNode(
+data class MindmapNode(
     /**
      * The Parent MindmapNode
      */
-    @JvmField val parentNode: MindmapNode?,
+    val parentNode: MindmapNode?,
     /**
      * The ID of the node (ID attribute)
      */

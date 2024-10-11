@@ -12,20 +12,54 @@ import android.os.Bundle
 import android.util.Log
 import android.view.Menu
 import android.view.MenuItem
-import android.view.View
 import android.widget.AdapterView.AdapterContextMenuInfo
 import android.widget.LinearLayout
+import androidx.activity.OnBackPressedCallback
+import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.activity.result.contract.ActivityResultContracts.StartActivityForResult
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.Icons.Filled
+import androidx.compose.material.icons.filled.Call
+import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.Icon
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Text
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.ComposeView
+import androidx.compose.ui.platform.ViewCompositionStrategy
+import androidx.compose.ui.platform.ViewCompositionStrategy.DisposeOnViewTreeLifecycleDestroyed
+import androidx.compose.ui.res.stringResource
 import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.lifecycleScope
 import ch.benediktkoeppel.code.droidplane.controller.NodeChange.AddedChild
 import ch.benediktkoeppel.code.droidplane.controller.NodeChange.NodeStyleChanged
 import ch.benediktkoeppel.code.droidplane.controller.NodeChange.RichContentChanged
 import ch.benediktkoeppel.code.droidplane.controller.NodeChange.SubscribeNodeRichContentChanged
-import ch.benediktkoeppel.code.droidplane.controller.OnRootNodeLoadedListener
 import ch.benediktkoeppel.code.droidplane.helper.NodeUtils
 import ch.benediktkoeppel.code.droidplane.helper.NodeUtils.openRichText
-import ch.benediktkoeppel.code.droidplane.model.MindmapNode
+import ch.benediktkoeppel.code.droidplane.ui.components.AppTopBar
+import ch.benediktkoeppel.code.droidplane.ui.components.AppTopBarAction.Backpress
+import ch.benediktkoeppel.code.droidplane.ui.components.AppTopBarAction.Help
+import ch.benediktkoeppel.code.droidplane.ui.components.AppTopBarAction.Open
+import ch.benediktkoeppel.code.droidplane.ui.components.AppTopBarAction.Search
+import ch.benediktkoeppel.code.droidplane.ui.components.AppTopBarAction.SearchNext
+import ch.benediktkoeppel.code.droidplane.ui.components.AppTopBarAction.SearchPrevious
+import ch.benediktkoeppel.code.droidplane.ui.components.AppTopBarAction.Top
+import ch.benediktkoeppel.code.droidplane.ui.components.AppTopBarAction.Up
+import ch.benediktkoeppel.code.droidplane.ui.theme.ContrastAwareReplyTheme
 import ch.benediktkoeppel.code.droidplane.view.HorizontalMindmapView
 import ch.benediktkoeppel.code.droidplane.view.MindmapNodeLayout
 import kotlinx.coroutines.launch
@@ -48,6 +82,12 @@ class MainActivity : FragmentActivity() {
         private set
     private var menu: Menu? = null
 
+    private val callback: OnBackPressedCallback = object : OnBackPressedCallback(true) {
+        override fun handleOnBackPressed() {
+            horizontalMindmapView?.upOrClose()
+        }
+    }
+
     public override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
@@ -65,119 +105,150 @@ class MainActivity : FragmentActivity() {
 
          */
 
-/*        setContent {
-            ContrastAwareReplyTheme {
-                val state = viewModel.uiState.collectAsState()
-                Scaffold(
-                    modifier = Modifier,
-                    topBar = {
-                        AppTopBar(
-                            text = stringResource(R.string.app_name),
-                            hasBackIcon = false,
-                            isFullScreen = false,
-//                            modifier =
-                        ) { }
-                    },
-//                    bottomBar = {},
-//                    snackbarHost = {},
-//                    floatingActionButton = {},
-//                    floatingActionButtonPosition =,
-//                    containerColor =,
-//                    contentColor =,
-//                    contentWindowInsets =,
-                    content = { innerPadding ->
-                        LazyColumn(
-                            modifier = Modifier.padding(innerPadding),
-//                            state =,
-//                            contentPadding =,
-//                            reverseLayout = false,
-//                            verticalArrangement =,
-//                            horizontalAlignment =,
-//                            flingBehavior =,
-//                            userScrollEnabled = false
-                        ) {
-//                            items(state.value.loading){
-//                                Text("test")
+
+        if (viewModel.modern) {
+            if (viewModel.uiState.value.loading) {
+                viewModel.apply {
+                    if (isAnExternalMindMapEdit()) {
+                        currentMindMapUri = intent.data
+                    }
+
+                    loadMindMap(
+                        getDocumentInputStream(isAnExternalMindMapEdit()),
+                        onRootNodeLoaded = { rootNode ->
+//                            horizontalMindmapView?.apply {
+//                                mainViewModel = viewModel
+//                                // by default, the root node is the deepest node that is expanded
+//                                deepestSelectedMindmapNode = rootNode
+//                                onRootNodeLoaded()
 //                            }
+                        },
+                        onNodeChange = { nodeChange ->
+                            Log.e("toto", "nodeChange:$nodeChange")
+                            when (nodeChange) {
+                                is AddedChild -> {
+//                                    nodeChange.parentNode.notifySubscribersAddedChildMindmapNode(nodeChange.childNode)
+                                }
+
+                                is RichContentChanged -> {
+//                                    nodeChange.node.notifySubscribersNodeRichContentChanged()
+                                }
+
+                                is NodeStyleChanged -> {
+//                                    nodeChange.node.notifySubscribersNodeStyleChanged()
+                                }
+
+                                is SubscribeNodeRichContentChanged -> {
+//                                    nodeChange.node.subscribeNodeRichContentChanged(this@MainActivity)
+                                }
+                            }
                         }
-                    }
-                )
+                    )
+                }
             }
-        }*/
+            setContent {
+                ContrastAwareReplyTheme {
+                    val state = viewModel.uiState.collectAsState()
+                    Scaffold(
+                        modifier = Modifier,
+                        topBar = {
+                            AppTopBar(
+                                text = state.value.selectedNode?.getNodeText(viewModel) ?: stringResource(R.string.app_name),
+                                hasBackIcon = state.value.selectedNode != state.value.rootNode,
+                                onBarAction = {
 
-        // set up horizontal viewModel view first
-        setUpHorizontalMindmapView()
-
-        lifecycleScope.launch {
-            viewModel.uiState.collect { newState ->
-                menu?.findItem(R.id.mindmap_loading)?.setVisible(newState.loading)
+                                }
+                            )
+                        },
+                        //                    bottomBar = {},
+                        //                    snackbarHost = {},
+                        //                    floatingActionButton = {},
+                        //                    floatingActionButtonPosition =,
+                        //                    containerColor =,
+                        //                    contentColor =,
+                        //                    contentWindowInsets =,
+                        content = { innerPadding ->
+                            LazyColumn(
+                                modifier = Modifier.padding(innerPadding),
+                                //                            state =,
+                                //                            contentPadding =,
+                                //                            reverseLayout = false,
+                                //                            verticalArrangement =,
+                                //                            horizontalAlignment =,
+                                //                            flingBehavior =,
+                                //                            userScrollEnabled = false
+                            ) {
+                                state.value.rootNode?.childMindmapNodes?.let { nodes ->
+                                    items(nodes) { node ->
+                                        node.getNodeText(viewModel)?.let { text ->
+                                            Text(text = text)
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    )
+                }
             }
-        }
-
-        // then populate view with viewModel
-        // if we already have a loaded viewModel, use this; otherwise load from the intent
-        if (!viewModel.uiState.value.loading) {
-            horizontalMindmapView?.apply {
-                horizontalMindmapView?.mainViewModel = viewModel
-                deepestSelectedMindmapNode = viewModel.rootNode
-                onRootNodeLoaded()
-            }
-            viewModel.rootNode?.subscribeNodeRichContentChanged(this)
         } else {
-            val onRootNodeLoadedListener: OnRootNodeLoadedListener = object : OnRootNodeLoadedListener {
-                override fun rootNodeLoaded(viewModel: MainViewModel, rootNode: MindmapNode?) {
-                    // now set up the view
-                    val finalRootNode = rootNode
-                    runOnUiThread {
-                        horizontalMindmapView?.apply {
-                            mainViewModel = viewModel
-                            // by default, the root node is the deepest node that is expanded
-                            deepestSelectedMindmapNode = finalRootNode
-                            onRootNodeLoaded()
-                        }
-                    }
+            // set up horizontal viewModel view first
+            setUpHorizontalMindmapView()
+
+            lifecycleScope.launch {
+                viewModel.uiState.collect { newState ->
                 }
             }
 
-            viewModel.apply {
-                if (isAnExternalMindMapEdit()) {
-                    currentMindMapUri = intent.data
+            // then populate view with viewModel
+            // if we already have a loaded viewModel, use this; otherwise load from the intent
+            if (!viewModel.uiState.value.loading) {
+                horizontalMindmapView?.apply {
+                    horizontalMindmapView?.mainViewModel = viewModel
+                    deepestSelectedMindmapNode = viewModel.rootNode
+                    onRootNodeLoaded()
                 }
+                viewModel.rootNode?.subscribeNodeRichContentChanged(this)
+            } else {
+                viewModel.apply {
+                    if (isAnExternalMindMapEdit()) {
+                        currentMindMapUri = intent.data
+                    }
 
-                loadMindMap(
-                    getDocumentInputStream(isAnExternalMindMapEdit()),
-                    onRootNodeLoadedListener,
-                    this,
-                    onNodeChange = { nodeChange ->
-                        when (nodeChange) {
-                            is AddedChild -> {
-                                runOnUiThread {
+                    loadMindMap(
+                        getDocumentInputStream(isAnExternalMindMapEdit()),
+                        onRootNodeLoaded = { rootNode ->
+                            horizontalMindmapView?.apply {
+                                mainViewModel = viewModel
+                                // by default, the root node is the deepest node that is expanded
+                                deepestSelectedMindmapNode = rootNode
+                                onRootNodeLoaded()
+                            }
+                        },
+                        onNodeChange = { nodeChange ->
+                            when (nodeChange) {
+                                is AddedChild -> {
                                     nodeChange.parentNode.notifySubscribersAddedChildMindmapNode(nodeChange.childNode)
                                 }
-                            }
 
-                            is RichContentChanged -> {
-                                runOnUiThread {
+                                is RichContentChanged -> {
                                     nodeChange.node.notifySubscribersNodeRichContentChanged()
                                 }
-                            }
 
-                            is NodeStyleChanged -> {
-                                runOnUiThread {
+                                is NodeStyleChanged -> {
                                     nodeChange.node.notifySubscribersNodeStyleChanged()
                                 }
-                            }
 
-                            is SubscribeNodeRichContentChanged -> {
-                                nodeChange.node.subscribeNodeRichContentChanged(this@MainActivity)
+                                is SubscribeNodeRichContentChanged -> {
+                                    nodeChange.node.subscribeNodeRichContentChanged(this@MainActivity)
+                                }
                             }
                         }
-                    }
-                )
+                    )
+                }
             }
         }
 
-        registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+        registerForActivityResult(StartActivityForResult()) { result ->
             if (result.resultCode == RESULT_OK) {
                 // The document selected by the user won't be returned in the intent. Instead, a URI to that document
                 // will be contained in the return intent provided to this method as a parameter. Pull that URI using
@@ -194,6 +265,8 @@ class MainActivity : FragmentActivity() {
                 }
             }
         }
+
+        onBackPressedDispatcher.addCallback(this, callback)
     }
 
     private fun getDocumentInputStream(isAnExternalMindMapEdit: Boolean): InputStream? {
@@ -233,7 +306,54 @@ class MainActivity : FragmentActivity() {
             }
         )
 
-        (findViewById<View>(R.id.layout_wrapper) as LinearLayout?)?.addView(horizontalMindmapView)
+        findViewById<ComposeView>(R.id.compose_view)?.apply {
+            // Dispose of the Composition when the view's LifecycleOwner
+            // is destroyed
+            setViewCompositionStrategy(DisposeOnViewTreeLifecycleDestroyed)
+            setContent {
+                ContrastAwareReplyTheme {
+                    val state = viewModel.uiState.collectAsState()
+                    AppTopBar(
+                        text = state.value.selectedNode?.getNodeText(viewModel) ?: stringResource(R.string.app_name),
+                        hasBackIcon = false,
+                        onBarAction = { action ->
+                            when (action) {
+                                Search -> {
+                                    horizontalMindmapView?.startSearch()
+                                }
+
+                                Backpress -> {
+                                    horizontalMindmapView?.upOrClose()
+                                }
+
+                                SearchNext -> {
+                                    horizontalMindmapView?.searchNext()
+                                }
+                                SearchPrevious -> {
+                                    horizontalMindmapView?.searchPrevious()
+                                }
+                                Up -> {
+                                    horizontalMindmapView?.up()
+                                }
+                                Top -> {
+                                    horizontalMindmapView?.top()
+                                }
+                                Open -> {
+                                    performFileSearch()
+                                }
+                                Help -> {
+                                 showHelp()
+                                }
+                            }
+                        },
+                    )
+                }
+            }
+        }
+
+        findViewById<LinearLayout>(R.id.layout_wrapper)?.apply {
+            addView(horizontalMindmapView)
+        }
 
         horizontalMindmapView?.enableHomeButtonIfEnoughColumns()
 
@@ -241,51 +361,10 @@ class MainActivity : FragmentActivity() {
         horizontalMindmapView?.setApplicationTitle()
     }
 
-    /**
-     * Creates the options menu
-     * @see android.app.Activity#onCreateOptionsMenu(android.view.Menu)
-     */
-    override fun onCreateOptionsMenu(menu: Menu): Boolean {
-        val inflater = menuInflater
-        inflater.inflate(R.menu.main, menu)
-        this.menu = menu
-        return true
-    }
-
-    /**
-     * Handler for the back button, Navigate one level up, and stay at the root node
-     * @see android.app.Activity#onBackPressed()
-     */
-    override fun onBackPressed() {
-        super.onBackPressed()
-        horizontalMindmapView?.upOrClose()
-    }
-
-    /**
-     * Handler of all menu events Home button: navigate one level up, and exit the application if the home button is
-     * pressed at the root node Menu Up: navigate one level up, and stay at the root node
-     *
-     * @see android.app.Activity#onOptionsItemSelected(android.view.MenuItem)
-     */
-    override fun onOptionsItemSelected(item: MenuItem): Boolean {
-        when (item.itemId) {
-            R.id.up -> horizontalMindmapView?.up()
-            R.id.top -> horizontalMindmapView?.top()
-            R.id.help -> {
-                // create a new intent (without URI)
-                val helpIntent = Intent(this, MainActivity::class.java)
-                helpIntent.putExtra(INTENT_START_HELP, true)
-                startActivity(helpIntent)
-            }
-
-            R.id.open -> performFileSearch()
-            android.R.id.home -> horizontalMindmapView?.up()
-            R.id.search -> horizontalMindmapView?.startSearch()
-            R.id.search_next -> horizontalMindmapView?.searchNext()
-            R.id.search_prev -> horizontalMindmapView?.searchPrevious()
-        }
-
-        return true
+    private fun showHelp() {
+        val helpIntent = Intent(this, MainActivity::class.java)
+        helpIntent.putExtra(INTENT_START_HELP, true)
+        startActivity(helpIntent)
     }
 
     /**
