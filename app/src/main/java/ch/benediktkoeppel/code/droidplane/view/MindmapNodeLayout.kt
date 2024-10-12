@@ -64,9 +64,7 @@ class MindmapNodeLayout : LinearLayout {
         for (iconName in iconNames) {
             val drawableName = getDrawableNameFromMindmapIcon(iconName)
             iconResourceIds?.add(resources.getIdentifier("@drawable/$drawableName", "id", packageName))
-            Log.e("toto", "construct" )
         }
-        Log.e("toto", "construct" )
 
         // set link icon if node has a link. The link icon will be the first icon shown
         if (mindmapNode.link != null) {
@@ -84,7 +82,6 @@ class MindmapNodeLayout : LinearLayout {
         // inflate the layout if we haven't done so yet
         inflate(context, R.layout.mindmap_node_list_item, this)
 
-        Log.e("toto","refreshView")
         // the mindmap_node_list_item consists of a ImageView (icon), a TextView (node text), and another TextView
         // ("+" button)
         val icon0View = findViewById<ImageView>(R.id.icon0)

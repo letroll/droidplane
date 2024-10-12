@@ -105,7 +105,6 @@ class HorizontalMindmapView(
         resizeAllColumns()
     }
 
-    // TODO: comment missing
     fun onRootNodeLoaded() {
         // expand the selected node chain
 
@@ -285,7 +284,6 @@ class HorizontalMindmapView(
      */
     fun top() {
         // remove all ListView layouts in linearLayout parent_list_view
-
         removeAllColumns()
 
         // go down into the root node
@@ -344,7 +342,6 @@ class HorizontalMindmapView(
                     synchronized(node.parentNode) {
                         nodeColumn = NodeColumn(context, node, vm)
                         addColumn(nodeColumn)
-
                         // keep track of which list view belongs to which node column. This is necessary because onItemClick will get a
                         // ListView (the one that was clicked), and we need to know which NodeColumn this is.
                         val nodeColumnListView = nodeColumn.listView
@@ -384,7 +381,6 @@ class HorizontalMindmapView(
      */
     fun downTo(node: MindmapNode?, openLast: Boolean) {
         // first navigate back to the top (essentially closing all other nodes)
-
         top()
 
         // go upwards from the target node, and keep track of each node leading down to the target node
@@ -402,7 +398,7 @@ class HorizontalMindmapView(
         for (mindmapNode in nodeHierarchy) {
             mindmapNode.isSelected = true
             scrollTo(mindmapNode)
-            if ((mindmapNode != node || openLast) && mindmapNode.numChildMindmapNodes > 0) {
+            if ((mindmapNode != node || openLast) && mindmapNode.childMindmapNodes.size > 0) {
                 down(mindmapNode)
             }
         }
@@ -476,7 +472,7 @@ class HorizontalMindmapView(
 
         // if the clicked node has child nodes, we set it to selected and drill down
         clickedNode?.apply {
-            if ((mindmapNode?.numChildMindmapNodes ?: 0) > 0) {
+            if ((mindmapNode?.childMindmapNodes?.size ?: 0) > 0) {
                 clickedNodeColumn.setItemColor(position)
 
                 // and drill down
@@ -484,8 +480,6 @@ class HorizontalMindmapView(
                     down(it)
                 }
             } else if (mindmapNode?.link != null) {
-
-
                 viewModel?.let { vm ->
                     NodeUtils.openLink(
                         mindmapNode,

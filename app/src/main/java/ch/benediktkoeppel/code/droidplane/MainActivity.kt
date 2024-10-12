@@ -14,42 +14,54 @@ import android.view.Menu
 import android.view.MenuItem
 import android.widget.AdapterView.AdapterContextMenuInfo
 import android.widget.LinearLayout
+import android.widget.Toast
 import androidx.activity.OnBackPressedCallback
 import androidx.activity.compose.setContent
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.result.contract.ActivityResultContracts.StartActivityForResult
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.Icons.Filled
-import androidx.compose.material.icons.filled.Call
-import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.ArrowDropDown
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.runtime.State
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.ComposeView
-import androidx.compose.ui.platform.ViewCompositionStrategy
 import androidx.compose.ui.platform.ViewCompositionStrategy.DisposeOnViewTreeLifecycleDestroyed
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.unit.dp
 import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.lifecycleScope
-import ch.benediktkoeppel.code.droidplane.controller.NodeChange.AddedChild
+import ch.benediktkoeppel.code.droidplane.MainViewModel.MainUiState
+import ch.benediktkoeppel.code.droidplane.SelectedNodeType.Link
+import ch.benediktkoeppel.code.droidplane.SelectedNodeType.None
+import ch.benediktkoeppel.code.droidplane.SelectedNodeType.RichText
 import ch.benediktkoeppel.code.droidplane.controller.NodeChange.NodeStyleChanged
 import ch.benediktkoeppel.code.droidplane.controller.NodeChange.RichContentChanged
 import ch.benediktkoeppel.code.droidplane.controller.NodeChange.SubscribeNodeRichContentChanged
 import ch.benediktkoeppel.code.droidplane.helper.NodeUtils
 import ch.benediktkoeppel.code.droidplane.helper.NodeUtils.openRichText
+import ch.benediktkoeppel.code.droidplane.model.MindmapNode
 import ch.benediktkoeppel.code.droidplane.ui.components.AppTopBar
 import ch.benediktkoeppel.code.droidplane.ui.components.AppTopBarAction.Backpress
 import ch.benediktkoeppel.code.droidplane.ui.components.AppTopBarAction.Help
@@ -59,6 +71,8 @@ import ch.benediktkoeppel.code.droidplane.ui.components.AppTopBarAction.SearchNe
 import ch.benediktkoeppel.code.droidplane.ui.components.AppTopBarAction.SearchPrevious
 import ch.benediktkoeppel.code.droidplane.ui.components.AppTopBarAction.Top
 import ch.benediktkoeppel.code.droidplane.ui.components.AppTopBarAction.Up
+import ch.benediktkoeppel.code.droidplane.ui.components.ToggleIcon
+import ch.benediktkoeppel.code.droidplane.ui.components.nodeList
 import ch.benediktkoeppel.code.droidplane.ui.theme.ContrastAwareReplyTheme
 import ch.benediktkoeppel.code.droidplane.view.HorizontalMindmapView
 import ch.benediktkoeppel.code.droidplane.view.MindmapNodeLayout
@@ -80,7 +94,6 @@ class MainActivity : FragmentActivity() {
 
     var horizontalMindmapView: HorizontalMindmapView? = null
         private set
-    private var menu: Menu? = null
 
     private val callback: OnBackPressedCallback = object : OnBackPressedCallback(true) {
         override fun handleOnBackPressed() {
@@ -124,24 +137,6 @@ class MainActivity : FragmentActivity() {
 //                            }
                         },
                         onNodeChange = { nodeChange ->
-                            Log.e("toto", "nodeChange:$nodeChange")
-                            when (nodeChange) {
-                                is AddedChild -> {
-//                                    nodeChange.parentNode.notifySubscribersAddedChildMindmapNode(nodeChange.childNode)
-                                }
-
-                                is RichContentChanged -> {
-//                                    nodeChange.node.notifySubscribersNodeRichContentChanged()
-                                }
-
-                                is NodeStyleChanged -> {
-//                                    nodeChange.node.notifySubscribersNodeStyleChanged()
-                                }
-
-                                is SubscribeNodeRichContentChanged -> {
-//                                    nodeChange.node.subscribeNodeRichContentChanged(this@MainActivity)
-                                }
-                            }
                         }
                     )
                 }
@@ -149,6 +144,9 @@ class MainActivity : FragmentActivity() {
             setContent {
                 ContrastAwareReplyTheme {
                     val state = viewModel.uiState.collectAsState()
+
+                    if(state.value.leaving)finish() //TODO confirm dialog
+
                     Scaffold(
                         modifier = Modifier,
                         topBar = {
@@ -178,13 +176,7 @@ class MainActivity : FragmentActivity() {
                                 //                            flingBehavior =,
                                 //                            userScrollEnabled = false
                             ) {
-                                state.value.rootNode?.childMindmapNodes?.let { nodes ->
-                                    items(nodes) { node ->
-                                        node.getNodeText(viewModel)?.let { text ->
-                                            Text(text = text)
-                                        }
-                                    }
-                                }
+
                             }
                         }
                     )
@@ -226,10 +218,6 @@ class MainActivity : FragmentActivity() {
                         },
                         onNodeChange = { nodeChange ->
                             when (nodeChange) {
-                                is AddedChild -> {
-                                    nodeChange.parentNode.notifySubscribersAddedChildMindmapNode(nodeChange.childNode)
-                                }
-
                                 is RichContentChanged -> {
                                     nodeChange.node.notifySubscribersNodeRichContentChanged()
                                 }
@@ -313,40 +301,97 @@ class MainActivity : FragmentActivity() {
             setContent {
                 ContrastAwareReplyTheme {
                     val state = viewModel.uiState.collectAsState()
-                    AppTopBar(
-                        text = state.value.selectedNode?.getNodeText(viewModel) ?: stringResource(R.string.app_name),
-                        hasBackIcon = false,
-                        onBarAction = { action ->
-                            when (action) {
-                                Search -> {
-                                    horizontalMindmapView?.startSearch()
+
+                    state.value.hasSelectedNodeType?.let { selectedNodeType ->
+                        state.value.selectedNode?.let { selectedNode ->
+                            when (selectedNodeType) {
+                                None -> { /*Not Used */
                                 }
 
-                                Backpress -> {
-                                    horizontalMindmapView?.upOrClose()
+                                RichText -> {
+                                    openRichText(
+                                        mindmapNode = selectedNode,
+                                        activity = this@MainActivity
+                                    )
                                 }
 
-                                SearchNext -> {
-                                    horizontalMindmapView?.searchNext()
-                                }
-                                SearchPrevious -> {
-                                    horizontalMindmapView?.searchPrevious()
-                                }
-                                Up -> {
-                                    horizontalMindmapView?.up()
-                                }
-                                Top -> {
-                                    horizontalMindmapView?.top()
-                                }
-                                Open -> {
-                                    performFileSearch()
-                                }
-                                Help -> {
-                                 showHelp()
+                                Link -> {
+                                    NodeUtils.openLink(
+                                        selectedNode,
+                                        this@MainActivity,
+                                        horizontalMindmapView,
+                                        viewModel,
+                                    )
                                 }
                             }
-                        },
-                    )
+                        }
+                    }
+
+                    Column {
+                        AppTopBar(
+                            text = state.value.selectedNode?.getNodeText(viewModel) ?: stringResource(R.string.app_name),
+                            hasBackIcon = state.value.canGoBack,
+                            onBarAction = { action ->
+                                when (action) {
+                                    Search -> {
+                                        horizontalMindmapView?.startSearch()
+                                    }
+
+                                    Backpress -> {
+                                        viewModel.upOrClose()
+//                                        horizontalMindmapView?.upOrClose()
+                                    }
+
+                                    SearchNext -> {
+                                        horizontalMindmapView?.searchNext()
+                                    }
+
+                                    SearchPrevious -> {
+                                        horizontalMindmapView?.searchPrevious()
+                                    }
+
+                                    Up -> {
+                                        horizontalMindmapView?.up()
+                                    }
+
+                                    Top -> {
+                                        horizontalMindmapView?.top()
+                                    }
+
+                                    Open -> {
+                                        performFileSearch()
+                                    }
+
+                                    Help -> {
+                                        showHelp()
+                                    }
+                                }
+                            },
+                        )
+                        LazyColumn(
+                            modifier = Modifier.height(300.dp),
+                            //                            state =,
+                            //                            contentPadding =,
+                            //                            reverseLayout = false,
+                            //                            verticalArrangement =,
+                            //                            horizontalAlignment =,
+                            //                            flingBehavior =,
+                            //                            userScrollEnabled = false
+                        ) {
+                            state.value.rootNode?.childMindmapNodes?.let { nodes ->
+                                nodeList(
+                                    nodes = nodes,
+                                    fetchText = { node ->
+                                        node.getNodeText(viewModel)
+                                    },
+                                    onNodeClick = { node ->
+                                        Toast.makeText(this@MainActivity, node.getNodeText(viewModel) ?: "", Toast.LENGTH_SHORT).show()
+                                        viewModel.onNodeClick(node)
+                                    }
+                                )
+                            }
+                        }
+                    }
                 }
             }
         }

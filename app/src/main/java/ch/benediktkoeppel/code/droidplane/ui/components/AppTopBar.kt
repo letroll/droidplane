@@ -105,7 +105,6 @@ fun AppTopBar(
             if (hasBackIcon) {
                 FilledIconButton(
                     onClick = { onBarAction(Backpress) },
-                    modifier = Modifier.padding(8.dp),
                     colors = IconButtonDefaults.filledIconButtonColors(
                         containerColor = MaterialTheme.colorScheme.surface,
                         contentColor = MaterialTheme.colorScheme.onSurface
@@ -113,9 +112,7 @@ fun AppTopBar(
                 ) {
                     Icon(
                         imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-//                        contentDescription = stringResource(id = R.string.back_button),
                         contentDescription = null,
-                        modifier = Modifier.size(14.dp)
                     )
                 }
             }

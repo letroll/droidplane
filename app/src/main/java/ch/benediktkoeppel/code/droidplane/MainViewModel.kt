@@ -1,14 +1,18 @@
 package ch.benediktkoeppel.code.droidplane
 
+import android.app.Activity
 import android.net.Uri
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import ch.benediktkoeppel.code.droidplane.SelectedNodeType.Link
+import ch.benediktkoeppel.code.droidplane.SelectedNodeType.None
+import ch.benediktkoeppel.code.droidplane.SelectedNodeType.RichText
 import ch.benediktkoeppel.code.droidplane.controller.NodeChange
-import ch.benediktkoeppel.code.droidplane.controller.NodeChange.AddedChild
 import ch.benediktkoeppel.code.droidplane.controller.NodeChange.NodeStyleChanged
 import ch.benediktkoeppel.code.droidplane.controller.NodeChange.RichContentChanged
 import ch.benediktkoeppel.code.droidplane.controller.NodeChange.SubscribeNodeRichContentChanged
+import ch.benediktkoeppel.code.droidplane.helper.AndroidHelper.getActivity
 import ch.benediktkoeppel.code.droidplane.helper.NodeUtils
 import ch.benediktkoeppel.code.droidplane.helper.NodeUtils.fillArrowLinks
 import ch.benediktkoeppel.code.droidplane.model.MindmapIndexes
@@ -27,16 +31,27 @@ import java.util.Stack
  */
 class MainViewModel : ViewModel() {
     data class MainUiState(
+        val title: String,
+        val defaultTitle: String,
         val loading: Boolean,
+        val leaving: Boolean,
+        val canGoBack: Boolean,
         val rootNode: MindmapNode? = null,
         val selectedNode: MindmapNode? = null,
-//       val nodes:List<>
+        val selectedNodeType: SelectedNodeType,
     ) {
         internal companion object {
             internal fun defaults() = MainUiState(
-                loading = true
+                loading = true,
+                canGoBack = false,
+                leaving = false,
+                title = "",
+                defaultTitle = "",
+                selectedNodeType = None,
             )
         }
+
+        val hasSelectedNodeType:SelectedNodeType?= if (selectedNode != null && selectedNodeType != None) selectedNodeType else null
     }
 
     val modern = false
@@ -128,7 +143,7 @@ class MainViewModel : ViewModel() {
                                 }
 
                                 else -> {
-                                    Log.d(MainApplication.TAG, "Received unknown node " + xpp.getName());
+                                    Log.d(MainApplication.TAG, "Received unknown node " + xpp.name);
                                 }
                             }
                         }
@@ -195,8 +210,11 @@ class MainViewModel : ViewModel() {
 
         // if we don't have a parent node, then this is the root node
         if (parentNode == null) {
+            val title = newMindmapNode.getNodeText(this).orEmpty()
             _uiState.update {
                 it.copy(
+                    title = title,
+                    defaultTitle = title,
                     rootNode = newMindmapNode,
                     selectedNode = newMindmapNode,
                 )
@@ -205,18 +223,15 @@ class MainViewModel : ViewModel() {
             onRootNodeLoaded(rootNode)
         } else {
             parentNode.addChildMindmapNode(newMindmapNode)
-            _uiState.update {
-                it.copy(
-                    rootNode = parentNode
-                )
-            }
-            if (parentNode.hasAddedChildMindmapNodeSubscribers()) {
-                onNodeChange(
-                    AddedChild(
-                        parentNode = parentNode,
-                        childNode = newMindmapNode,
+            if (parentNode.hasAddedChildMindmapNodeSubscribers()) { //si le node est a ajouter
+                Log.e("toto", "add node:${newMindmapNode.getNodeText(this)}")
+                _uiState.update {
+                    it.copy(
+                        rootNode = parentNode
                     )
-                )
+                }
+
+                parentNode.notifySubscribersAddedChildMindmapNode(newMindmapNode)
             }
         }
     }
@@ -306,6 +321,127 @@ class MainViewModel : ViewModel() {
         val mindmapDirectoryPath = mindmapPath?.substring(0, mindmapPath.lastIndexOf("/"))
         Log.d(MainApplication.TAG, "MainViewModel directory path $mindmapDirectoryPath")
         return mindmapDirectoryPath
+    }
+
+    fun onNodeClick(node: MindmapNode) {
+        when {
+            node.childMindmapNodes.size > 0 -> {
+                Log.e("toto","parent:${node.parentNode}")
+                showNode(node)
+            }
+            node.link != null -> {
+                _uiState.update {
+                    it.copy(
+                        selectedNode = node,
+                        selectedNodeType = Link,
+                    )
+                }
+            }
+            node.richTextContents.isNotEmpty() -> {
+                _uiState.update {
+                    it.copy(
+                        selectedNode = node,
+                        selectedNodeType = RichText,
+                    )
+                }
+            }
+            else -> {
+               setTitle(node.getNodeText(this))
+            }
+        }
+    }
+
+    /**
+     * Open up Node node, and display all its child nodes. This should only be called if the node's parent is
+     * currently already expanded. If not (e.g. when following a deep link), use downTo
+     *
+     * @param node
+     */
+    private fun showNode(node: MindmapNode) {
+        _uiState.update {
+            it.copy(
+                selectedNode = node,
+            )
+        }
+//        val nodeColumn: NodeColumn = NodeColumn(context, node, vm)
+//        addColumn(nodeColumn)
+//        // keep track of which list view belongs to which node column. This is necessary because onItemClick will get a
+//        // ListView (the one that was clicked), and we need to know which NodeColumn this is.
+//        val nodeColumnListView = nodeColumn.listView
+//        listViewToNodeColumn[nodeColumnListView] = nodeColumn
+
+        // then scroll all the way to the right
+//        scrollToRight()
+
+        enableHomeButtonIfNeeded(node)
+
+        // get the title of the parent of the rightmost column (i.e. the selected node in the 2nd-rightmost column)
+        setTitle(node.getNodeText(this))
+
+        // mark node as selected
+        node.isSelected = true
+
+        // keep track in the mind map which node is currently selected
+//        this.deepestSelectedMindmapNode = node
+        _uiState.update {
+            it.copy(
+                rootNode = node
+            )
+        }
+    }
+
+    private fun enableHomeButtonIfNeeded(node: MindmapNode) {
+        _uiState.update {
+            it.copy(
+                canGoBack = node.parentNode!=null
+            )
+        }
+    }
+
+    fun setTitle(title: String?){
+        _uiState.update {
+            it.copy(
+                title = title?:it.defaultTitle
+            )
+        }
+    }
+
+    /**
+     * Navigates back up one level in the MainViewModel. If we already display the root node, the application will finish
+     */
+    fun upOrClose() {
+        up(true)
+    }
+
+    /**
+     * Navigates back up one level in the MainViewModel, if possible. If force is true, the application closes if we can't
+     * go further up
+     *
+     * @param force
+     */
+    private fun up(force: Boolean) {
+        _uiState.value.selectedNode?.parentNode?.let { parentNode ->
+            _uiState.update {
+                it.copy(
+                    rootNode = parentNode
+                )
+            }
+
+            // enable the up navigation with the Home (app) button (top left corner)
+            enableHomeButtonIfNeeded(parentNode)
+
+            // get the title of the parent of the rightmost column (i.e. the selected node in the 2nd-rightmost column)
+            setTitle(parentNode.getNodeText(this))
+        }?:run{
+            if(force) {
+                _uiState.update {
+                    it.copy(
+                        leaving = true
+                    )
+                }
+            }
+        }
+
     }
 }
 

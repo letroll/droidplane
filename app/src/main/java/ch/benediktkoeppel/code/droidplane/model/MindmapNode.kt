@@ -135,9 +135,6 @@ data class MindmapNode(
             return combinedArrowLists
         }
 
-    val numChildMindmapNodes: Int
-        get() = childMindmapNodes.size
-
     fun subscribe(nodeColumn: NodeColumn) {
         this.subscribedNodeColumn = WeakReference(nodeColumn)
     }
