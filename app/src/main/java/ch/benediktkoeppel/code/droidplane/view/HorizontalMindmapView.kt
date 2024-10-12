@@ -194,10 +194,8 @@ class HorizontalMindmapView(
      */
     private fun removeRightmostColumn(): Boolean {
         // only remove a column if we have at least 2 columns. If there is only one column, it will not be removed.
-
-        if (nodeColumns.size >= 2) {
+        return if (nodeColumns.size >= 2) {
             // the column to remove
-
             val rightmostColumn = nodeColumns[nodeColumns.size - 1]
 
             // remove it from the linear layout
@@ -210,9 +208,9 @@ class HorizontalMindmapView(
             nodeColumns[nodeColumns.size - 1].deselectAllNodes()
 
             // a column was removed, so we return true
-            return true
+            true
         } else {
-            return false
+            false
         }
     }
 

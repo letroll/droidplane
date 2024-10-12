@@ -150,13 +150,7 @@ class MainActivity : FragmentActivity() {
                     Scaffold(
                         modifier = Modifier,
                         topBar = {
-                            AppTopBar(
-                                text = state.value.selectedNode?.getNodeText(viewModel) ?: stringResource(R.string.app_name),
-                                hasBackIcon = state.value.selectedNode != state.value.rootNode,
-                                onBarAction = {
 
-                                }
-                            )
                         },
                         //                    bottomBar = {},
                         //                    snackbarHost = {},
@@ -331,6 +325,9 @@ class MainActivity : FragmentActivity() {
                         AppTopBar(
                             text = state.value.selectedNode?.getNodeText(viewModel) ?: stringResource(R.string.app_name),
                             hasBackIcon = state.value.canGoBack,
+                            onQuery = { query ->
+                               viewModel.search(query)
+                            },
                             onBarAction = { action ->
                                 when (action) {
                                     Search -> {
@@ -343,19 +340,23 @@ class MainActivity : FragmentActivity() {
                                     }
 
                                     SearchNext -> {
-                                        horizontalMindmapView?.searchNext()
+                                        viewModel.searchNext()
+//                                        horizontalMindmapView?.searchNext()
                                     }
 
                                     SearchPrevious -> {
-                                        horizontalMindmapView?.searchPrevious()
+                                        viewModel.searchPrevious()
+//                                        horizontalMindmapView?.searchPrevious()
                                     }
 
                                     Up -> {
-                                        horizontalMindmapView?.up()
+                                        viewModel.up(false)
+//                                        horizontalMindmapView?.up()
                                     }
 
                                     Top -> {
-                                        horizontalMindmapView?.top()
+                                        viewModel.top()
+//                                        horizontalMindmapView?.top()
                                     }
 
                                     Open -> {

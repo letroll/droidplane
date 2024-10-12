@@ -1,6 +1,5 @@
 package ch.benediktkoeppel.code.droidplane
 
-import android.app.Activity
 import android.net.Uri
 import android.util.Log
 import androidx.lifecycle.ViewModel
@@ -12,7 +11,6 @@ import ch.benediktkoeppel.code.droidplane.controller.NodeChange
 import ch.benediktkoeppel.code.droidplane.controller.NodeChange.NodeStyleChanged
 import ch.benediktkoeppel.code.droidplane.controller.NodeChange.RichContentChanged
 import ch.benediktkoeppel.code.droidplane.controller.NodeChange.SubscribeNodeRichContentChanged
-import ch.benediktkoeppel.code.droidplane.helper.AndroidHelper.getActivity
 import ch.benediktkoeppel.code.droidplane.helper.NodeUtils
 import ch.benediktkoeppel.code.droidplane.helper.NodeUtils.fillArrowLinks
 import ch.benediktkoeppel.code.droidplane.model.MindmapIndexes
@@ -33,6 +31,7 @@ class MainViewModel : ViewModel() {
     data class MainUiState(
         val title: String,
         val defaultTitle: String,
+        val lastSearchString: String,
         val loading: Boolean,
         val leaving: Boolean,
         val canGoBack: Boolean,
@@ -47,11 +46,12 @@ class MainViewModel : ViewModel() {
                 leaving = false,
                 title = "",
                 defaultTitle = "",
+                lastSearchString = "",
                 selectedNodeType = None,
             )
         }
 
-        val hasSelectedNodeType:SelectedNodeType?= if (selectedNode != null && selectedNodeType != None) selectedNodeType else null
+        val hasSelectedNodeType: SelectedNodeType? = if (selectedNode != null && selectedNodeType != None) selectedNodeType else null
     }
 
     val modern = false
@@ -224,7 +224,8 @@ class MainViewModel : ViewModel() {
         } else {
             parentNode.addChildMindmapNode(newMindmapNode)
             if (parentNode.hasAddedChildMindmapNodeSubscribers()) { //si le node est a ajouter
-                Log.e("toto", "add node:${newMindmapNode.getNodeText(this)}")
+                Log.e("toto", "add node:(${newMindmapNode.id})${newMindmapNode.getNodeText(this)}")
+//                Log.e("toto", "add node:${newMindmapNode}")
                 _uiState.update {
                     it.copy(
                         rootNode = parentNode
@@ -326,9 +327,24 @@ class MainViewModel : ViewModel() {
     fun onNodeClick(node: MindmapNode) {
         when {
             node.childMindmapNodes.size > 0 -> {
-                Log.e("toto","parent:${node.parentNode}")
+//                Log.e(
+//                    "toto", """
+//                parent:${node.parentNode}
+//                children:
+//                    ${node.childMindmapNodes.joinToString(separator = "\n", prefix = "      ")}
+//                """.trimIndent()
+//                )
+                Log.e(
+                    "toto", """
+-----------------------------------
+parent:${node.parentNode?.id}   
+children:${node.id}   
+${node.childMindmapNodes.joinToString(separator = "\n", transform = { "(${it.id})${it.getNodeText(this)}"})}
+                """.trimIndent()
+                )
                 showNode(node)
             }
+
             node.link != null -> {
                 _uiState.update {
                     it.copy(
@@ -337,6 +353,7 @@ class MainViewModel : ViewModel() {
                     )
                 }
             }
+
             node.richTextContents.isNotEmpty() -> {
                 _uiState.update {
                     it.copy(
@@ -345,8 +362,9 @@ class MainViewModel : ViewModel() {
                     )
                 }
             }
+
             else -> {
-               setTitle(node.getNodeText(this))
+                setTitle(node.getNodeText(this))
             }
         }
     }
@@ -361,6 +379,7 @@ class MainViewModel : ViewModel() {
         _uiState.update {
             it.copy(
                 selectedNode = node,
+                rootNode = node
             )
         }
 //        val nodeColumn: NodeColumn = NodeColumn(context, node, vm)
@@ -380,28 +399,20 @@ class MainViewModel : ViewModel() {
 
         // mark node as selected
         node.isSelected = true
+    }
 
-        // keep track in the mind map which node is currently selected
-//        this.deepestSelectedMindmapNode = node
+    private fun enableHomeButtonIfNeeded(node: MindmapNode?) {
         _uiState.update {
             it.copy(
-                rootNode = node
+                canGoBack = node?.parentNode != null
             )
         }
     }
 
-    private fun enableHomeButtonIfNeeded(node: MindmapNode) {
+    fun setTitle(title: String?) {
         _uiState.update {
             it.copy(
-                canGoBack = node.parentNode!=null
-            )
-        }
-    }
-
-    fun setTitle(title: String?){
-        _uiState.update {
-            it.copy(
-                title = title?:it.defaultTitle
+                title = title ?: it.defaultTitle
             )
         }
     }
@@ -419,29 +430,110 @@ class MainViewModel : ViewModel() {
      *
      * @param force
      */
-    private fun up(force: Boolean) {
-        _uiState.value.selectedNode?.parentNode?.let { parentNode ->
-            _uiState.update {
-                it.copy(
-                    rootNode = parentNode
-                )
-            }
-
-            // enable the up navigation with the Home (app) button (top left corner)
-            enableHomeButtonIfNeeded(parentNode)
-
-            // get the title of the parent of the rightmost column (i.e. the selected node in the 2nd-rightmost column)
-            setTitle(parentNode.getNodeText(this))
-        }?:run{
-            if(force) {
+    fun up(force: Boolean) {
+        _uiState.value.selectedNode?.id?.let { nodeId ->
+            findFilledNode(nodeId)?.let { node ->
                 _uiState.update {
                     it.copy(
-                        leaving = true
+                        rootNode = node.parentNode,
+                        selectedNode = node.parentNode?.parentNode,
                     )
                 }
+
+                // enable the up navigation with the Home (app) button (top left corner)
+                enableHomeButtonIfNeeded(node.parentNode)
+
+                // get the title of the parent of the rightmost column (i.e. the selected node in the 2nd-rightmost column)
+                setTitle(node.parentNode?.getNodeText(this))
+            } ?: run {
+                if (force) {
+                    leaveApp()
+                }
+            }
+        } ?: run {
+            if (force) {
+                leaveApp()
             }
         }
-
     }
+
+    private fun leaveApp() {
+        _uiState.update {
+            it.copy(
+                leaving = true
+            )
+        }
+    }
+
+    //TODO Try with clone
+    // TODO use suspend
+    /** Depth-first search in the core text of the nodes in this sub-tree.  */ // TODO: this doesn't work while viewModel is still loading
+    private fun findFilledNode(
+        parentNodeId: String,
+    ): MindmapNode? {
+//        viewModelScope.launch {
+//
+//        }
+        return depthFirstSearchRecursive(rootNode,parentNodeId)
+    }
+
+    private fun depthFirstSearchRecursive(
+        node: MindmapNode?,
+        targetId: String,
+    ): MindmapNode? {
+        if (node == null){
+            return null
+        }
+        if (node.id == targetId) {
+            return node
+        }
+        for (child in node.childMindmapNodes) {
+            val result = depthFirstSearchRecursive(child, targetId)
+            if (result != null) {
+                return result
+            }
+        }
+        return null
+    }
+
+    fun searchNext() {
+        TODO("Not yet implemented")
+    }
+
+    fun searchPrevious() {
+        TODO("Not yet implemented")
+    }
+
+    fun top() {
+        _uiState.update {
+            it.copy(
+                rootNode = rootNode,
+                selectedNode = null,
+            )
+        }
+    }
+
+    fun search(query: String) {
+        TODO("Not yet implemented")
+    }
+
+//    fun search(
+//        searchString: String,
+//        viewModel: MainViewModel,
+//    ): List<MindmapNode> {
+//        val res = ArrayList<MindmapNode>()
+//        if (getNodeText(viewModel)?.uppercase(Locale.getDefault())?.contains(searchString.uppercase(Locale.getDefault())) == true) { // TODO: npe here when text is null, because text is a rich text
+//            res.add(this)
+//        }
+//        for (child in childMindmapNodes) {
+//            res.addAll(
+//                child.search(
+//                    searchString,
+//                    viewModel
+//                )
+//            )
+//        }
+//        return res
+//    }
 }
 
