@@ -6,7 +6,7 @@ plugins {
 
 android {
     defaultConfig {
-        applicationId = "ch.benediktkoeppel.code.droidplane"
+        applicationId = "fr.julien.quievreux.droidplane2"
         minSdk = 21
         targetSdk = 34
     }
@@ -25,7 +25,7 @@ android {
         sourceCompatibility = JavaVersion.VERSION_21
         targetCompatibility = JavaVersion.VERSION_21
     }
-    namespace = "ch.benediktkoeppel.code.droidplane"
+    namespace = "fr.julien.quievreux.droidplane2"
     compileSdk = 34
 
     kotlinOptions {
