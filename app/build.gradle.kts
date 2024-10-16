@@ -48,6 +48,8 @@ dependencies {
     debugImplementation(libs.androidx.ui.tooling)
 
     implementation(libs.androidx.material3)
+    implementation(libs.font.awesome)
+    implementation(libs.tabler.icons)
 
     implementation(project.dependencies.platform(libs.koin.bom))
     implementation(libs.koin.android)

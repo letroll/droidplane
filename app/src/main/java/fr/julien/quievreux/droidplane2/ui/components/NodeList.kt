@@ -25,6 +25,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import fr.julien.quievreux.droidplane2.MainApplication
 import fr.julien.quievreux.droidplane2.model.MindmapNode
+import fr.julien.quievreux.droidplane2.model.getNodeIconsResIdFromName
 import fr.julien.quievreux.droidplane2.ui.theme.ContrastAwareReplyTheme
 
 fun LazyListScope.nodeList(
@@ -63,8 +64,13 @@ fun LazyListScope.nodeList(
                     val iconNames = node.iconNames
                     val iconResourceIds = mutableListOf<Int>()
                     for (iconName in iconNames) {
-                        val drawableName = getDrawableNameFromMindmapIcon(iconName,context)
-                        iconResourceIds.add(context.resources.getIdentifier("@drawable/$drawableName", "id", context.packageName))
+                        getNodeIconsResIdFromName(iconName)?.let {
+                            Log.e(MainApplication.TAG, "converted icon from enum")
+                            iconResourceIds.add(it)
+                        }?:run {
+                            val drawableName = getDrawableNameFromMindmapIcon(iconName, context)
+                            iconResourceIds.add(context.resources.getIdentifier("@drawable/$drawableName", "id", context.packageName))
+                        }
                     }
 
                     // set link icon if node has a link. The link icon will be the first icon shown
@@ -78,6 +84,7 @@ fun LazyListScope.nodeList(
                     }
 
                     if(iconResourceIds.isNotEmpty()) {
+
                         Icon(
                             painter = painterResource(iconResourceIds.first()),
                             contentDescription = null,

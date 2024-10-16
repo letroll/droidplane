@@ -3,12 +3,12 @@ buildscript {
     repositories {
         google()
         mavenCentral()
+        maven("https://jitpack.io")
     }
     dependencies {
-        classpath("com.android.tools.build:gradle:8.2.2")
-        classpath("com.google.gms:google-services:4.4.2")
-        classpath("org.projectlombok:lombok:1.18.34")
-        classpath("org.jetbrains.kotlin:kotlin-gradle-plugin:2.0.20")
+        classpath(libs.gradle)
+        classpath(libs.google.services)
+        classpath(libs.kotlin.gradle.plugin)
     }
 }
 
@@ -16,6 +16,7 @@ allprojects {
     repositories {
         google()
         mavenCentral()
+        maven("https://jitpack.io")
     }
 }
 
