@@ -1,5 +1,5 @@
 [versions]
-activityCompose = "1.9.2"
+activityCompose = "1.9.3"
 constraintlayout = "2.1.4"
 fontAwesome = "1.1.1"
 googleServices = "4.4.2"

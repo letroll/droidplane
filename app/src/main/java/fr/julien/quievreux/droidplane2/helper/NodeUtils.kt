@@ -176,34 +176,40 @@ object NodeUtils {
         mindmapNode: MindmapNode,
         activity: FragmentActivity,
     ) {
-        val richTextContent = mindmapNode.richTextContents[0]
-        val intent = Intent(activity, RichTextViewActivity::class.java)
-        intent.putExtra("richTextContent", richTextContent)
-        activity.startActivity(intent)
+        if(mindmapNode.richTextContents.isNotEmpty()){
+            val richTextContent = mindmapNode.richTextContents.first()
+            val intent = Intent(activity, RichTextViewActivity::class.java)
+            intent.putExtra("richTextContent", richTextContent)
+            activity.startActivity(intent)
+        }
     }
 
+
+    // if the link has a "#ID123", it's an internal link within the document
+    private fun isInternalLink(node: MindmapNode?): Boolean =
+        node?.link?.fragment != null && node.link.fragment?.startsWith("ID") == true
 
     /**
      * Opens the link of this node (if any)
      */
-    //TODO remove link to activity
     fun openLink(
         mindmapNode: MindmapNode?,
         activity: FragmentActivity,
-        horizontalMindmapView: HorizontalMindmapView?,
-        viewModel: MainViewModel
+        viewModel: MainViewModel,
+        onLinkBroken : (String?) -> Unit,
     ) {
+        //TODO use something like timber
         // TODO: if link is internal, substring ID
-        Log.d(MainApplication.TAG, "Opening link (to string): " + mindmapNode?.link.toString())
-        Log.d(MainApplication.TAG, "Opening link (fragment, everything after '#'): " + mindmapNode?.link?.fragment)
+        Log.d(MainApplication.TAG, """
+Opening link (to string): ${mindmapNode?.link}
+Opening link (fragment, everything after '#'): ${mindmapNode?.link?.fragment}
+        """.trimIndent())
 
-        // if the link has a "#ID123", it's an internal link within the document
-        if (mindmapNode?.link?.fragment != null && mindmapNode.link.fragment?.startsWith("ID") == true) {
+        if (isInternalLink(mindmapNode)) {
             openInternalFragmentLink(
                 mindmapNode = mindmapNode,
-                activity = activity,
                 viewModel = viewModel,
-                horizontalMindmapView = horizontalMindmapView,
+                onLinkBroken = onLinkBroken,
             )
         } else {
             openIntentLink(
@@ -219,9 +225,8 @@ object NodeUtils {
      */
     private fun openInternalFragmentLink(
         mindmapNode: MindmapNode?,
-        activity: FragmentActivity,
         viewModel: MainViewModel,
-        horizontalMindmapView: HorizontalMindmapView?,
+        onLinkBroken: (String?) -> Unit,
     ) {
         // internal link, so this.link is of the form "#ID_123234534" this.link.getFragment() should give everything
         // after the "#" it is null if there is no "#", which should be the case for all other links
@@ -234,20 +239,16 @@ object NodeUtils {
             // the internal linked node might be anywhere in the viewModel, i.e. on a completely separate branch than
             // we are on currently. We need to go to the Top, and then descend into the viewModel to reach the right
             // point
-            horizontalMindmapView?.downTo(linkedInternal, true)
+            viewModel.downTo(linkedInternal, true)
         } else {
-            Toast.makeText(
-                activity,
-                "This internal link to ID $fragment seems to be broken.",
-                Toast.LENGTH_SHORT
-            ).show()
+            onLinkBroken(fragment)
         }
     }
 
     /**
      * Open this node's link as intent
      */
-    fun openIntentLink(
+    private fun openIntentLink(
         mindmapNode: MindmapNode?,
         mindmapDirectoryPath: String?,
         activity: FragmentActivity,

@@ -67,6 +67,10 @@ class MainActivity : FragmentActivity() {
 
     val viewModel: MainViewModel by viewModel()
 
+    private val clipboardManager by lazy {
+        getSystemService(CLIPBOARD_SERVICE) as ClipboardManager
+    }
+
     var horizontalMindmapView: HorizontalMindmapView? = null
         private set
 
@@ -120,7 +124,7 @@ class MainActivity : FragmentActivity() {
                 ContrastAwareReplyTheme {
                     val state = viewModel.uiState.collectAsState()
 
-                    if(state.value.leaving)finish() //TODO confirm dialog
+                    if (state.value.leaving) finish() //TODO confirm dialog
 
                     Scaffold(
                         modifier = Modifier,
@@ -287,10 +291,16 @@ class MainActivity : FragmentActivity() {
 
                                 Link -> {
                                     NodeUtils.openLink(
-                                        selectedNode,
-                                        this@MainActivity,
-                                        horizontalMindmapView,
-                                        viewModel,
+                                        mindmapNode = selectedNode,
+                                        activity = this@MainActivity,
+                                        viewModel = viewModel,
+                                        onLinkBroken = { fragment ->
+                                            Toast.makeText(
+                                                this@MainActivity,
+                                                "This internal link to ID $fragment seems to be broken.",
+                                                Toast.LENGTH_SHORT
+                                            ).show()
+                                        }
                                     )
                                 }
                             }
@@ -302,9 +312,9 @@ class MainActivity : FragmentActivity() {
                             text = state.value.selectedNode?.getNodeText(viewModel) ?: stringResource(R.string.app_name),
                             hasBackIcon = state.value.canGoBack,
                             onQuery = { query ->
-                               viewModel.search(query)
+                                viewModel.search(query)
                             },
-                            hasSearchNavigateButton = Pair(state.value.currentSearchResultIndex > 0 , state.value.currentSearchResultIndex < nodeFindList.value.size - 1),
+                            hasSearchNavigateButton = Pair(state.value.currentSearchResultIndex > 0, state.value.currentSearchResultIndex < nodeFindList.value.size - 1),
                             onBarAction = { action ->
                                 when (action) {
                                     Search -> {
@@ -347,7 +357,8 @@ class MainActivity : FragmentActivity() {
                             },
                         )
                         LazyColumn(
-                            modifier = Modifier.height(300.dp),
+                            modifier = Modifier
+                                .height(300.dp),
                             //                            state =,
                             //                            contentPadding =,
                             //                            reverseLayout = false,
@@ -357,11 +368,11 @@ class MainActivity : FragmentActivity() {
                             //                            userScrollEnabled = false
                         ) {
                             state.value.rootNode?.childMindmapNodes?.let { nodes ->
-                                Log.e("toto","list updated")
-                                val searchResultToShow = if(nodeFindList.value.isEmpty()){
-                                   null
-                                }else{
-                                   nodeFindList.value[state.value.currentSearchResultIndex]
+                                Log.e("toto", "list updated")
+                                val searchResultToShow = if (nodeFindList.value.isEmpty()) {
+                                    null
+                                } else {
+                                    nodeFindList.value[state.value.currentSearchResultIndex]
                                 }
                                 nodeList(
                                     nodes = nodes,
@@ -369,10 +380,12 @@ class MainActivity : FragmentActivity() {
                                     fetchText = { node ->
                                         node.getNodeText(viewModel)
                                     },
-                                    onNodeClick = { node ->
-                                        Toast.makeText(this@MainActivity, node.getNodeText(viewModel) ?: "", Toast.LENGTH_SHORT).show()
-                                        viewModel.onNodeClick(node)
-                                    }
+                                    updateClipBoard = { text ->
+                                        val clipData = ClipData.newPlainText("node", text)
+                                        updateClipboard(clipData)
+                                    },
+                                    onNodeClick = viewModel::onNodeClick,
+                                    onNodeContextMenuClick = viewModel::onNodeContextMenuClick,
                                 )
                             }
                         }
@@ -412,19 +425,21 @@ class MainActivity : FragmentActivity() {
 
         // MindmapNodeLayout extends LinearView, so we can cast targetView back to MindmapNodeLayout
         val mindmapNodeLayout = contextMenuInfo?.targetView as MindmapNodeLayout
-        Log.d(MainApplication.TAG, "mindmapNodeLayout.text = " + mindmapNodeLayout.mindmapNode?.getNodeText(viewModel))
-
-        Log.d(MainApplication.TAG, "contextMenuInfo.position = " + contextMenuInfo.position)
-        Log.d(MainApplication.TAG, "item.getTitle() = " + item.title)
+        Log.d(
+            MainApplication.TAG, """
+        mindmapNodeLayout.text =${mindmapNodeLayout.mindmapNode?.getNodeText(viewModel)} 
+        ${contextMenuInfo.position}=${contextMenuInfo.position}
+        ${item.title} =  ${item.title}
+        """.trimIndent()
+        )
 
         when (item.groupId) {
             MindmapNodeLayout.CONTEXT_MENU_NORMAL_GROUP_ID -> when (item.itemId) {
                 R.id.contextcopy -> {
                     Log.d(MainApplication.TAG, "Copying text to clipboard")
-                    val clipboardManager = getSystemService(CLIPBOARD_SERVICE) as ClipboardManager
 
                     val clipData = ClipData.newPlainText("node", mindmapNodeLayout.mindmapNode?.getNodeText(viewModel))
-                    clipboardManager.setPrimaryClip(clipData)
+                    updateClipboard(clipData)
                 }
 
                 R.id.contextedittext -> {
@@ -437,8 +452,8 @@ class MainActivity : FragmentActivity() {
                     NodeUtils.openLink(
                         mindmapNode = mindmapNodeLayout.mindmapNode,
                         activity = this,
-                        horizontalMindmapView = horizontalMindmapView,
                         viewModel = viewModel,
+                        {}
                     )
                 }
 
@@ -461,11 +476,16 @@ class MainActivity : FragmentActivity() {
             MindmapNodeLayout.CONTEXT_MENU_ARROWLINK_GROUP_ID -> {
                 val nodeNumericId = item.itemId
                 val nodeByNumericID = viewModel.getNodeByNumericID(nodeNumericId)
+                viewModel.downTo(nodeByNumericID, true)
                 horizontalMindmapView?.downTo(nodeByNumericID, true)
             }
         }
 
         return true
+    }
+
+    private fun updateClipboard(clipData: ClipData) {
+        clipboardManager.setPrimaryClip(clipData)
     }
 
     /**

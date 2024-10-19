@@ -482,8 +482,8 @@ class HorizontalMindmapView(
                     NodeUtils.openLink(
                         mindmapNode,
                         mainActivity,
-                        this@HorizontalMindmapView,
-                        vm
+                        vm,
+                        {}
                     )
                 }
             } else if (mindmapNode?.richTextContents?.isNotEmpty() == true) {

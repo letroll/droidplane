@@ -13,10 +13,13 @@ import fr.julien.quievreux.droidplane2.controller.NodeChange.RichContentChanged
 import fr.julien.quievreux.droidplane2.controller.NodeChange.SubscribeNodeRichContentChanged
 import fr.julien.quievreux.droidplane2.helper.NodeUtils
 import fr.julien.quievreux.droidplane2.helper.NodeUtils.fillArrowLinks
+import fr.julien.quievreux.droidplane2.model.ContextMenuAction
+import fr.julien.quievreux.droidplane2.model.ContextMenuAction.CopyText
+import fr.julien.quievreux.droidplane2.model.ContextMenuAction.Edit
+import fr.julien.quievreux.droidplane2.model.ContextMenuAction.NodeLink
 import fr.julien.quievreux.droidplane2.model.MindmapIndexes
 import fr.julien.quievreux.droidplane2.model.MindmapNode
 import fr.julien.quievreux.droidplane2.model.NodeAttribute
-import fr.julien.quievreux.droidplane2.model.NodeConstant
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -97,7 +100,7 @@ class MainViewModel : ViewModel() {
     /**
      * A map that resolves node IDs to Node objects
      */
-    var mindmapIndexes: MindmapIndexes? = null
+    private var mindmapIndexes: MindmapIndexes? = null
 
     init {
 
@@ -559,7 +562,7 @@ ${node.childMindmapNodes.joinToString(separator = "\n", transform = { "(${it.id}
      * Navigate down the MainViewModel to the specified node, opening each of it's parent nodes along the way.
      * @param node
      */
-    private fun downTo(node: MindmapNode?, openLast: Boolean) {
+    fun downTo(node: MindmapNode?, openLast: Boolean) {
         // first navigate back to the top (essentially closing all other nodes)
         top()
 
@@ -619,6 +622,20 @@ query:$query
 isSearching:${_isSearching.value} 
 find:${nodeFindList.value.joinToString(separator = "|", transform = {it.getNodeText(this@MainViewModel).orEmpty()})}" 
         """.trimIndent())
+    }
+
+    fun onNodeContextMenuClick(contextMenuAction: ContextMenuAction) {
+        when(contextMenuAction){
+            Edit -> {
+
+            }
+            is NodeLink -> {
+                val nodeByNumericID = getNodeByNumericID(contextMenuAction.node.numericId)
+                downTo(nodeByNumericID, true)
+            }
+
+            is CopyText -> {/* already handled by activity */}
+        }
     }
 
 //    fun search(
