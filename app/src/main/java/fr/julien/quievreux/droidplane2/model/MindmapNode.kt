@@ -4,10 +4,7 @@ import android.net.Uri
 import android.text.Html
 import fr.julien.quievreux.droidplane2.MainActivity
 import fr.julien.quievreux.droidplane2.MainViewModel
-import fr.julien.quievreux.droidplane2.view.MindmapNodeLayout
-import fr.julien.quievreux.droidplane2.view.NodeColumn
 import java.lang.ref.WeakReference
-import java.util.Locale
 
 /**
  * A MindMapNode is a special type of DOM Node. A DOM Node can be converted to a MindMapNode if it has type ELEMENT,
@@ -91,9 +88,7 @@ data class MindmapNode(
      * List of incoming arrow MindmapNodes
      */
     val arrowLinkIncomingNodes: MutableList<MindmapNode> = mutableListOf()
-    private var subscribedNodeColumn: WeakReference<NodeColumn>? = null
     private var subscribedMainActivity: WeakReference<MainActivity>? = null
-    private var subscribedNodeLayout: WeakReference<MindmapNodeLayout>? = null
     var loaded = false
 
     // TODO: this should probably live in a view controller, not here
@@ -117,8 +112,6 @@ data class MindmapNode(
         return text
     }
 
-    val isExpandable: Boolean = childMindmapNodes.isNotEmpty()
-
     fun addRichTextContent(richTextContent: String) {
         richTextContents.add(richTextContent)
     }
@@ -131,45 +124,15 @@ data class MindmapNode(
             return combinedArrowLists
         }
 
-    fun subscribe(nodeColumn: NodeColumn) {
-        this.subscribedNodeColumn = WeakReference(nodeColumn)
-    }
-
     fun addChildMindmapNode(newMindmapNode: MindmapNode) {
         childMindmapNodes.add(newMindmapNode)
     }
 
-    fun hasAddedChildMindmapNodeSubscribers(): Boolean = this.subscribedNodeColumn != null
-
-    fun notifySubscribersAddedChildMindmapNode(mindmapNode: MindmapNode) {
-        if (this.subscribedNodeColumn != null) {
-            subscribedNodeColumn?.get()?.notifyNewMindmapNode(mindmapNode)
-        }
-    }
-
     fun hasNodeRichContentChangedSubscribers(): Boolean = this.subscribedMainActivity != null
-
-    fun notifySubscribersNodeRichContentChanged() {
-        if (this.subscribedMainActivity != null) {
-            subscribedMainActivity?.get()?.horizontalMindmapView?.setApplicationTitle()
-        }
-    }
 
     // TODO: ugly that MainActivity is needed here. Would be better to introduce an listener interface (same for node column above)
     fun subscribeNodeRichContentChanged(mainActivity: MainActivity) {
         this.subscribedMainActivity = WeakReference(mainActivity)
-    }
-
-    fun hasNodeStyleChangedSubscribers(): Boolean = this.subscribedNodeLayout != null
-
-    fun subscribeNodeStyleChanged(nodeLayout: MindmapNodeLayout) {
-        this.subscribedNodeLayout = WeakReference(nodeLayout)
-    }
-
-    fun notifySubscribersNodeStyleChanged() {
-        if (this.subscribedNodeLayout != null) {
-            subscribedNodeLayout?.get()?.refreshView()
-        }
     }
 
     fun addIconName(iconName: String) {
@@ -178,26 +141,6 @@ data class MindmapNode(
 
     fun addArrowLinkDestinationId(destinationId: String) {
         arrowLinkDestinationIds.add(destinationId)
-    }
-
-    /** Depth-first search in the core text of the nodes in this sub-tree.  */ // TODO: this doesn't work while viewModel is still loading
-    fun search(
-        searchString: String,
-        viewModel: MainViewModel,
-    ): List<MindmapNode> {
-        val res = ArrayList<MindmapNode>()
-        if (getNodeText(viewModel)?.uppercase(Locale.getDefault())?.contains(searchString.uppercase(Locale.getDefault())) == true) { // TODO: npe here when text is null, because text is a rich text
-            res.add(this)
-        }
-        for (child in childMindmapNodes) {
-            res.addAll(
-                child.search(
-                    searchString,
-                    viewModel
-                )
-            )
-        }
-        return res
     }
 
     fun deselectAllChildNodes(): MindmapNode {

@@ -8,7 +8,6 @@ import fr.julien.quievreux.droidplane2.SelectedNodeType.Link
 import fr.julien.quievreux.droidplane2.SelectedNodeType.None
 import fr.julien.quievreux.droidplane2.SelectedNodeType.RichText
 import fr.julien.quievreux.droidplane2.controller.NodeChange
-import fr.julien.quievreux.droidplane2.controller.NodeChange.NodeStyleChanged
 import fr.julien.quievreux.droidplane2.controller.NodeChange.RichContentChanged
 import fr.julien.quievreux.droidplane2.controller.NodeChange.SubscribeNodeRichContentChanged
 import fr.julien.quievreux.droidplane2.helper.NodeUtils
@@ -86,7 +85,7 @@ class MainViewModel : ViewModel() {
             } else {
                 nodes.filter { node ->// filter and return a list of nodes based on the text the user typed
                     node.getNodeText(this)?.contains(text.trim(), ignoreCase = true) == true
-                }.reversed()
+                }//.reversed()
             }
         }.stateIn( //basically convert the Flow returned from combine operator to StateFlow
             scope = viewModelScope,
@@ -170,7 +169,7 @@ class MainViewModel : ViewModel() {
                                 }
 
                                 xpp.name == "icon" && xpp.getAttributeValue(null, "BUILTIN") != null -> {
-                                    parseIcon(xpp, nodeStack, onNodeChange)
+                                    parseIcon(xpp, nodeStack)
                                 }
 
                                 xpp.name == "arrowlink" -> {
@@ -265,17 +264,6 @@ class MainViewModel : ViewModel() {
             _allNodes.update {
                 it + newMindmapNode
             }
-            if (parentNode.hasAddedChildMindmapNodeSubscribers()) { //si le node est a ajouter
-                Log.e("toto", "add node:(${newMindmapNode.id})${newMindmapNode.getNodeText(this)}")
-//                Log.e("toto", "add node:${newMindmapNode}")
-                _uiState.update {
-                    it.copy(
-                        rootNode = parentNode
-                    )
-                }
-
-                parentNode.notifySubscribersAddedChildMindmapNode(newMindmapNode)
-            }
         }
     }
 
@@ -310,7 +298,7 @@ class MainViewModel : ViewModel() {
         }
     }
 
-    private fun parseIcon(xpp: XmlPullParser, nodeStack: Stack<MindmapNode>, onNodeChange: (nodeChange: NodeChange) -> Unit) {
+    private fun parseIcon(xpp: XmlPullParser, nodeStack: Stack<MindmapNode>) {
         val iconName = xpp.getAttributeValue(null, NodeAttribute.BUILTIN.name)
 
         // if we have no parent node, something went seriously wrong - we can't have icons that is not part of a viewModel node
@@ -318,11 +306,6 @@ class MainViewModel : ViewModel() {
 
         val parentNode = nodeStack.peek()
         parentNode.addIconName(iconName)
-
-        // let view know that node content has changed
-        if (parentNode.hasNodeStyleChangedSubscribers()) {
-            onNodeChange(NodeStyleChanged(parentNode))
-        }
     }
 
     private fun parseFont(xpp: XmlPullParser, nodeStack: Stack<MindmapNode>, onNodeChange: (nodeChange: NodeChange) -> Unit) {
@@ -339,11 +322,6 @@ class MainViewModel : ViewModel() {
         val italicsAttribute = xpp.getAttributeValue(null, NodeAttribute.ITALIC.name)
         if (italicsAttribute != null && italicsAttribute == "true") {
             parentNode.isItalic = true
-        }
-
-        // let view know that node content has changed
-        if (parentNode.hasNodeStyleChangedSubscribers()) {
-            onNodeChange(NodeStyleChanged(parentNode))
         }
     }
 
@@ -551,6 +529,11 @@ ${node.childMindmapNodes.joinToString(separator = "\n", transform = { "(${it.id}
     }
 
     private fun showCurrentSearchResult() {
+        Log.e("toto","""
+showCurrentSearchResult:${_uiState.value.currentSearchResultIndex}
+nodeFindList:${nodeFindList.value.map { it.getNodeText(this) }.joinToString(separator = "|")}
+        """.trimIndent()
+            )
         if (_uiState.value.currentSearchResultIndex >= 0 && _uiState.value.currentSearchResultIndex < nodeFindList.value.size) {
             downTo(nodeFindList.value[_uiState.value.currentSearchResultIndex], false)
         }
@@ -620,8 +603,12 @@ ${node.childMindmapNodes.joinToString(separator = "\n", transform = { "(${it.id}
         Log.e("toto","""
 query:$query 
 isSearching:${_isSearching.value} 
-find:${nodeFindList.value.joinToString(separator = "|", transform = {it.getNodeText(this@MainViewModel).orEmpty()})}" 
+find:${nodeFindList.value.joinToString(separator = "|", transform = {it.getNodeText(this@MainViewModel).orEmpty()})} 
         """.trimIndent())
+
+        if(nodeFindList.value.size==1){
+            showCurrentSearchResult()
+        }
     }
 
     fun onNodeContextMenuClick(contextMenuAction: ContextMenuAction) {

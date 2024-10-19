@@ -13,7 +13,6 @@ import fr.julien.quievreux.droidplane2.MainApplication
 import fr.julien.quievreux.droidplane2.MainViewModel
 import fr.julien.quievreux.droidplane2.model.MindmapIndexes
 import fr.julien.quievreux.droidplane2.model.MindmapNode
-import fr.julien.quievreux.droidplane2.view.HorizontalMindmapView
 import fr.julien.quievreux.droidplane2.view.RichTextViewActivity
 import org.xmlpull.v1.XmlPullParser
 import org.xmlpull.v1.XmlPullParserException

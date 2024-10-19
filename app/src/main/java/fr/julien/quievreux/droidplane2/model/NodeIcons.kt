@@ -24,6 +24,8 @@ enum class NodeIcons(
     val resId: Int,
     val imageVector: ImageVector,
 ) {
+    //TODO bind all icon
+    //TODO remove all drawable
     Attach("attach", R.drawable.icon_attach, FontAwesomeIcons.Solid.Paperclip),
     Full0("full-0", R.drawable.icon_full_0, TablerIcons.Circle0),
     Full1("full-1", R.drawable.icon_full_1, TablerIcons.Circle1),
