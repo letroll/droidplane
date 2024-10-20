@@ -1,7 +1,6 @@
 package fr.julien.quievreux.droidplane2.ui.components
 
 import androidx.compose.foundation.Image
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
@@ -35,8 +34,6 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Color.Companion
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
@@ -51,7 +48,6 @@ import fr.julien.quievreux.droidplane2.ui.components.AppTopBarAction.Up
 import fr.julien.quievreux.droidplane2.R
 
 enum class AppTopBarAction {
-    Search,
     SearchNext,
     SearchPrevious,
     Up,
@@ -208,7 +204,6 @@ fun AppTopBar(
                 BarIcon(
                     imageVector = Icons.Default.Search,
                     onClick = {
-//                        onBarAction(Search)
                         showSearch = true
                     },
                 )

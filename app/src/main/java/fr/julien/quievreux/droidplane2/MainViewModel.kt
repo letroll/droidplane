@@ -7,9 +7,6 @@ import androidx.lifecycle.viewModelScope
 import fr.julien.quievreux.droidplane2.SelectedNodeType.Link
 import fr.julien.quievreux.droidplane2.SelectedNodeType.None
 import fr.julien.quievreux.droidplane2.SelectedNodeType.RichText
-import fr.julien.quievreux.droidplane2.controller.NodeChange
-import fr.julien.quievreux.droidplane2.controller.NodeChange.RichContentChanged
-import fr.julien.quievreux.droidplane2.controller.NodeChange.SubscribeNodeRichContentChanged
 import fr.julien.quievreux.droidplane2.helper.NodeUtils
 import fr.julien.quievreux.droidplane2.helper.NodeUtils.fillArrowLinks
 import fr.julien.quievreux.droidplane2.model.ContextMenuAction
@@ -63,8 +60,6 @@ class MainViewModel : ViewModel() {
 
         val hasSelectedNodeType: SelectedNodeType? = if (selectedNode != null && selectedNodeType != None) selectedNodeType else null
     }
-
-    val modern = false
 
     private val _uiState: MutableStateFlow<MainUiState> = MutableStateFlow(MainUiState.defaults())
     val uiState: StateFlow<MainUiState> = _uiState
@@ -130,9 +125,6 @@ class MainViewModel : ViewModel() {
      */
     fun loadMindMap(
         inputStream: InputStream? = null,
-        onRootNodeLoaded: (rootNode: MindmapNode?) -> Unit,
-        onNodeChange: (nodeChange: NodeChange) -> Unit,
-        //TODO remove lambda and use state
     ) {
         viewModelScope.launch {
             setMindmapIsLoading(true)
@@ -157,15 +149,15 @@ class MainViewModel : ViewModel() {
                         XmlPullParser.START_TAG -> {
                             when {
                                 xpp.name == "node" -> {
-                                    parseNode(nodeStack, xpp, onNodeChange, onRootNodeLoaded)
+                                    parseNode(nodeStack, xpp)
                                 }
 
                                 isRichContent(xpp) -> {
-                                    parseRichContent(xpp, nodeStack, onNodeChange)
+                                    parseRichContent(xpp, nodeStack)
                                 }
 
                                 xpp.name == "font" -> {
-                                    parseFont(xpp, nodeStack, onNodeChange)
+                                    parseFont(xpp, nodeStack)
                                 }
 
                                 xpp.name == "icon" && xpp.getAttributeValue(null, "BUILTIN") != null -> {
@@ -229,8 +221,6 @@ class MainViewModel : ViewModel() {
     private fun parseNode(
         nodeStack: Stack<MindmapNode>,
         xpp: XmlPullParser,
-        onNodeChange: (nodeChange: NodeChange) -> Unit,
-        onRootNodeLoaded: (rootNode: MindmapNode?) -> Unit,
     ) {
         var parentNode: MindmapNode? = null
         if (!nodeStack.empty()) {
@@ -239,8 +229,6 @@ class MainViewModel : ViewModel() {
 
         val newMindmapNode = NodeUtils.parseNodeTag(xpp, parentNode)
         nodeStack.push(newMindmapNode)
-
-        onNodeChange(SubscribeNodeRichContentChanged(newMindmapNode))
 
         // if we don't have a parent node, then this is the root node
         if (parentNode == null) {
@@ -254,7 +242,6 @@ class MainViewModel : ViewModel() {
                 )
             }
             rootNode = newMindmapNode
-            onRootNodeLoaded(rootNode)
             _allNodes.update {
                 listOf(newMindmapNode)
             }
@@ -279,7 +266,7 @@ class MainViewModel : ViewModel() {
     // if this is an empty tag, we won't need to bother trying to read its content
     // we don't even need to read the <richcontent> node's attributes, as we would
     // only be interested in it's children
-    private fun parseRichContent(xpp: XmlPullParser, nodeStack: Stack<MindmapNode>, onNodeChange: (nodeChange: NodeChange) -> Unit) {
+    private fun parseRichContent(xpp: XmlPullParser, nodeStack: Stack<MindmapNode>) {
         if (xpp.isEmptyElementTag) {
             Log.d(MainApplication.TAG, "Received empty richcontent node - skipping")
         } else {
@@ -290,11 +277,6 @@ class MainViewModel : ViewModel() {
 
             val parentNode = nodeStack.peek()
             parentNode.addRichTextContent(richTextContent)
-
-            // let view know that node content has changed
-            if (parentNode.hasNodeRichContentChangedSubscribers()) {
-                onNodeChange(RichContentChanged(parentNode))
-            }
         }
     }
 
@@ -308,7 +290,7 @@ class MainViewModel : ViewModel() {
         parentNode.addIconName(iconName)
     }
 
-    private fun parseFont(xpp: XmlPullParser, nodeStack: Stack<MindmapNode>, onNodeChange: (nodeChange: NodeChange) -> Unit) {
+    private fun parseFont(xpp: XmlPullParser, nodeStack: Stack<MindmapNode>) {
         val boldAttribute = xpp.getAttributeValue(null, NodeAttribute.BOLD.name)
 
         // if we have no parent node, something went seriously wrong - we can't have a font node that is not part of a viewModel node
@@ -624,24 +606,5 @@ find:${nodeFindList.value.joinToString(separator = "|", transform = {it.getNodeT
             is CopyText -> {/* already handled by activity */}
         }
     }
-
-//    fun search(
-//        searchString: String,
-//        viewModel: MainViewModel,
-//    ): List<MindmapNode> {
-//        val res = ArrayList<MindmapNode>()
-//        if (getNodeText(viewModel)?.uppercase(Locale.getDefault())?.contains(searchString.uppercase(Locale.getDefault())) == true) { // TODO: npe here when text is null, because text is a rich text
-//            res.add(this)
-//        }
-//        for (child in childMindmapNodes) {
-//            res.addAll(
-//                child.search(
-//                    searchString,
-//                    viewModel
-//                )
-//            )
-//        }
-//        return res
-//    }
 }
 

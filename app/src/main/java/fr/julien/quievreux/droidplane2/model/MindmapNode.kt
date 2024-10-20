@@ -88,7 +88,6 @@ data class MindmapNode(
      * List of incoming arrow MindmapNodes
      */
     val arrowLinkIncomingNodes: MutableList<MindmapNode> = mutableListOf()
-    private var subscribedMainActivity: WeakReference<MainActivity>? = null
     var loaded = false
 
     // TODO: this should probably live in a view controller, not here
@@ -126,13 +125,6 @@ data class MindmapNode(
 
     fun addChildMindmapNode(newMindmapNode: MindmapNode) {
         childMindmapNodes.add(newMindmapNode)
-    }
-
-    fun hasNodeRichContentChangedSubscribers(): Boolean = this.subscribedMainActivity != null
-
-    // TODO: ugly that MainActivity is needed here. Would be better to introduce an listener interface (same for node column above)
-    fun subscribeNodeRichContentChanged(mainActivity: MainActivity) {
-        this.subscribedMainActivity = WeakReference(mainActivity)
     }
 
     fun addIconName(iconName: String) {
