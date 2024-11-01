@@ -7,8 +7,8 @@ import android.util.Log
 import android.webkit.MimeTypeMap
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import fr.julien.quievreux.droidplane2.SelectedNodeType.None
-import fr.julien.quievreux.droidplane2.SelectedNodeType.RichText
+import fr.julien.quievreux.droidplane2.ContentNodeType.Classic
+import fr.julien.quievreux.droidplane2.ContentNodeType.RelativeFile
 import fr.julien.quievreux.droidplane2.helper.NodeUtils
 import fr.julien.quievreux.droidplane2.helper.NodeUtils.fillArrowLinks
 import fr.julien.quievreux.droidplane2.model.ContextMenuAction
@@ -49,13 +49,10 @@ class MainViewModel : ViewModel() {
         val canGoBack: Boolean = false,
         val rootNode: MindmapNode? = null,
         val selectedNode: MindmapNode? = null,
-        val selectedNodeType: SelectedNodeType = None,
         val error: String = "",
         val viewIntentNode: ViewIntentNode? = null,
-        val relativeIntent: ViewIntentNode? = null,
-    ) {
-        val hasSelectedNodeType: SelectedNodeType? = if (selectedNode != null && selectedNodeType != None) selectedNodeType else null
-    }
+        val contentNodeType: ContentNodeType = ContentNodeType.None
+    )
 
     private val _uiState: MutableStateFlow<MainUiState> = MutableStateFlow(MainUiState())
     val uiState: StateFlow<MainUiState> = _uiState
@@ -103,7 +100,7 @@ class MainViewModel : ViewModel() {
      */
     fun getNodeByID(id: String?): MindmapNode? = mindmapIndexes?.nodesByIdIndex?.get(id)
 
-    fun getNodeByNumericID(numericId: Int?): MindmapNode? = mindmapIndexes?.nodesByNumericIndex?.get(numericId)
+    private fun getNodeByNumericID(numericId: Int?): MindmapNode? = mindmapIndexes?.nodesByNumericIndex?.get(numericId)
 
     private fun setMindmapIsLoading(mindmapIsLoading: Boolean) {
         _uiState.update {
@@ -164,7 +161,7 @@ class MainViewModel : ViewModel() {
                                 }
 
                                 else -> {
-                                    Log.d(MainApplication.TAG, "Received unknown node " + xpp.name);
+                                    Log.d(MainApplication.TAG, "Received unknown node " + xpp.name)
                                 }
                             }
                         }
@@ -348,8 +345,11 @@ ${node.childMindmapNodes.joinToString(separator = "\n", transform = { "(${it.id}
             node.richTextContents.isNotEmpty() -> {
                 _uiState.update {
                     it.copy(
-                        selectedNode = node,
-                        selectedNodeType = RichText,
+                        viewIntentNode = ViewIntentNode(
+                            intent = Intent(),
+                            node = node,
+                        ),
+                        contentNodeType = ContentNodeType.RichText
                     )
                 }
             }
@@ -646,7 +646,8 @@ find:${nodeFindList.value.joinToString(separator = "|", transform = { it.getNode
                 viewIntentNode = ViewIntentNode(
                     intent = openUriIntent,
                     node = mindmapNode,
-                )
+                ),
+               contentNodeType = Classic
             )
         }
     }
@@ -683,10 +684,11 @@ find:${nodeFindList.value.joinToString(separator = "|", transform = { it.getNode
             intent.setDataAndType(Uri.fromFile(file), mime)
             _uiState.update {
                 it.copy(
-                    relativeIntent = ViewIntentNode(
+                    viewIntentNode = ViewIntentNode(
                         intent = intent,
                         node = mindmapNode
-                    )
+                    ),
+                    contentNodeType = RelativeFile
                 )
             }
         }

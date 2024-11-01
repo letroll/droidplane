@@ -1,22 +1,14 @@
 package fr.julien.quievreux.droidplane2.helper
 
-import android.content.ActivityNotFoundException
 import android.content.Intent
-import android.content.Intent.ACTION_VIEW
 import android.net.Uri
-import android.util.Log
 import android.util.Pair
-import android.webkit.MimeTypeMap
-import android.widget.Toast
 import androidx.fragment.app.FragmentActivity
-import fr.julien.quievreux.droidplane2.MainApplication
-import fr.julien.quievreux.droidplane2.MainViewModel
 import fr.julien.quievreux.droidplane2.model.MindmapIndexes
 import fr.julien.quievreux.droidplane2.model.MindmapNode
 import fr.julien.quievreux.droidplane2.view.RichTextViewActivity
 import org.xmlpull.v1.XmlPullParser
 import org.xmlpull.v1.XmlPullParserException
-import java.io.File
 import java.io.IOException
 import java.util.Stack
 

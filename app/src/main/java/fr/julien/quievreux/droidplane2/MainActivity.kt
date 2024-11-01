@@ -12,6 +12,7 @@ import android.net.Uri
 import android.os.Bundle
 import android.util.Log
 import android.widget.Toast
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.padding
@@ -22,8 +23,8 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.fragment.app.FragmentActivity
-import fr.julien.quievreux.droidplane2.SelectedNodeType.None
-import fr.julien.quievreux.droidplane2.SelectedNodeType.RichText
+import fr.julien.quievreux.droidplane2.ContentNodeType.Classic
+import fr.julien.quievreux.droidplane2.ContentNodeType.RelativeFile
 import fr.julien.quievreux.droidplane2.helper.NodeUtils.openRichText
 import fr.julien.quievreux.droidplane2.ui.components.AppTopBar
 import fr.julien.quievreux.droidplane2.ui.components.AppTopBarAction.Backpress
@@ -82,52 +83,49 @@ class MainActivity : FragmentActivity() {
                 if (state.value.leaving) finish() //TODO confirm dialog
                 val nodeFindList = viewModel.nodeFindList.collectAsState()
 
-                state.value.hasSelectedNodeType?.let { selectedNodeType ->
-                    state.value.selectedNode?.let { selectedNode ->
-                        when (selectedNodeType) {
-                            None -> { /*Not Used */
-                            }
-
-                            RichText -> {
-                                openRichText(
-                                    mindmapNode = selectedNode,
-                                    activity = this@MainActivity
-                                )
-                            }
-                        }
-                    }
+                BackHandler(true) {
+                    viewModel.upOrClose()
                 }
 
                 LaunchedEffect(state.value.error) {
                     state.value.error.let { message ->
-                        Toast.makeText(
-                            this@MainActivity,
-                            message,
-                            Toast.LENGTH_SHORT
-                        ).show()
+                        if(message.isNotEmpty()) {
+                            Toast.makeText(
+                                this@MainActivity,
+                                message,
+                                Toast.LENGTH_SHORT
+                            ).show()
+                        }
                     }
                 }
 
                 LaunchedEffect(state.value.viewIntentNode){
                     state.value.viewIntentNode?.let { viewIntentNode ->
-                        // try opening the link normally with an intent
-                        try {
-                            startActivity(viewIntentNode.intent)
-                        } catch (e: ActivityNotFoundException) {
-                            Log.w(MainApplication.TAG, "ActivityNotFoundException when opening link as normal intent")
-                            viewModel.openRelativeFile(viewIntentNode.node)
-                        }
-                    }
-                }
+                        when(state.value.contentNodeType){
+                            ContentNodeType.None -> TODO()
+                            ContentNodeType.RichText -> {
+                                openRichText(
+                                    mindmapNode = viewIntentNode.node,
+                                    activity = this@MainActivity
+                                )
+                            }
+                            RelativeFile -> {
+                                try {
+                                    startActivity(viewIntentNode.intent)
+                                } catch (e1: Exception) {
+                                    Log.e(MainApplication.TAG, "No application found to open " + viewIntentNode.node.link)
+                                    e1.printStackTrace()
+                                }
+                            }
 
-                LaunchedEffect(state.value.relativeIntent) {
-                    // try to open as relative file
-                    state.value.relativeIntent?.let { viewIntentNode ->
-                        try {
-                            startActivity(viewIntentNode.intent)
-                        } catch (e1: Exception) {
-                            Log.e(MainApplication.TAG, "No application found to open " + viewIntentNode.node.link)
-                            e1.printStackTrace()
+                            Classic -> {
+                                try {
+                                    startActivity(viewIntentNode.intent)
+                                } catch (e: ActivityNotFoundException) {
+                                    Log.w(MainApplication.TAG, "ActivityNotFoundException when opening link as normal intent")
+                                    viewModel.openRelativeFile(viewIntentNode.node)
+                                }
+                            }
                         }
                     }
                 }
