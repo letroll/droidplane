@@ -2,7 +2,6 @@ package fr.julien.quievreux.droidplane2.ui.components
 
 import android.content.Context
 import android.util.Log
-import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.indication
@@ -39,6 +38,7 @@ import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -52,6 +52,8 @@ import compose.icons.fontawesomeicons.regular.Clipboard
 import compose.icons.fontawesomeicons.regular.Edit
 import compose.icons.fontawesomeicons.solid.Link
 import fr.julien.quievreux.droidplane2.MainApplication
+import fr.julien.quievreux.droidplane2.R
+import fr.julien.quievreux.droidplane2.helper.DateUtils
 import fr.julien.quievreux.droidplane2.model.ContextMenuAction
 import fr.julien.quievreux.droidplane2.model.ContextMenuAction.CopyText
 import fr.julien.quievreux.droidplane2.model.ContextMenuAction.Edit
@@ -77,7 +79,7 @@ fun LazyListScope.nodeList(
     items(
         items = nodes,
         key = { node ->
-           node.id
+            node.id
         }
     ) { node ->
         if (node.id == searchResultToShow?.id) {
@@ -102,7 +104,6 @@ fun LazyListScope.nodeList(
 //    }
 }
 
-@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun NodeItem(
     fetchText: (MindmapNode) -> String?,
@@ -118,6 +119,18 @@ fun NodeItem(
         ContextMenuDropDownItem(
             text = "copy $text",
             action = CopyText(text)
+        ),
+        ContextMenuDropDownItem(
+            text = stringResource(
+                id = R.string.node_information,
+                node.creationDate?.let{ DateUtils.formatDate(it) }.orEmpty(),
+                node.modificationDate?.let{ DateUtils.formatDate(it) }.orEmpty(),
+            ),
+            action = CopyText(stringResource(
+                id = R.string.node_information,
+                node.creationDate?.let{ DateUtils.formatDate(it) }.orEmpty(),
+                node.modificationDate?.let{ DateUtils.formatDate(it) }.orEmpty(),
+            ))
         )
     )
 
@@ -278,9 +291,11 @@ fun NodeItem(
             contextMenuDropDownItems.forEach { item ->
                 DropdownMenuItem(
                     onClick = {
-                        when(item.action){
-                            is CopyText -> updateClipBoard(item.action.text)
-                            else -> onNodeContextMenuClick(item.action)
+                        item.action?.let { action ->
+                            when (action) {
+                                is CopyText -> updateClipBoard(action.text)
+                                else -> onNodeContextMenuClick(action)
+                            }
                         }
                         isContextMenuVisble = false
                     },
@@ -288,7 +303,7 @@ fun NodeItem(
                         Text(text = item.text)
                     },
 //                    modifier = TODO(),
-                    leadingIcon = { GetLeadingIcon(item.action) },
+                    leadingIcon = { item.action?.let { GetLeadingIcon(it) } },
 //                    trailingIcon = TODO(),
 //                    enabled = TODO(),
 //                    colors = TODO(),
@@ -341,27 +356,33 @@ private fun NodeListPreview() {
         numericId = 1196,
         text = "root",
         link = null,
-        treeIdAttribute = null
+        treeIdAttribute = null,
+        creationDate = 1728740019071,
+        modificationDate = 1728740023499,
     )
 
     val node2 = MindmapNode(
         parentNode = null,
-        id = "sumo",
+        id = "dqfqsd",
         numericId = 1196,
         text = "root",
         link = null,
-        treeIdAttribute = null
+        treeIdAttribute = null,
+        creationDate = 1728740019071,
+        modificationDate = 1728740023499,
     )
 
     node2.addChildMindmapNode(node1)
 
     val node3 = MindmapNode(
         parentNode = null,
-        id = "sumo",
+        id = "sqdfqsd",
         numericId = 1196,
         text = "root",
         link = null,
-        treeIdAttribute = null
+        treeIdAttribute = null,
+        creationDate = 1728740019071,
+        modificationDate = 1728740023499,
     )
 
     val nodes = listOf(node1, node2, node3)

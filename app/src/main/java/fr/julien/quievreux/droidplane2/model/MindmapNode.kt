@@ -10,17 +10,11 @@ import fr.julien.quievreux.droidplane2.MainViewModel
  */
 //TODO make it stable
 data class MindmapNode(
-    /**
-     * The Parent MindmapNode
-     */
     val parentNode: MindmapNode?,
     /**
      * The ID of the node (ID attribute)
      */
     val id: String,
-    /**
-     * The numeric representation of this ID
-     */
     val numericId: Int,
 
     private val text: String?,
@@ -32,25 +26,12 @@ data class MindmapNode(
      * If the node clones another node, it doesn't have text or richtext, but a TREE_ID
      */
     private val treeIdAttribute: String?,
+    val creationDate: Long?,
+    val modificationDate: Long?,
 ) {
-    /**
-     * The Rich Text content of the node (if any)
-     */
     val richTextContents: MutableList<String> = mutableListOf()
-
-    /**
-     * Bold style
-     */
     var isBold: Boolean = false
-
-    /**
-     * Italic style
-     */
     var isItalic: Boolean = false
-
-    /**
-     * The names of the icon
-     */
     val iconNames: MutableList<String> = mutableListOf()
 
     /**

@@ -147,6 +147,9 @@ object NodeUtils {
 
         val text = xpp.getAttributeValue(null, "TEXT")
 
+        val creationDate = xpp.getAttributeValue(null, "CREATED")?.toLong()
+        val modificationDate = xpp.getAttributeValue(null, "MODIFIED")?.toLong()
+
         // get link
         val linkAttribute = xpp.getAttributeValue(null, "LINK")
         val link = if (linkAttribute != null && linkAttribute != "") {
@@ -158,7 +161,16 @@ object NodeUtils {
         // get tree ID (of cloned node)
         val treeIdAttribute = xpp.getAttributeValue(null, "TREE_ID")
 
-        val newMindmapNode = MindmapNode(parentNode, id, numericId, text, link, treeIdAttribute)
+        val newMindmapNode = MindmapNode(
+            parentNode = parentNode,
+            id = id,
+            numericId = numericId,
+            text = text,
+            link = link,
+            treeIdAttribute = treeIdAttribute,
+            creationDate = creationDate,
+            modificationDate = modificationDate,
+        )
         return newMindmapNode
     }
 
