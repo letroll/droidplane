@@ -1,10 +1,12 @@
 package fr.julien.quievreux.droidplane2
 
+import android.content.Intent
+import android.content.Intent.ACTION_VIEW
 import android.net.Uri
 import android.util.Log
+import android.webkit.MimeTypeMap
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import fr.julien.quievreux.droidplane2.SelectedNodeType.Link
 import fr.julien.quievreux.droidplane2.SelectedNodeType.None
 import fr.julien.quievreux.droidplane2.SelectedNodeType.RichText
 import fr.julien.quievreux.droidplane2.helper.NodeUtils
@@ -16,6 +18,7 @@ import fr.julien.quievreux.droidplane2.model.ContextMenuAction.NodeLink
 import fr.julien.quievreux.droidplane2.model.MindmapIndexes
 import fr.julien.quievreux.droidplane2.model.MindmapNode
 import fr.julien.quievreux.droidplane2.model.NodeAttribute
+import fr.julien.quievreux.droidplane2.model.isInternalLink
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -26,47 +29,39 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import org.xmlpull.v1.XmlPullParser
 import org.xmlpull.v1.XmlPullParserFactory
+import java.io.File
 import java.io.InputStream
 import java.util.Stack
+
+data class ViewIntentNode(val intent: Intent, val node: MindmapNode)
 
 /**
  * MainViewModel handles the loading and storing of a mind map document.
  */
 class MainViewModel : ViewModel() {
     data class MainUiState(
-        val title: String,
-        val defaultTitle: String,
-        val lastSearchString: String,
-        val currentSearchResultIndex: Int,
-        val loading: Boolean,
-        val leaving: Boolean,
-        val canGoBack: Boolean,
+        val title: String = "",
+        val defaultTitle: String = "",
+        val lastSearchString: String = "",
+        val currentSearchResultIndex: Int = 0,
+        val loading: Boolean = true,
+        val leaving: Boolean = false,
+        val canGoBack: Boolean = false,
         val rootNode: MindmapNode? = null,
         val selectedNode: MindmapNode? = null,
-        val selectedNodeType: SelectedNodeType,
+        val selectedNodeType: SelectedNodeType = None,
+        val error: String = "",
+        val viewIntentNode: ViewIntentNode? = null,
+        val relativeIntent: ViewIntentNode? = null,
     ) {
-        internal companion object {
-            internal fun defaults() = MainUiState(
-                loading = true,
-                canGoBack = false,
-                leaving = false,
-                title = "",
-                defaultTitle = "",
-                lastSearchString = "",
-                currentSearchResultIndex = 0,
-                selectedNodeType = None,
-            )
-        }
-
         val hasSelectedNodeType: SelectedNodeType? = if (selectedNode != null && selectedNodeType != None) selectedNodeType else null
     }
 
-    private val _uiState: MutableStateFlow<MainUiState> = MutableStateFlow(MainUiState.defaults())
+    private val _uiState: MutableStateFlow<MainUiState> = MutableStateFlow(MainUiState())
     val uiState: StateFlow<MainUiState> = _uiState
 
     //first state whether the search is happening or not
     private val _isSearching = MutableStateFlow(false)
-//    val isSearching = _isSearching.asStateFlow()
 
     //second state the text typed by the user
     private val _searchText = MutableStateFlow("")
@@ -317,7 +312,7 @@ class MainViewModel : ViewModel() {
         parentNode.addArrowLinkDestinationId(destinationId)
     }
 
-    fun getMindmapDirectoryPath(): String? {
+    private fun getMindmapDirectoryPath(): String? {
         // link is relative to viewModel file
         val mindmapPath = currentMindMapUri?.path
         Log.d(MainApplication.TAG, "MainViewModel path $mindmapPath")
@@ -326,7 +321,9 @@ class MainViewModel : ViewModel() {
         return mindmapDirectoryPath
     }
 
-    fun onNodeClick(node: MindmapNode) {
+    fun onNodeClick(
+        node: MindmapNode,
+    ) {
         when {
             node.childMindmapNodes.size > 0 -> {
                 Log.e(
@@ -341,11 +338,10 @@ ${node.childMindmapNodes.joinToString(separator = "\n", transform = { "(${it.id}
             }
 
             node.link != null -> {
-                _uiState.update {
-                    it.copy(
-                        selectedNode = node,
-                        selectedNodeType = Link,
-                    )
+                if (node.isInternalLink()) {
+                    openInternalFragmentLink(mindmapNode = node)
+                } else {
+                    openIntentLink(mindmapNode = node)
                 }
             }
 
@@ -511,11 +507,12 @@ ${node.childMindmapNodes.joinToString(separator = "\n", transform = { "(${it.id}
     }
 
     private fun showCurrentSearchResult() {
-        Log.e("toto","""
+        Log.e(
+            "toto", """
 showCurrentSearchResult:${_uiState.value.currentSearchResultIndex}
 nodeFindList:${nodeFindList.value.map { it.getNodeText(this) }.joinToString(separator = "|")}
         """.trimIndent()
-            )
+        )
         if (_uiState.value.currentSearchResultIndex >= 0 && _uiState.value.currentSearchResultIndex < nodeFindList.value.size) {
             downTo(nodeFindList.value[_uiState.value.currentSearchResultIndex], false)
         }
@@ -527,7 +524,7 @@ nodeFindList:${nodeFindList.value.map { it.getNodeText(this) }.joinToString(sepa
      * Navigate down the MainViewModel to the specified node, opening each of it's parent nodes along the way.
      * @param node
      */
-    fun downTo(node: MindmapNode?, openLast: Boolean) {
+    private fun downTo(node: MindmapNode?, openLast: Boolean) {
         // first navigate back to the top (essentially closing all other nodes)
         top()
 
@@ -582,28 +579,116 @@ nodeFindList:${nodeFindList.value.map { it.getNodeText(this) }.joinToString(sepa
         _isSearching.update {
             query.isNotEmpty()
         }
-        Log.e("toto","""
+        Log.e(
+            "toto", """
 query:$query 
 isSearching:${_isSearching.value} 
-find:${nodeFindList.value.joinToString(separator = "|", transform = {it.getNodeText(this@MainViewModel).orEmpty()})} 
-        """.trimIndent())
+find:${nodeFindList.value.joinToString(separator = "|", transform = { it.getNodeText(this@MainViewModel).orEmpty() })} 
+        """.trimIndent()
+        )
 
-        if(nodeFindList.value.size==1){
+        if (nodeFindList.value.size == 1) {
             showCurrentSearchResult()
         }
     }
 
     fun onNodeContextMenuClick(contextMenuAction: ContextMenuAction) {
-        when(contextMenuAction){
+        when (contextMenuAction) {
             Edit -> {
 
             }
+
             is NodeLink -> {
                 val nodeByNumericID = getNodeByNumericID(contextMenuAction.node.numericId)
                 downTo(nodeByNumericID, true)
             }
 
-            is CopyText -> {/* already handled by activity */}
+            is CopyText -> {/* already handled by activity */
+            }
+        }
+    }
+
+    /**
+     * Open this node's link as internal fragment
+     */
+    private fun openInternalFragmentLink(mindmapNode: MindmapNode?) {
+        // internal link, so this.link is of the form "#ID_123234534" this.link.getFragment() should give everything
+        // after the "#" it is null if there is no "#", which should be the case for all other links
+        val fragment = mindmapNode?.link?.fragment
+        val linkedInternal = getNodeByID(fragment)
+
+        if (linkedInternal != null) {
+            Log.d(MainApplication.TAG, "Opening internal node, $linkedInternal, with ID: $fragment")
+
+            // the internal linked node might be anywhere in the viewModel, i.e. on a completely separate branch than
+            // we are on currently. We need to go to the Top, and then descend into the viewModel to reach the right
+            // point
+            downTo(linkedInternal, true)
+        } else {
+            _uiState.update {
+                it.copy(
+                    error = "This internal link to ID $fragment seems to be broken.",
+                )
+            }
+        }
+    }
+
+    /**
+     * Open this node's link as intent
+     */
+    private fun openIntentLink(
+        mindmapNode: MindmapNode,
+    ) {
+        val openUriIntent = Intent(ACTION_VIEW)
+        openUriIntent.setData(mindmapNode.link)
+        _uiState.update {
+            it.copy(
+                viewIntentNode = ViewIntentNode(
+                    intent = openUriIntent,
+                    node = mindmapNode,
+                )
+            )
+        }
+    }
+
+    fun openRelativeFile(mindmapNode: MindmapNode) {
+        val fileName: String? = if (mindmapNode.link?.path?.startsWith("/") == true) {
+            // absolute filename
+            mindmapNode.link.path
+        } else {
+            getMindmapDirectoryPath() + "/" + mindmapNode.link?.path
+        }
+        fileName?.let {
+            val file = File(fileName)
+            if (!file.exists()) {
+                Log.e(MainApplication.TAG, "File $fileName does not exist.")
+                return
+            }
+            if (!file.canRead()) {
+                Log.e(MainApplication.TAG, "Can not read file $fileName.")
+                return
+            }
+            Log.d(MainApplication.TAG, "Opening file " + Uri.fromFile(file))
+            // http://stackoverflow.com/a/3571239/1067124
+            var extension = ""
+            val i = fileName.lastIndexOf('.')
+            val p = fileName.lastIndexOf('/')
+            if (i > p) {
+                extension = fileName.substring(i + 1)
+            }
+            val mime = MimeTypeMap.getSingleton().getMimeTypeFromExtension(extension)
+
+            val intent = Intent()
+            intent.setAction(ACTION_VIEW)
+            intent.setDataAndType(Uri.fromFile(file), mime)
+            _uiState.update {
+                it.copy(
+                    relativeIntent = ViewIntentNode(
+                        intent = intent,
+                        node = mindmapNode
+                    )
+                )
+            }
         }
     }
 }

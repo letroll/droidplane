@@ -1,6 +1,7 @@
 package fr.julien.quievreux.droidplane2
 
 import android.app.AlertDialog.Builder
+import android.content.ActivityNotFoundException
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Intent
@@ -16,14 +17,13 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material3.Scaffold
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.fragment.app.FragmentActivity
-import fr.julien.quievreux.droidplane2.SelectedNodeType.Link
 import fr.julien.quievreux.droidplane2.SelectedNodeType.None
 import fr.julien.quievreux.droidplane2.SelectedNodeType.RichText
-import fr.julien.quievreux.droidplane2.helper.NodeUtils
 import fr.julien.quievreux.droidplane2.helper.NodeUtils.openRichText
 import fr.julien.quievreux.droidplane2.ui.components.AppTopBar
 import fr.julien.quievreux.droidplane2.ui.components.AppTopBarAction.Backpress
@@ -94,21 +94,40 @@ class MainActivity : FragmentActivity() {
                                     activity = this@MainActivity
                                 )
                             }
+                        }
+                    }
+                }
 
-                            Link -> {
-                                NodeUtils.openLink(
-                                    mindmapNode = selectedNode,
-                                    activity = this@MainActivity,
-                                    viewModel = viewModel,
-                                    onLinkBroken = { fragment ->
-                                        Toast.makeText(
-                                            this@MainActivity,
-                                            "This internal link to ID $fragment seems to be broken.",
-                                            Toast.LENGTH_SHORT
-                                        ).show()
-                                    }
-                                )
-                            }
+                LaunchedEffect(state.value.error) {
+                    state.value.error.let { message ->
+                        Toast.makeText(
+                            this@MainActivity,
+                            message,
+                            Toast.LENGTH_SHORT
+                        ).show()
+                    }
+                }
+
+                LaunchedEffect(state.value.viewIntentNode){
+                    state.value.viewIntentNode?.let { viewIntentNode ->
+                        // try opening the link normally with an intent
+                        try {
+                            startActivity(viewIntentNode.intent)
+                        } catch (e: ActivityNotFoundException) {
+                            Log.w(MainApplication.TAG, "ActivityNotFoundException when opening link as normal intent")
+                            viewModel.openRelativeFile(viewIntentNode.node)
+                        }
+                    }
+                }
+
+                LaunchedEffect(state.value.relativeIntent) {
+                    // try to open as relative file
+                    state.value.relativeIntent?.let { viewIntentNode ->
+                        try {
+                            startActivity(viewIntentNode.intent)
+                        } catch (e1: Exception) {
+                            Log.e(MainApplication.TAG, "No application found to open " + viewIntentNode.node.link)
+                            e1.printStackTrace()
                         }
                     }
                 }
@@ -150,7 +169,6 @@ class MainActivity : FragmentActivity() {
                     //                    contentColor =,
                     //                    contentWindowInsets =,
                     content = { innerPadding ->
-
                         LazyColumn(
                             modifier = Modifier.padding(innerPadding),
                         ) {

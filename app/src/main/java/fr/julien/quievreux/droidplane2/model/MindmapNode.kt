@@ -2,9 +2,7 @@ package fr.julien.quievreux.droidplane2.model
 
 import android.net.Uri
 import android.text.Html
-import fr.julien.quievreux.droidplane2.MainActivity
 import fr.julien.quievreux.droidplane2.MainViewModel
-import java.lang.ref.WeakReference
 
 /**
  * A MindMapNode is a special type of DOM Node. A DOM Node can be converted to a MindMapNode if it has type ELEMENT,
@@ -142,3 +140,6 @@ data class MindmapNode(
         return this
     }
 }
+
+// if the link has a "#ID123", it's an internal link within the document
+fun MindmapNode.isInternalLink(): Boolean = link?.fragment != null && link.fragment?.startsWith("ID") == true
