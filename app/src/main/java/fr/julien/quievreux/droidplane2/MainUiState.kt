@@ -1,6 +1,6 @@
 package fr.julien.quievreux.droidplane2
 
-import fr.julien.quievreux.droidplane2.ContentNodeType.None
+import fr.julien.quievreux.droidplane2.ContentNodeType.Classic
 import fr.julien.quievreux.droidplane2.model.MindmapNode
 
 data class MainUiState(
@@ -16,7 +16,7 @@ data class MainUiState(
     val error: String = "",
     val errorAction: ErrorAction? = null,
     val viewIntentNode: ViewIntentNode? = null,
-    val contentNodeType: ContentNodeType = None,
+    val contentNodeType: ContentNodeType = Classic,
 ) {
     data class ErrorAction(val actionLabel:Int,val action:()->Unit)
 }

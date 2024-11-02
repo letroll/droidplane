@@ -10,15 +10,12 @@ An Android application to read [Freeplane](https://docs.freeplane.org/) MinMap
 
 ### TODO
 
-* [ ] icon in row
-* [ ] link
-* [ ] clone
-* [ ] search
-* [ ] gérer le mode paysage
-* [ ] virer les anciennes vues
-* [ ] tester sur une grosse carte
-* [ ] édition
-* *[x] up
-* *[x] top
-* *[ ] next
-* *[ ] previous
+* [X]  icon in row
+* [X]  link
+* [ ]  clone
+* [X]  search
+* [ ]  gérer le mode paysage
+* [X]  virer les anciennes vues
+* [ ]  tester sur une grosse carte
+* [ ]  édition
+  * [ ]  ajouter un node
