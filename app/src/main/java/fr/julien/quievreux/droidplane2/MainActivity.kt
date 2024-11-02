@@ -1,5 +1,6 @@
 package fr.julien.quievreux.droidplane2
 
+import android.annotation.SuppressLint
 import android.app.AlertDialog.Builder
 import android.content.ActivityNotFoundException
 import android.content.ClipData
@@ -11,20 +12,28 @@ import android.content.Intent.ACTION_VIEW
 import android.net.Uri
 import android.os.Bundle
 import android.util.Log
-import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarDuration.Indefinite
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SnackbarResult.ActionPerformed
+import androidx.compose.material3.SnackbarResult.Dismissed
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.State
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.fragment.app.FragmentActivity
 import fr.julien.quievreux.droidplane2.ContentNodeType.Classic
 import fr.julien.quievreux.droidplane2.ContentNodeType.RelativeFile
+import fr.julien.quievreux.droidplane2.ContentNodeType.RichText
 import fr.julien.quievreux.droidplane2.helper.NodeUtils.openRichText
 import fr.julien.quievreux.droidplane2.ui.components.AppTopBar
 import fr.julien.quievreux.droidplane2.ui.components.AppTopBarAction.Backpress
@@ -36,6 +45,8 @@ import fr.julien.quievreux.droidplane2.ui.components.AppTopBarAction.Top
 import fr.julien.quievreux.droidplane2.ui.components.AppTopBarAction.Up
 import fr.julien.quievreux.droidplane2.ui.components.nodeList
 import fr.julien.quievreux.droidplane2.ui.theme.ContrastAwareReplyTheme
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.launch
 import org.koin.androidx.viewmodel.ext.android.viewModel
 import java.io.FileNotFoundException
 import java.io.InputStream
@@ -64,6 +75,7 @@ class MainActivity : FragmentActivity() {
         }
     }
 
+    @SuppressLint("RememberReturnType")
     public override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
@@ -78,6 +90,9 @@ class MainActivity : FragmentActivity() {
             }
         }
         setContent {
+            val scope = rememberCoroutineScope()
+            val snackbarHostState = remember { SnackbarHostState() }
+
             ContrastAwareReplyTheme {
                 val state = viewModel.uiState.collectAsState()
                 if (state.value.leaving) finish() //TODO confirm dialog
@@ -88,46 +103,15 @@ class MainActivity : FragmentActivity() {
                 }
 
                 LaunchedEffect(state.value.error) {
-                    state.value.error.let { message ->
-                        if(message.isNotEmpty()) {
-                            Toast.makeText(
-                                this@MainActivity,
-                                message,
-                                Toast.LENGTH_SHORT
-                            ).show()
-                        }
-                    }
+                    onError(state, scope, snackbarHostState)
                 }
 
-                LaunchedEffect(state.value.viewIntentNode){
-                    state.value.viewIntentNode?.let { viewIntentNode ->
-                        when(state.value.contentNodeType){
-                            ContentNodeType.None -> TODO()
-                            ContentNodeType.RichText -> {
-                                openRichText(
-                                    mindmapNode = viewIntentNode.node,
-                                    activity = this@MainActivity
-                                )
-                            }
-                            RelativeFile -> {
-                                try {
-                                    startActivity(viewIntentNode.intent)
-                                } catch (e1: Exception) {
-                                    Log.e(MainApplication.TAG, "No application found to open " + viewIntentNode.node.link)
-                                    e1.printStackTrace()
-                                }
-                            }
-
-                            Classic -> {
-                                try {
-                                    startActivity(viewIntentNode.intent)
-                                } catch (e: ActivityNotFoundException) {
-                                    Log.w(MainApplication.TAG, "ActivityNotFoundException when opening link as normal intent")
-                                    viewModel.openRelativeFile(viewIntentNode.node)
-                                }
-                            }
-                        }
-                    }
+                LaunchedEffect(state.value.viewIntentNode) {
+                    onViewIntent(
+                        state = state,
+                        scope = scope,
+                        snackbarHostState = snackbarHostState,
+                    )
                 }
 
                 Scaffold(
@@ -160,7 +144,9 @@ class MainActivity : FragmentActivity() {
                         )
                     },
                     //                    bottomBar = {},
-                    //                    snackbarHost = {},
+                    snackbarHost = {
+                        SnackbarHost(hostState = snackbarHostState)
+                    },
                     //                    floatingActionButton = {},
                     //                    floatingActionButtonPosition =,
                     //                    containerColor =,
@@ -171,7 +157,7 @@ class MainActivity : FragmentActivity() {
                             modifier = Modifier.padding(innerPadding),
                         ) {
                             state.value.rootNode?.childMindmapNodes?.let { nodes ->
-                                Log.e("toto", "list updated")
+//                                Log.e("toto", "list updated")
                                 val searchResultToShow = if (nodeFindList.value.isEmpty() || (state.value.currentSearchResultIndex in 0 until nodeFindList.value.size - 1)) {
                                     null
                                 } else {
@@ -198,6 +184,95 @@ class MainActivity : FragmentActivity() {
             }
         }
 
+    }
+
+    private fun onViewIntent(
+        state: State<MainUiState>,
+        scope: CoroutineScope,
+        snackbarHostState: SnackbarHostState,
+    ) {
+        state.value.viewIntentNode?.let { viewIntentNode ->
+            when (state.value.contentNodeType) {
+                RichText -> {
+                    openRichText(
+                        mindmapNode = viewIntentNode.node,
+                        activity = this@MainActivity
+                    )
+                }
+
+                RelativeFile -> {
+                    try {
+                        startActivity(viewIntentNode.intent)
+                    } catch (e1: Exception) {
+                        showError(
+                            message = "No application found to open ${viewIntentNode.node.link}",
+                            scope = scope,
+                            snackbarHostState = snackbarHostState,
+                        )
+                        e1.printStackTrace()
+                    }
+                }
+
+                Classic -> {
+                    try {
+                        startActivity(viewIntentNode.intent)
+                    } catch (e: ActivityNotFoundException) {
+                        showError(
+                            message = "ActivityNotFoundException when opening link as normal intent",
+                            scope = scope,
+                            snackbarHostState = snackbarHostState,
+                        )
+                        viewModel.openRelativeFile(viewIntentNode.node)
+                    }
+                }
+            }
+        }
+    }
+
+    private fun onError(
+        state: State<MainUiState>,
+        scope: CoroutineScope,
+        snackbarHostState: SnackbarHostState,
+    ) {
+        state.value.error.let { message ->
+            if (message.isNotEmpty()) {
+                state.value.errorAction?.let { errorAction ->
+                    scope.launch {
+                        val result = snackbarHostState
+                            .showSnackbar(
+                                message = message,
+                                actionLabel = getString(errorAction.actionLabel),
+                                // Defaults to SnackbarDuration.Short
+                                duration = Indefinite
+                            )
+                        when (result) {
+                            ActionPerformed -> {
+                                /* Handle snackbar action performed */
+                                errorAction.action()
+                            }
+
+                            Dismissed -> {
+                                /* Handle snackbar dismissed */
+                            }
+                        }
+                    }
+                } ?: run {
+                    scope.launch {
+                        snackbarHostState.showSnackbar(message)
+                    }
+                }
+            }
+        }
+    }
+
+    private fun showError(
+        message:String,
+        scope: CoroutineScope,
+        snackbarHostState: SnackbarHostState,
+    ){
+        scope.launch {
+            snackbarHostState.showSnackbar(message)
+        }
     }
 
     private fun openFile() {

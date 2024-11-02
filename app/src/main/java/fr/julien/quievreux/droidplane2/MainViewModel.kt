@@ -39,20 +39,6 @@ data class ViewIntentNode(val intent: Intent, val node: MindmapNode)
  * MainViewModel handles the loading and storing of a mind map document.
  */
 class MainViewModel : ViewModel() {
-    data class MainUiState(
-        val title: String = "",
-        val defaultTitle: String = "",
-        val lastSearchString: String = "",
-        val currentSearchResultIndex: Int = 0,
-        val loading: Boolean = true,
-        val leaving: Boolean = false,
-        val canGoBack: Boolean = false,
-        val rootNode: MindmapNode? = null,
-        val selectedNode: MindmapNode? = null,
-        val error: String = "",
-        val viewIntentNode: ViewIntentNode? = null,
-        val contentNodeType: ContentNodeType = ContentNodeType.None
-    )
 
     private val _uiState: MutableStateFlow<MainUiState> = MutableStateFlow(MainUiState())
     val uiState: StateFlow<MainUiState> = _uiState
@@ -87,10 +73,6 @@ class MainViewModel : ViewModel() {
      * A map that resolves node IDs to Node objects
      */
     private var mindmapIndexes: MindmapIndexes? = null
-
-    init {
-
-    }
 
     /**
      * Returns the node for a given Node ID

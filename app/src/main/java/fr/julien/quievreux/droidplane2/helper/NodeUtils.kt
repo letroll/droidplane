@@ -186,4 +186,20 @@ object NodeUtils {
             activity.startActivity(intent)
         }
     }
+
+/*    fun generateNodeID(proposedID: String?): String {
+        if (proposedID != null && "" != proposedID && getNodeForID(proposedID) == null) {
+            return proposedID
+        }
+        var returnValue: String
+        do {
+            val prefix = "ID_"
+            *//*
+			 * The prefix is to enable the id to be an ID in the sense of
+			 * XML/DTD.
+			 *//*
+            returnValue = prefix + ran.nextInt(UNDEFINED_NODE_ID).toString()
+        } while (nodes.containsKey(returnValue))
+        return returnValue
+    }*/
 }
