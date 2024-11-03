@@ -11,13 +11,13 @@ legacySupportV4 = "1.0.0"
 lifecycleExtensions = "2.2.0"
 lifecycleViewmodelKtx = "2.8.6"
 tablerIcons = "1.1.1"
-agp = "8.7.2"
 coreKtx = "1.13.1"
 junit = "4.13.2"
 junitVersion = "1.2.1"
 espressoCore = "3.6.1"
 appcompat = "1.7.0"
 material = "1.12.0"
+agp = "8.2.2"
 
 [libraries]
 androidx-activity-compose = { module = "androidx.activity:activity-compose", version.ref = "activityCompose" }
@@ -53,3 +53,4 @@ material = { group = "com.google.android.material", name = "material", version.r
 # Add this line
 compose-compiler = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
 kotlin-android = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }
+android-library = { id = "com.android.library", version.ref = "agp" }

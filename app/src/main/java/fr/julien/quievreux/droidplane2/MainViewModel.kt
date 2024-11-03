@@ -9,6 +9,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import fr.julien.quievreux.droidplane2.ContentNodeType.Classic
 import fr.julien.quievreux.droidplane2.ContentNodeType.RelativeFile
+import fr.julien.quievreux.droidplane2.data.NodeManager
 import fr.julien.quievreux.droidplane2.helper.NodeUtils
 import fr.julien.quievreux.droidplane2.helper.NodeUtils.fillArrowLinks
 import fr.julien.quievreux.droidplane2.model.ContextMenuAction
@@ -27,6 +28,7 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import org.koin.java.KoinJavaComponent.inject
 import org.xmlpull.v1.XmlPullParser
 import org.xmlpull.v1.XmlPullParserFactory
 import java.io.File
@@ -38,7 +40,9 @@ data class ViewIntentNode(val intent: Intent, val node: MindmapNode)
 /**
  * MainViewModel handles the loading and storing of a mind map document.
  */
-class MainViewModel : ViewModel() {
+class MainViewModel(
+//    private val nodeManager: NodeManager,
+) : ViewModel() {
 
     private val _uiState: MutableStateFlow<MainUiState> = MutableStateFlow(MainUiState())
     val uiState: StateFlow<MainUiState> = _uiState
