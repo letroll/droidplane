@@ -59,7 +59,7 @@ import fr.julien.quievreux.droidplane2.model.ContextMenuAction.CopyText
 import fr.julien.quievreux.droidplane2.model.ContextMenuAction.Edit
 import fr.julien.quievreux.droidplane2.model.ContextMenuAction.NodeLink
 import fr.julien.quievreux.droidplane2.model.ContextMenuDropDownItem
-import fr.julien.quievreux.droidplane2.model.MindmapNode
+import fr.julien.quievreux.droidplane2.data.model.MindmapNode
 import fr.julien.quievreux.droidplane2.model.NodeIcons.Link
 import fr.julien.quievreux.droidplane2.model.NodeIcons.RicheText
 import fr.julien.quievreux.droidplane2.model.getNodeFontIconsFromName
@@ -123,15 +123,21 @@ fun NodeItem(
         ContextMenuDropDownItem(
             text = stringResource(
                 id = R.string.node_information,
-                node.creationDate?.let{ DateUtils.formatDate(it) }.orEmpty(),
-                node.modificationDate?.let{ DateUtils.formatDate(it) }.orEmpty(),
+                node.creationDate?.let { DateUtils.formatDate(it) }.orEmpty(),
+                node.modificationDate?.let { DateUtils.formatDate(it) }.orEmpty(),
             ),
-            action = CopyText(stringResource(
-                id = R.string.node_information,
-                node.creationDate?.let{ DateUtils.formatDate(it) }.orEmpty(),
-                node.modificationDate?.let{ DateUtils.formatDate(it) }.orEmpty(),
-            ))
-        )
+            action = CopyText(
+                stringResource(
+                    id = R.string.node_information,
+                    node.creationDate?.let { DateUtils.formatDate(it) }.orEmpty(),
+                    node.modificationDate?.let { DateUtils.formatDate(it) }.orEmpty(),
+                )
+            )
+        ),
+        ContextMenuDropDownItem(
+            text = stringResource(id = R.string.edit),
+            action = Edit(node)
+        ),
     )
 
     node.arrowLinks.forEach { link ->
@@ -209,12 +215,12 @@ fun NodeItem(
 
             for (iconName in iconNames) {
                 getNodeFontIconsFromName(iconName)?.let {
-                    Log.e(MainApplication.TAG, "converted icon from enum to font icon")
+//                    Log.e(MainApplication.TAG, "converted icon from enum to font icon")
                     imageVectors.add(it)
                 }
 
                 getNodeIconsResIdFromName(iconName)?.let {
-                    Log.e(MainApplication.TAG, "converted icon from enum")
+//                    Log.e(MainApplication.TAG, "converted icon from enum")
                     iconResourceIds.add(it)
                 } ?: run {
                     val drawableName = getDrawableNameFromMindmapIcon(iconName, context)
@@ -294,7 +300,7 @@ fun NodeItem(
                         item.action?.let { action ->
                             when (action) {
                                 is CopyText -> updateClipBoard(action.text)
-                                else -> onNodeContextMenuClick(action)
+                                is Edit, is NodeLink -> onNodeContextMenuClick(action)
                             }
                         }
                         isContextMenuVisble = false
@@ -320,7 +326,7 @@ fun NodeItem(
     Icon(
         imageVector = when (action) {
             is CopyText -> FontAwesomeIcons.Regular.Clipboard
-            Edit -> FontAwesomeIcons.Regular.Edit
+            is Edit -> FontAwesomeIcons.Regular.Edit
             is NodeLink -> FontAwesomeIcons.Solid.Link
         },
         tint = MaterialTheme.colorScheme.primary,

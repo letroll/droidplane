@@ -15,6 +15,7 @@ import android.util.Log
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material3.Scaffold
@@ -26,6 +27,7 @@ import androidx.compose.material3.SnackbarResult.Dismissed
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.State
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
@@ -34,6 +36,8 @@ import androidx.fragment.app.FragmentActivity
 import fr.julien.quievreux.droidplane2.ContentNodeType.Classic
 import fr.julien.quievreux.droidplane2.ContentNodeType.RelativeFile
 import fr.julien.quievreux.droidplane2.ContentNodeType.RichText
+import fr.julien.quievreux.droidplane2.MainUiState.DialogType.Edit
+import fr.julien.quievreux.droidplane2.MainUiState.DialogType.None
 import fr.julien.quievreux.droidplane2.helper.NodeUtils.openRichText
 import fr.julien.quievreux.droidplane2.ui.components.AppTopBar
 import fr.julien.quievreux.droidplane2.ui.components.AppTopBarAction.Backpress
@@ -43,6 +47,7 @@ import fr.julien.quievreux.droidplane2.ui.components.AppTopBarAction.SearchNext
 import fr.julien.quievreux.droidplane2.ui.components.AppTopBarAction.SearchPrevious
 import fr.julien.quievreux.droidplane2.ui.components.AppTopBarAction.Top
 import fr.julien.quievreux.droidplane2.ui.components.AppTopBarAction.Up
+import fr.julien.quievreux.droidplane2.ui.components.CustomDialog
 import fr.julien.quievreux.droidplane2.ui.components.nodeList
 import fr.julien.quievreux.droidplane2.ui.theme.ContrastAwareReplyTheme
 import kotlinx.coroutines.CoroutineScope
@@ -114,16 +119,30 @@ class MainActivity : FragmentActivity() {
                     )
                 }
 
+                when (val dialog = state.value.dialogUiState.dialogType) {
+                    None -> {}
+                    is Edit -> {
+                        CustomDialog(
+                            value = dialog.oldValue,
+                            onDismiss = {
+                                viewModel.setDialogState(None)
+                            }
+                        ) { newValue ->
+                            viewModel.updateValue(dialog.node,newValue)
+                        }
+                    }
+                }
+
                 Scaffold(
                     modifier = Modifier,
                     topBar = {
                         AppTopBar(
-                            text = state.value.selectedNode?.getNodeText(viewModel) ?: stringResource(R.string.app_name),
+                            text = state.value.rootNode?.let { viewModel.getNodeText(it) } ?: stringResource(R.string.app_name),
                             hasBackIcon = state.value.canGoBack,
                             onQuery = { query ->
                                 viewModel.search(query)
                             },
-                            hasSearchNavigateButton = Pair(state.value.currentSearchResultIndex > 0, state.value.currentSearchResultIndex < nodeFindList.value.size - 1),
+                            hasSearchNavigateButton = Pair(state.value.searchUiState.currentSearchResultIndex > 0, state.value.searchUiState.currentSearchResultIndex < nodeFindList.value.size - 1),
                             onBarAction = { action ->
                                 when (action) {
                                     Backpress -> viewModel.upOrClose()
@@ -154,20 +173,21 @@ class MainActivity : FragmentActivity() {
                     //                    contentWindowInsets =,
                     content = { innerPadding ->
                         LazyColumn(
-                            modifier = Modifier.padding(innerPadding),
+                            modifier = Modifier
+                                .padding(innerPadding),
                         ) {
                             state.value.rootNode?.childMindmapNodes?.let { nodes ->
-//                                Log.e("toto", "list updated")
-                                val searchResultToShow = if (nodeFindList.value.isEmpty() || (state.value.currentSearchResultIndex in 0 until nodeFindList.value.size - 1)) {
+                                Log.e("toto", "list updated")
+                                val searchResultToShow = if (nodeFindList.value.isEmpty() || (state.value.searchUiState.currentSearchResultIndex in 0 until nodeFindList.value.size - 1)) {
                                     null
                                 } else {
-                                    nodeFindList.value[state.value.currentSearchResultIndex]
+                                    nodeFindList.value[state.value.searchUiState.currentSearchResultIndex]
                                 }
                                 nodeList(
                                     nodes = nodes,
                                     searchResultToShow = searchResultToShow,
                                     fetchText = { node ->
-                                        node.getNodeText(viewModel)
+                                        viewModel.getNodeText(node)
                                     },
                                     updateClipBoard = { text ->
                                         val clipData = ClipData.newPlainText("node", text)
@@ -266,10 +286,10 @@ class MainActivity : FragmentActivity() {
     }
 
     private fun showError(
-        message:String,
+        message: String,
         scope: CoroutineScope,
         snackbarHostState: SnackbarHostState,
-    ){
+    ) {
         scope.launch {
             snackbarHostState.showSnackbar(message)
         }

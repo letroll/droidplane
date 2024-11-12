@@ -8,8 +8,7 @@ import org.koin.dsl.module
 val koinModule = module {
     viewModel{
         MainViewModel(
-//            get()
-            //TODO make di usable
+            get()
         )
     }
 

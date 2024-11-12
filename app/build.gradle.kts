@@ -8,7 +8,7 @@ android {
     defaultConfig {
         applicationId = "fr.julien.quievreux.droidplane2"
         minSdk = 21
-        targetSdk = 34
+        targetSdk = 35
     }
 
     buildFeatures {
@@ -26,7 +26,7 @@ android {
         targetCompatibility = JavaVersion.VERSION_21
     }
     namespace = "fr.julien.quievreux.droidplane2"
-    compileSdk = 34
+    compileSdk = 35
 
     kotlinOptions {
         jvmTarget = "21"

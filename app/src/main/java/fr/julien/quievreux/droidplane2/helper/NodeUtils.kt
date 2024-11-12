@@ -4,8 +4,8 @@ import android.content.Intent
 import android.net.Uri
 import android.util.Pair
 import androidx.fragment.app.FragmentActivity
-import fr.julien.quievreux.droidplane2.model.MindmapIndexes
-import fr.julien.quievreux.droidplane2.model.MindmapNode
+import fr.julien.quievreux.droidplane2.data.model.MindmapIndexes
+import fr.julien.quievreux.droidplane2.data.model.MindmapNode
 import fr.julien.quievreux.droidplane2.view.RichTextViewActivity
 import org.xmlpull.v1.XmlPullParser
 import org.xmlpull.v1.XmlPullParserException
@@ -100,7 +100,7 @@ object NodeUtils {
     fun loadAndIndexNodesByIds(root: MindmapNode?): MindmapIndexes {
         // TODO: check if this optimization was necessary - otherwise go back to old implementation
 
-        // TODO: this causes us to load all viewModel nodes, defeating the lazy loading in fr.julien.quievreux.droidplane2.model.MindmapNode.getChildNodes
+        // TODO: this causes us to load all viewModel nodes, defeating the lazy loading in.MindmapNode.getChildNodes
 
         val stack = Stack<MindmapNode?>()
         stack.push(root)

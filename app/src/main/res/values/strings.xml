@@ -21,5 +21,6 @@
     <string name="search_next">Search Next</string>
     <string name="search_prev">Search Prev.</string>
     <string name="open">Open</string>
+    <string name="edit">Edit</string>
     <string name="node_information">Created : %1$s Modified : %2$s</string>
 </resources>

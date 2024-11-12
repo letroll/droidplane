@@ -1,8 +1,8 @@
-package fr.julien.quievreux.droidplane2.model
+package fr.julien.quievreux.droidplane2.data.model
 
 import android.net.Uri
 import android.text.Html
-import fr.julien.quievreux.droidplane2.MainViewModel
+import fr.julien.quievreux.droidplane2.data.NodeManager
 
 /**
  * A MindMapNode is a special type of DOM Node. A DOM Node can be converted to a MindMapNode if it has type ELEMENT,
@@ -26,58 +26,30 @@ data class MindmapNode(
      * If the node clones another node, it doesn't have text or richtext, but a TREE_ID
      */
     private val treeIdAttribute: String?,
+    val childMindmapNodes: MutableList<MindmapNode> = mutableListOf(),
+    val richTextContents: MutableList<String> = mutableListOf(),
+    val iconNames: MutableList<String> = mutableListOf(),
     val creationDate: Long?,
     val modificationDate: Long?,
-) {
-    val richTextContents: MutableList<String> = mutableListOf()
-    var isBold: Boolean = false
-    var isItalic: Boolean = false
-    val iconNames: MutableList<String> = mutableListOf()
-
-    /**
-     * Returns whether this node is selected
-     */
-    /**
-     * Selects or deselects this node
-     *
-     * @param selected
-     */
-    /**
-     * Whether the node is selected or not, will be set after it was clicked by the user
-     */
+    var isBold: Boolean = false,
+    var isItalic: Boolean = false,
     // TODO: this has nothing to do with the model
-    var isSelected: Boolean = false
-
-    /**
-     * The list of child MindmapNodes. We support lazy loading.
-     */
-    var childMindmapNodes: MutableList<MindmapNode> = mutableListOf()
-
-    /**
-     * List of outgoing arrow links
-     */
-    val arrowLinkDestinationIds: MutableList<String> = mutableListOf()
-
-    /**
-     * List of outgoing arrow MindmapNodes
-     */
-    val arrowLinkDestinationNodes: MutableList<MindmapNode> = mutableListOf()
-
-    /**
-     * List of incoming arrow MindmapNodes
-     */
-    val arrowLinkIncomingNodes: MutableList<MindmapNode> = mutableListOf()
-    var loaded = false
+    var isSelected: Boolean = false,
+    val arrowLinkDestinationIds: MutableList<String> = mutableListOf(),
+    val arrowLinkDestinationNodes: MutableList<MindmapNode> = mutableListOf(),
+    val arrowLinkIncomingNodes: MutableList<MindmapNode> = mutableListOf(),
+    var loaded: Boolean = false, //TODO needed?
+) {
 
     // TODO: this should probably live in a view controller, not here
-    fun getNodeText(viewModel: MainViewModel): String? {
+    fun getNodeText(nodeManager: NodeManager): String? {
         // if this is a cloned node, get the text from the original node
 
         if (treeIdAttribute != null && treeIdAttribute != "") {
             // TODO this now fails when loading, because the background indexing is not done yet - so we maybe should mark this as "pending", and put it into a queue, to be updated once the linked node is there
-            val linkedNode = viewModel.getNodeByID(treeIdAttribute)
+            val linkedNode = nodeManager.getNodeByID(treeIdAttribute)
             if (linkedNode != null) {
-                return linkedNode.getNodeText(viewModel)
+                return linkedNode.getNodeText(nodeManager)
             }
         }
 
@@ -124,3 +96,4 @@ data class MindmapNode(
 
 // if the link has a "#ID123", it's an internal link within the document
 fun MindmapNode.isInternalLink(): Boolean = link?.fragment != null && link.fragment?.startsWith("ID") == true
+fun MindmapNode.isRoot(): Boolean = parentNode == null

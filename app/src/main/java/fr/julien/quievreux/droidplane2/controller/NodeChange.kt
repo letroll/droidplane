@@ -1,6 +1,6 @@
 package fr.julien.quievreux.droidplane2.controller
 
-import fr.julien.quievreux.droidplane2.model.MindmapNode
+import fr.julien.quievreux.droidplane2.data.model.MindmapNode
 
 sealed class NodeChange{
     data class RichContentChanged(val node: MindmapNode): NodeChange()
