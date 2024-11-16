@@ -7,8 +7,8 @@ plugins {
 android {
     defaultConfig {
         applicationId = "fr.julien.quievreux.droidplane2"
-        minSdk = 21
-        targetSdk = 35
+        minSdk = libs.versions.minSdkVersion.get().toInt()
+        targetSdk = libs.versions.targetSdkVersion.get().toInt()
     }
 
     buildFeatures {
@@ -26,7 +26,7 @@ android {
         targetCompatibility = JavaVersion.VERSION_21
     }
     namespace = "fr.julien.quievreux.droidplane2"
-    compileSdk = 35
+    compileSdk = libs.versions.targetSdkVersion.get().toInt()
 
     kotlinOptions {
         jvmTarget = "21"
@@ -38,6 +38,8 @@ dependencies {
     implementation(libs.androidx.lifecycle.extensions)
     implementation(libs.androidx.lifecycle.viewmodel.ktx)
     implementation(libs.androidx.constraintlayout)
+
+    implementation(project(":core"))
     implementation(project(":data"))
 
     val composeBom = platform("androidx.compose:compose-bom:2024.09.03")

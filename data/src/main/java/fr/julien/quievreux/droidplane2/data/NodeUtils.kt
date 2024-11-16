@@ -1,12 +1,9 @@
-package fr.julien.quievreux.droidplane2.helper
+package fr.julien.quievreux.droidplane2.data
 
-import android.content.Intent
 import android.net.Uri
 import android.util.Pair
-import androidx.fragment.app.FragmentActivity
 import fr.julien.quievreux.droidplane2.data.model.MindmapIndexes
 import fr.julien.quievreux.droidplane2.data.model.MindmapNode
-import fr.julien.quievreux.droidplane2.view.RichTextViewActivity
 import org.xmlpull.v1.XmlPullParser
 import org.xmlpull.v1.XmlPullParserException
 import java.io.IOException
@@ -172,19 +169,6 @@ object NodeUtils {
             modificationDate = modificationDate,
         )
         return newMindmapNode
-    }
-
-
-    fun openRichText(
-        mindmapNode: MindmapNode,
-        activity: FragmentActivity,
-    ) {
-        if(mindmapNode.richTextContents.isNotEmpty()){
-            val richTextContent = mindmapNode.richTextContents.first()
-            val intent = Intent(activity, RichTextViewActivity::class.java)
-            intent.putExtra("richTextContent", richTextContent)
-            activity.startActivity(intent)
-        }
     }
 
 /*    fun generateNodeID(proposedID: String?): String {

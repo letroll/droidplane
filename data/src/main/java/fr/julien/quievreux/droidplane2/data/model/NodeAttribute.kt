@@ -1,4 +1,4 @@
-package fr.julien.quievreux.droidplane2.model
+package fr.julien.quievreux.droidplane2.data.model
 
 enum class NodeAttribute(text:String) {
     BUILTIN("BUILTIN"),

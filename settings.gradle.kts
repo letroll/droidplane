@@ -17,3 +17,4 @@ dependencyResolutionManagement {
 rootProject.name = "droidplane2"
 include(":app")
 include(":data")
+include(":core")

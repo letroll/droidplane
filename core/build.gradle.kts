@@ -4,7 +4,7 @@ plugins {
 }
 
 android {
-    namespace = "fr.julien.quievreux.droidplane2.data"
+    namespace = "fr.julien.quievreux.droidplane2.core"
     compileSdk = libs.versions.targetSdkVersion.get().toInt()
 
     defaultConfig {
@@ -17,46 +17,29 @@ android {
     buildTypes {
         release {
             isMinifyEnabled = false
-            proguardFiles(
-                getDefaultProguardFile("proguard-android-optimize.txt"),
-                "proguard-rules.pro"
-            )
+            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
         }
     }
     compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_21
-        targetCompatibility = JavaVersion.VERSION_21
+        sourceCompatibility = JavaVersion.VERSION_1_8
+        targetCompatibility = JavaVersion.VERSION_1_8
     }
     kotlinOptions {
-        jvmTarget = "21"
-    }
-
-    testOptions {
-        unitTests.all {
-            it.useJUnitPlatform()
-        }
+        jvmTarget = "1.8"
     }
 }
 
 dependencies {
+
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.appcompat)
     implementation(libs.material)
-
-    implementation(project(":core"))
 
     implementation(project.dependencies.platform(libs.koin.bom))
     implementation(libs.koin.android)
     implementation(libs.koin.core)
 
-    testImplementation(project(":core"))
-
     testImplementation(libs.junit)
-    testImplementation(libs.kotest)
-    testImplementation(libs.kotest.assertions)
-    testImplementation(libs.kotest.runner.junit5)
-    testImplementation(libs.mockk)
-
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
 }

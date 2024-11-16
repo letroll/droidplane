@@ -38,7 +38,6 @@ data class MindmapNode(
     val arrowLinkDestinationIds: MutableList<String> = mutableListOf(),
     val arrowLinkDestinationNodes: MutableList<MindmapNode> = mutableListOf(),
     val arrowLinkIncomingNodes: MutableList<MindmapNode> = mutableListOf(),
-    var loaded: Boolean = false, //TODO needed?
 ) {
 
     // TODO: this should probably live in a view controller, not here

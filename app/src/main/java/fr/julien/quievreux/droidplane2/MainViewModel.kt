@@ -14,13 +14,6 @@ import fr.julien.quievreux.droidplane2.MainUiState.DialogUiState
 import fr.julien.quievreux.droidplane2.MainUiState.SearchUiState
 import fr.julien.quievreux.droidplane2.data.NodeManager
 import fr.julien.quievreux.droidplane2.helper.DateUtils
-import fr.julien.quievreux.droidplane2.helper.NodeUtils
-import fr.julien.quievreux.droidplane2.helper.NodeUtils.fillArrowLinks
-import fr.julien.quievreux.droidplane2.helper.XmlParseUtils.parseArrowLink
-import fr.julien.quievreux.droidplane2.helper.XmlParseUtils.parseFont
-import fr.julien.quievreux.droidplane2.helper.XmlParseUtils.parseIcon
-import fr.julien.quievreux.droidplane2.helper.XmlParseUtils.parseRichContent
-import fr.julien.quievreux.droidplane2.helper.isRichContent
 import fr.julien.quievreux.droidplane2.model.ContextMenuAction
 import fr.julien.quievreux.droidplane2.model.ContextMenuAction.CopyText
 import fr.julien.quievreux.droidplane2.model.ContextMenuAction.Edit
@@ -28,21 +21,18 @@ import fr.julien.quievreux.droidplane2.model.ContextMenuAction.NodeLink
 import fr.julien.quievreux.droidplane2.data.model.MindmapIndexes
 import fr.julien.quievreux.droidplane2.data.model.MindmapNode
 import fr.julien.quievreux.droidplane2.data.model.isInternalLink
+import fr.julien.quievreux.droidplane2.extensions.default
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import org.xmlpull.v1.XmlPullParser
-import org.xmlpull.v1.XmlPullParserFactory
+import org.koin.core.parameter.parametersOf
+import org.koin.java.KoinJavaComponent.inject
 import java.io.File
 import java.io.InputStream
 import java.util.Date
-import java.util.Stack
 
 data class ViewIntentNode(
     val intent: Intent,
@@ -52,38 +42,14 @@ data class ViewIntentNode(
 /**
  * MainViewModel handles the loading and storing of a mind map document.
  */
-class MainViewModel(
-    private val nodeManager: NodeManager,
-) : ViewModel() {
+class MainViewModel(coroutineScope: CoroutineScope = Dispatchers.default()) : ViewModel(viewModelScope = coroutineScope) {
 
     private val _uiState: MutableStateFlow<MainUiState> = MutableStateFlow(MainUiState())
     val uiState: StateFlow<MainUiState> = _uiState
 
-    //first state whether the search is happening or not
-    private val _isSearching = MutableStateFlow(false)
-
-    //second state the text typed by the user
-    private val _searchText = MutableStateFlow("")
-    private val searchText = _searchText.asStateFlow()
-
-    private val _allNodes = MutableStateFlow(emptyList<MindmapNode>())
-    val nodeFindList = searchText
-        .combine(_allNodes) { text, nodes ->//combine searchText with _nodeFindList
-            if (text.isBlank()) { //return the entery list of nodes if not is typed
-                nodes
-            } else {
-                nodes.filter { node ->// filter and return a list of nodes based on the text the user typed
-                    node.getNodeText(nodeManager)?.contains(text.trim(), ignoreCase = true) == true
-                }//.reversed()
-            }
-        }.stateIn( //basically convert the Flow returned from combine operator to StateFlow
-            scope = viewModelScope,
-            started = SharingStarted.WhileSubscribed(5000),//it will allow the StateFlow survive 5 seconds before it been canceled
-            initialValue = _allNodes.value
-        )
+    private val nodeManager : NodeManager by inject(NodeManager::class.java) { parametersOf(viewModelScope) }
 
     var currentMindMapUri: Uri? = null
-    private var rootNode: MindmapNode? = null
 
     private fun setMindmapIsLoading(mindmapIsLoading: Boolean) {
         updateUiState {
@@ -93,143 +59,40 @@ class MainViewModel(
         }
     }
 
-    //TODO extract parsing from viewModel
     /**
      * Loads a mind map (*.mm) XML document into its internal DOM tree
      *
      * @param inputStream the inputStream to load
      */
-    fun loadMindMap(
-        inputStream: InputStream? = null,
-    ) {
+    fun loadMindMap(inputStream: InputStream) {
         viewModelScope.launch {
             setMindmapIsLoading(true)
-
-            val nodeStack = Stack<MindmapNode>()
-
-            try {
-                // set up XML pull parsing
-                val factory = XmlPullParserFactory.newInstance()
-                factory.isNamespaceAware = true
-                val xpp = factory.newPullParser()
-                xpp.setInput(inputStream, "UTF-8")
-
-                // stream parse the XML
-                var eventType = xpp.eventType
-                while (eventType != XmlPullParser.END_DOCUMENT) {
-                    when (eventType) {
-                        XmlPullParser.START_DOCUMENT -> {
-                            Log.d(MainApplication.TAG, "Received XML Start Document")
-                        }
-
-                        XmlPullParser.START_TAG -> {
-                            when {
-                                xpp.name == "node" -> {
-                                    parseNode(nodeStack, xpp)
-                                }
-
-                                xpp.isRichContent() -> {
-                                    parseRichContent(xpp, nodeStack)
-                                }
-
-                                xpp.name == "font" -> {
-                                    parseFont(xpp, nodeStack)
-                                }
-
-                                xpp.name == "icon" && xpp.getAttributeValue(null, "BUILTIN") != null -> {
-                                    parseIcon(xpp, nodeStack)
-                                }
-
-                                xpp.name == "arrowlink" -> {
-                                    parseArrowLink(xpp, nodeStack)
-                                }
-
-                                else -> {
-                                    Log.d(MainApplication.TAG, "Received unknown node " + xpp.name)
-                                }
-                            }
-                        }
-
-                        XmlPullParser.END_TAG -> {
-                            if (xpp.name == "node") {
-                                val completedMindmapNode = nodeStack.pop()
-                                completedMindmapNode.loaded = true
-                            }
-                        }
-
-                        XmlPullParser.TEXT -> {
-                            // do we have TEXT nodes in the viewModel at all?
-                        }
-
-                        else -> {
-                            throw IllegalStateException("Received unknown event $eventType")
-                        }
-                    }
-
-                    eventType = xpp.next()
-                }
-            } catch (e: Exception) {
-                throw RuntimeException(e)
-            }
-
-            // stack should now be empty
-            if (!nodeStack.empty()) {
-                throw RuntimeException("Stack should be empty")
-                // TODO: we could try to be lenient here to allow opening partial documents
-                //  (which sometimes happens when dropbox doesn't fully sync).
-                //  Probably doesn't work anyways, as we already throw a runtime exception above if we receive garbage
-            }
-
-            // TODO: can we do this as we stream through the XML above?
-            // load all nodes of root node into simplified MindmapNode, and index them by ID for faster lookup
-            nodeManager.updatemMindmapIndexes(NodeUtils.loadAndIndexNodesByIds(rootNode))
-
-
-            // Nodes can refer to other nodes with arrowlinks. We want to have the link on both ends of the link, so we can
-            // now set the corresponding links
-            fillArrowLinks(nodeManager.getNodeByIdIndex())
-
-            Log.d(MainApplication.TAG, "Document loaded")
-
+            nodeManager.loadMindMap(
+               inputStream = inputStream,
+                onLoadFinished = {},
+                onError = { exception ->
+                   updateUiState {
+                      it.copy(
+                          error = exception.message?:exception.stackTraceToString()
+                      )
+                   }
+                },
+               onParentNode = { parentNode ->
+                   val title = parentNode.getNodeText(nodeManager).orEmpty()
+                   updateUiState {
+                       it.copy(
+                           title = title,
+                           defaultTitle = title,
+                           rootNode = parentNode,
+                       )
+                   }
+               }
+            )
             setMindmapIsLoading(false)
         }
     }
 
-    private fun parseNode(
-        nodeStack: Stack<MindmapNode>,
-        xpp: XmlPullParser,
-    ) {
-        var parentNode: MindmapNode? = null
-        if (!nodeStack.empty()) {
-            parentNode = nodeStack.peek()
-        }
-
-        val newMindmapNode = NodeUtils.parseNodeTag(xpp, parentNode)
-        nodeStack.push(newMindmapNode)
-
-        // if we don't have a parent node, then this is the root node
-        if (parentNode == null) {
-            val title = newMindmapNode.getNodeText(nodeManager).orEmpty()
-            updateUiState {
-                it.copy(
-                    title = title,
-                    defaultTitle = title,
-                    rootNode = newMindmapNode,
-                )
-            }
-            rootNode = newMindmapNode
-            _allNodes.update {
-                listOf(newMindmapNode)
-            }
-        } else {
-            //TODO change to immutable list
-            parentNode.addChildMindmapNode(newMindmapNode)
-
-            _allNodes.update {
-                it + newMindmapNode
-            }
-        }
-    }
+    fun getSearchResult() = nodeManager.getSearchResult()
 
     private fun getMindmapDirectoryPath(): String? {
         // link is relative to viewModel file
@@ -336,7 +199,7 @@ ${node.childMindmapNodes.joinToString(separator = "\n", transform = { "(${it.id}
      */
     fun up(force: Boolean) {
         _uiState.value.rootNode?.id?.let { nodeId ->
-            findFilledNode(nodeId)?.let { node ->
+            nodeManager.findFilledNode(nodeId)?.let { node ->
                 val parent = node.parentNode
                 parent?.isSelected = false
                 updateUiState {
@@ -371,37 +234,6 @@ ${node.childMindmapNodes.joinToString(separator = "\n", transform = { "(${it.id}
         }
     }
 
-    //TODO Try with clone
-    // TODO use suspend
-    /** Depth-first search in the core text of the nodes in this sub-tree.  */ // TODO: this doesn't work while viewModel is still loading
-    private fun findFilledNode(
-        parentNodeId: String,
-    ): MindmapNode? {
-//        viewModelScope.launch {
-//
-//        }
-        return depthFirstSearchRecursive(rootNode, parentNodeId)
-    }
-
-    private fun depthFirstSearchRecursive(
-        node: MindmapNode?,
-        targetId: String,
-    ): MindmapNode? {
-        if (node == null) {
-            return null
-        }
-        if (node.id == targetId) {
-            return node
-        }
-        for (child in node.childMindmapNodes) {
-            val result = depthFirstSearchRecursive(child, targetId)
-            if (result != null) {
-                return result
-            }
-        }
-        return null
-    }
-
     private fun updateUiState(newUiState: (MainUiState) -> MainUiState) {
         _uiState.update {
             newUiState(it)
@@ -426,7 +258,7 @@ ${node.childMindmapNodes.joinToString(separator = "\n", transform = { "(${it.id}
 
     /** Selects the next search result node.  */
     fun searchNext() {
-        if (_uiState.value.searchUiState.currentSearchResultIndex < nodeFindList.value.size - 1) {
+        if (_uiState.value.searchUiState.currentSearchResultIndex < nodeManager.getResultCount() - 1) {
             updateSearchUiState {
                 it.copy(
                     currentSearchResultIndex = it.currentSearchResultIndex + 1
@@ -454,11 +286,11 @@ ${node.childMindmapNodes.joinToString(separator = "\n", transform = { "(${it.id}
         Log.e(
             "toto", """
 showCurrentSearchResult:${_uiState.value.searchUiState.currentSearchResultIndex}
-nodeFindList:${nodeFindList.value.map { it.getNodeText(nodeManager) }.joinToString(separator = "|")}
+nodeFindList:${nodeManager.nodeFindList.value.map { it.getNodeText(nodeManager) }.joinToString(separator = "|")}
         """.trimIndent()
         )
-        if (_uiState.value.searchUiState.currentSearchResultIndex >= 0 && _uiState.value.searchUiState.currentSearchResultIndex < nodeFindList.value.size) {
-            downTo(nodeFindList.value[_uiState.value.searchUiState.currentSearchResultIndex], false)
+        if (_uiState.value.searchUiState.currentSearchResultIndex >= 0 && _uiState.value.searchUiState.currentSearchResultIndex < nodeManager.nodeFindList.value.size) {
+            downTo(nodeManager.nodeFindList.value[_uiState.value.searchUiState.currentSearchResultIndex], false)
         }
         //TODO Shows/hides the next/prev buttons
         //TODO highlight result in column
@@ -505,7 +337,7 @@ nodeFindList:${nodeFindList.value.map { it.getNodeText(nodeManager) }.joinToStri
     fun top() {
         updateUiState {
             it.copy(
-                rootNode = rootNode,
+                rootNode = nodeManager.getRootNode(),
             )
         }
     }
@@ -516,23 +348,12 @@ nodeFindList:${nodeFindList.value.map { it.getNodeText(nodeManager) }.joinToStri
 //                currentSearchResultIndex = 0
 //            )
 //        }
-        _searchText.update {
-            query
-        }
-        _isSearching.update {
-            query.isNotEmpty()
-        }
-        Log.e(
-            "toto", """
-query:$query 
-isSearching:${_isSearching.value} 
-find:${nodeFindList.value.joinToString(separator = "|", transform = { it.getNodeText(nodeManager).orEmpty() })} 
-        """.trimIndent()
+        nodeManager.search(
+            query = query,
+            onResultFound = {
+                showCurrentSearchResult()
+            }
         )
-
-        if (nodeFindList.value.size == 1) {
-            showCurrentSearchResult()
-        }
     }
 
     fun onNodeContextMenuClick(contextMenuAction: ContextMenuAction) {

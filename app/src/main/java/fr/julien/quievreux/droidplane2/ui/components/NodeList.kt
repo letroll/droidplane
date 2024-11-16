@@ -1,7 +1,7 @@
 package fr.julien.quievreux.droidplane2.ui.components
 
+import android.annotation.SuppressLint
 import android.content.Context
-import android.util.Log
 import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.indication
@@ -51,7 +51,6 @@ import compose.icons.fontawesomeicons.Solid
 import compose.icons.fontawesomeicons.regular.Clipboard
 import compose.icons.fontawesomeicons.regular.Edit
 import compose.icons.fontawesomeicons.solid.Link
-import fr.julien.quievreux.droidplane2.MainApplication
 import fr.julien.quievreux.droidplane2.R
 import fr.julien.quievreux.droidplane2.helper.DateUtils
 import fr.julien.quievreux.droidplane2.model.ContextMenuAction
@@ -104,6 +103,7 @@ fun LazyListScope.nodeList(
 //    }
 }
 
+@SuppressLint("DiscouragedApi")
 @Composable
 fun NodeItem(
     fetchText: (MindmapNode) -> String?,
@@ -215,12 +215,10 @@ fun NodeItem(
 
             for (iconName in iconNames) {
                 getNodeFontIconsFromName(iconName)?.let {
-//                    Log.e(MainApplication.TAG, "converted icon from enum to font icon")
                     imageVectors.add(it)
                 }
 
                 getNodeIconsResIdFromName(iconName)?.let {
-//                    Log.e(MainApplication.TAG, "converted icon from enum")
                     iconResourceIds.add(it)
                 } ?: run {
                     val drawableName = getDrawableNameFromMindmapIcon(iconName, context)
@@ -278,7 +276,6 @@ fun NodeItem(
                 style = applyTextStyle(node),
                 color = MaterialTheme.colorScheme.primary
             )
-//                    Log.e("toto", "node:$text childes:${node.childMindmapNodes.size}")
             if (node.childMindmapNodes.size > 0) {
                 ToggleIcon(
                     isOpen = node.isSelected,
@@ -349,7 +346,6 @@ fun applyTextStyle(node: MindmapNode) = TextStyle(
 private fun getDrawableNameFromMindmapIcon(iconName: String, context: Context): String {
     var name = "icon_" + iconName.lowercase(context.resources.configuration.locale).replace("[^a-z0-9_.]".toRegex(), "_")
     name = name.replace("_$".toRegex(), "")
-    Log.e(MainApplication.TAG, "converted icon name $iconName to $name")
     return name
 }
 
@@ -393,15 +389,12 @@ private fun NodeListPreview() {
 
     val nodes = listOf(node1, node2, node3)
     ContrastAwareReplyTheme {
-//        val context = LocalContext.current
-//        val viewModel = MainViewModel()
         LazyColumn(
             modifier = Modifier.height(300.dp),
         ) {
             nodeList(
                 nodes = nodes,
-                fetchText = { node ->
-//                    node.getNodeText(viewModel)
+                fetchText = { _ ->
                     "node"
                 },
                 updateClipBoard = {},

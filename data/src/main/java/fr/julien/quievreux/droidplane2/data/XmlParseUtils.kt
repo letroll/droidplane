@@ -1,13 +1,13 @@
-package fr.julien.quievreux.droidplane2.helper
+package fr.julien.quievreux.droidplane2.data
 
 import android.util.Log
-import fr.julien.quievreux.droidplane2.MainApplication
 import fr.julien.quievreux.droidplane2.data.model.MindmapNode
-import fr.julien.quievreux.droidplane2.model.NodeAttribute
+import fr.julien.quievreux.droidplane2.data.model.NodeAttribute
 import org.xmlpull.v1.XmlPullParser
 import java.util.Stack
 
 object XmlParseUtils {
+    private const val XML_PARSE_UTILS_TAG = "XmlParseUtils"
     // extract the richcontent (HTML) of the node. This works both for nodes with a rich text content
     // (TYPE="NODE"), for "Notes" (TYPE="NOTE"), for "Details" (TYPE="DETAILS").
 
@@ -16,7 +16,7 @@ object XmlParseUtils {
     // only be interested in it's children
     fun parseRichContent(xpp: XmlPullParser, nodeStack: Stack<MindmapNode>) {
         if (xpp.isEmptyElementTag) {
-            Log.d(MainApplication.TAG, "Received empty richcontent node - skipping")
+            Log.d(XML_PARSE_UTILS_TAG, "Received empty richcontent node - skipping")
         } else {
             val richTextContent = NodeUtils.loadRichContentNodes(xpp)
 

@@ -5,15 +5,16 @@ import fr.julien.quievreux.droidplane2.data.NodeManager
 import org.koin.core.module.dsl.viewModel
 import org.koin.dsl.module
 
-val koinModule = module {
+val appKoinModule = module {
     viewModel{
         MainViewModel(
-            get()
         )
     }
 
-    single {
-        NodeManager()
+    single { params ->
+        NodeManager(
+            coroutineScope = params.get()
+        )
     }
 }
 

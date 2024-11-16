@@ -11,13 +11,16 @@ import android.content.Intent.ACTION_OPEN_DOCUMENT
 import android.content.Intent.ACTION_VIEW
 import android.net.Uri
 import android.os.Bundle
-import android.util.Log
+import androidx.activity.SystemBarStyle
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
+import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarDuration.Indefinite
 import androidx.compose.material3.SnackbarHost
@@ -27,10 +30,10 @@ import androidx.compose.material3.SnackbarResult.Dismissed
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.State
 import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.res.stringResource
 import androidx.fragment.app.FragmentActivity
 import fr.julien.quievreux.droidplane2.ContentNodeType.Classic
@@ -38,7 +41,8 @@ import fr.julien.quievreux.droidplane2.ContentNodeType.RelativeFile
 import fr.julien.quievreux.droidplane2.ContentNodeType.RichText
 import fr.julien.quievreux.droidplane2.MainUiState.DialogType.Edit
 import fr.julien.quievreux.droidplane2.MainUiState.DialogType.None
-import fr.julien.quievreux.droidplane2.helper.NodeUtils.openRichText
+import fr.julien.quievreux.droidplane2.core.log.Logger
+import fr.julien.quievreux.droidplane2.data.model.MindmapNode
 import fr.julien.quievreux.droidplane2.ui.components.AppTopBar
 import fr.julien.quievreux.droidplane2.ui.components.AppTopBarAction.Backpress
 import fr.julien.quievreux.droidplane2.ui.components.AppTopBarAction.Help
@@ -50,9 +54,14 @@ import fr.julien.quievreux.droidplane2.ui.components.AppTopBarAction.Up
 import fr.julien.quievreux.droidplane2.ui.components.CustomDialog
 import fr.julien.quievreux.droidplane2.ui.components.nodeList
 import fr.julien.quievreux.droidplane2.ui.theme.ContrastAwareReplyTheme
+import fr.julien.quievreux.droidplane2.ui.theme.primaryContainerLight
+import fr.julien.quievreux.droidplane2.ui.theme.primaryLight
+import fr.julien.quievreux.droidplane2.view.RichTextViewActivity
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
+import org.koin.android.ext.android.inject
 import org.koin.androidx.viewmodel.ext.android.viewModel
+import org.koin.java.KoinJavaComponent.inject
 import java.io.FileNotFoundException
 import java.io.InputStream
 
@@ -65,7 +74,8 @@ import java.io.InputStream
  */
 class MainActivity : FragmentActivity() {
 
-    val viewModel: MainViewModel by viewModel()
+    private val viewModel: MainViewModel by viewModel()
+    private val logger by inject<Logger>()
 
     private val clipboardManager by lazy {
         getSystemService(CLIPBOARD_SERVICE) as ClipboardManager
@@ -83,6 +93,12 @@ class MainActivity : FragmentActivity() {
     @SuppressLint("RememberReturnType")
     public override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        enableEdgeToEdge(
+            navigationBarStyle = SystemBarStyle.light(
+                scrim = primaryLight.toArgb(),
+                darkScrim = primaryContainerLight.toArgb()
+            )
+        )
         setContentView(R.layout.activity_main)
 
         if (viewModel.uiState.value.loading) {
@@ -91,7 +107,7 @@ class MainActivity : FragmentActivity() {
                     currentMindMapUri = intent.data
                 }
 
-                loadMindMap(getDocumentInputStream(isAnExternalMindMapEdit()))
+                getDocumentInputStream(isAnExternalMindMapEdit())?.let { loadMindMap(it) }
             }
         }
         setContent {
@@ -101,7 +117,7 @@ class MainActivity : FragmentActivity() {
             ContrastAwareReplyTheme {
                 val state = viewModel.uiState.collectAsState()
                 if (state.value.leaving) finish() //TODO confirm dialog
-                val nodeFindList = viewModel.nodeFindList.collectAsState()
+                val nodeFindList = viewModel.getSearchResult().collectAsState()
 
                 BackHandler(true) {
                     viewModel.upOrClose()
@@ -174,10 +190,12 @@ class MainActivity : FragmentActivity() {
                     content = { innerPadding ->
                         LazyColumn(
                             modifier = Modifier
+                                .fillMaxSize()
+                                .background(MaterialTheme.colorScheme.surfaceContainer)
                                 .padding(innerPadding),
                         ) {
                             state.value.rootNode?.childMindmapNodes?.let { nodes ->
-                                Log.e("toto", "list updated")
+                                logger.e("list updated")
                                 val searchResultToShow = if (nodeFindList.value.isEmpty() || (state.value.searchUiState.currentSearchResultIndex in 0 until nodeFindList.value.size - 1)) {
                                     null
                                 } else {
@@ -348,6 +366,19 @@ class MainActivity : FragmentActivity() {
         val alert = builder.create()
         alert.show()
     }
+
+    private fun openRichText(
+        mindmapNode: MindmapNode,
+        activity: FragmentActivity,
+    ) {
+        if(mindmapNode.richTextContents.isNotEmpty()){
+            val richTextContent = mindmapNode.richTextContents.first()
+            val intent = Intent(activity, RichTextViewActivity::class.java)
+            intent.putExtra("richTextContent", richTextContent)
+            activity.startActivity(intent)
+        }
+    }
+
 
     companion object {
         const val INTENT_START_HELP: String = "fr.julien.quievreux.droidplane2.INTENT_START_HELP"
