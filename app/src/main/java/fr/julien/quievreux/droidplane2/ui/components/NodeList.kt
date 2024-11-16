@@ -374,7 +374,11 @@ private fun NodeListPreview() {
         modificationDate = 1728740023499,
     )
 
+
     node2.addChildMindmapNode(node1)
+//    node2 = node2.copy(
+//        childMindmapNodes = node2.childMindmapNodes +  node1
+//    )
 
     val node3 = MindmapNode(
         parentNode = null,

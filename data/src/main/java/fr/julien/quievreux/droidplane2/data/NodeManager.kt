@@ -8,6 +8,7 @@ import fr.julien.quievreux.droidplane2.data.XmlParseUtils.parseIcon
 import fr.julien.quievreux.droidplane2.data.XmlParseUtils.parseRichContent
 import fr.julien.quievreux.droidplane2.data.model.MindmapIndexes
 import fr.julien.quievreux.droidplane2.data.model.MindmapNode
+import fr.julien.quievreux.droidplane2.data.model.NodeType
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -22,7 +23,7 @@ import java.util.Stack
 import kotlin.random.Random
 
 class NodeManager(
-    private val logger: Logger,
+    private val logger: Logger?=null,
     coroutineScope: CoroutineScope,
 ) {
     private val random = Random(System.currentTimeMillis())
@@ -129,7 +130,7 @@ class NodeManager(
             when (eventType) {
                 XmlPullParser.START_DOCUMENT -> {
                     hasStartDocument = true
-                    logger.e("Received XML Start Document")
+                    logger?.e("Received XML Start Document")
                 }
 
                 XmlPullParser.START_TAG -> {
@@ -146,28 +147,28 @@ class NodeManager(
                             parseRichContent(xpp, nodeStack)
                         }
 
-                        xpp.name == "font" -> {
+                        xpp.name == NodeType.Font.value -> {
                             parseFont(xpp, nodeStack)
                         }
 
-                        xpp.name == "icon" && xpp.getAttributeValue(null, "BUILTIN") != null -> {
+                        xpp.name == NodeType.Icon.value && xpp.getAttributeValue(null, "BUILTIN") != null -> {
                             parseIcon(xpp, nodeStack)
                         }
 
-                        xpp.name == "arrowlink" -> {
+                        xpp.name == NodeType.ArrowLink.value -> {
                             parseArrowLink(xpp, nodeStack)
                         }
 
                         else -> {
-                            logger.d( "Received unknown node " + xpp.name)
+                            logger?.d( "Received unknown node " + xpp.name)
                         }
                     }
                 }
 
                 XmlPullParser.END_TAG -> {
-//                    if(hasStartDocument.not()){
+                    if(hasStartDocument.not()){
                         onError(RuntimeException("Received END_DOCUMENT without START_DOCUMENT"))
-//                    }
+                    }
                     if (xpp.name == "node") {
                         nodeStack.pop()
                     }
@@ -223,8 +224,6 @@ class NodeManager(
         // if we don't have a parent node, then this is the root node
         if (parentNode == null) {
             onParentNode(newMindmapNode)
-            /*
-            */
             rootNode = newMindmapNode
             _allNodes.update {
                 listOf(newMindmapNode)
@@ -232,6 +231,9 @@ class NodeManager(
         } else {
             //TODO change to immutable list
             parentNode.addChildMindmapNode(newMindmapNode)
+//            parentNode = parentNode.copy(
+//                childMindmapNodes = parentNode.childMindmapNodes + newMindmapNode
+//            )
 
             _allNodes.update {
                 it + newMindmapNode
@@ -275,7 +277,7 @@ class NodeManager(
         _isSearching.update {
             query.isNotEmpty()
         }
-        logger.e(
+        logger?.e(
             "toto", """
 query:$query 
 isSearching:${_isSearching.value} 

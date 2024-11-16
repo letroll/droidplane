@@ -1,6 +1,7 @@
 package fr.julien.quievreux.droidplane2.di
 
 import fr.julien.quievreux.droidplane2.MainViewModel
+import fr.julien.quievreux.droidplane2.core.log.AndLogger
 import fr.julien.quievreux.droidplane2.data.NodeManager
 import org.koin.core.module.dsl.viewModel
 import org.koin.dsl.module
@@ -13,7 +14,8 @@ val appKoinModule = module {
 
     single { params ->
         NodeManager(
-            coroutineScope = params.get()
+            coroutineScope = params.get(),
+            logger = AndLogger()
         )
     }
 }

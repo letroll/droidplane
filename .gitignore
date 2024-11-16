@@ -61,3 +61,5 @@ Thumbs.db
 /.idea/inspectionProfiles/Project_Default.xml
 /.idea/studiobot.xml
 /.idea/.name
+/.idea/.gitignore
+/.idea/droidplane.iml
