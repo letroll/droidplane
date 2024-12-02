@@ -61,7 +61,6 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import org.koin.android.ext.android.inject
 import org.koin.androidx.viewmodel.ext.android.viewModel
-import org.koin.java.KoinJavaComponent.inject
 import java.io.FileNotFoundException
 import java.io.InputStream
 
@@ -101,14 +100,12 @@ class MainActivity : FragmentActivity() {
         )
         setContentView(R.layout.activity_main)
 
-        if (viewModel.uiState.value.loading) {
-            viewModel.apply {
-                if (isAnExternalMindMapEdit()) {
-                    currentMindMapUri = intent.data
-                }
-
-                getDocumentInputStream(isAnExternalMindMapEdit())?.let { loadMindMap(it) }
+        viewModel.apply {
+            if (isAnExternalMindMapEdit()) {
+                viewModel.setMapUri(intent.data)
             }
+
+            getDocumentInputStream(isAnExternalMindMapEdit())?.let { loadMindMap(it) }
         }
         setContent {
             val scope = rememberCoroutineScope()
@@ -117,7 +114,7 @@ class MainActivity : FragmentActivity() {
             ContrastAwareReplyTheme {
                 val state = viewModel.uiState.collectAsState()
                 if (state.value.leaving) finish() //TODO confirm dialog
-                val nodeFindList = viewModel.getSearchResult().collectAsState()
+                val nodeFindList = viewModel.getSearchResultFlow().collectAsState()
 
                 BackHandler(true) {
                     viewModel.upOrClose()
@@ -144,7 +141,7 @@ class MainActivity : FragmentActivity() {
                                 viewModel.setDialogState(None)
                             }
                         ) { newValue ->
-                            viewModel.updateValue(dialog.node,newValue)
+                            viewModel.updateNodeText(dialog.node, newValue)
                         }
                     }
                 }
@@ -194,7 +191,7 @@ class MainActivity : FragmentActivity() {
                                 .background(MaterialTheme.colorScheme.surfaceContainer)
                                 .padding(innerPadding),
                         ) {
-                            state.value.rootNode?.childMindmapNodes?.let { nodes ->
+                            state.value.rootNode?.let { node ->
                                 logger.e("list updated")
                                 val searchResultToShow = if (nodeFindList.value.isEmpty() || (state.value.searchUiState.currentSearchResultIndex in 0 until nodeFindList.value.size - 1)) {
                                     null
@@ -202,15 +199,10 @@ class MainActivity : FragmentActivity() {
                                     nodeFindList.value[state.value.searchUiState.currentSearchResultIndex]
                                 }
                                 nodeList(
-                                    nodes = nodes,
+                                    node = node,
                                     searchResultToShow = searchResultToShow,
-                                    fetchText = { node ->
-                                        viewModel.getNodeText(node)
-                                    },
-                                    updateClipBoard = { text ->
-                                        val clipData = ClipData.newPlainText("node", text)
-                                        updateClipboard(clipData)
-                                    },
+                                    fetchText = viewModel::getNodeText,
+                                    updateClipBoard = ::updateClipboard,
                                     onNodeClick = viewModel::onNodeClick,
                                     onNodeContextMenuClick = viewModel::onNodeContextMenuClick,
                                 )
@@ -221,7 +213,6 @@ class MainActivity : FragmentActivity() {
                 )
             }
         }
-
     }
 
     private fun onViewIntent(
@@ -348,7 +339,8 @@ class MainActivity : FragmentActivity() {
         startActivity(helpIntent)
     }
 
-    private fun updateClipboard(clipData: ClipData) {
+    private fun updateClipboard(text: String) {
+        val clipData = ClipData.newPlainText("node", text)
         clipboardManager.setPrimaryClip(clipData)
     }
 
@@ -371,14 +363,13 @@ class MainActivity : FragmentActivity() {
         mindmapNode: MindmapNode,
         activity: FragmentActivity,
     ) {
-        if(mindmapNode.richTextContents.isNotEmpty()){
+        if (mindmapNode.richTextContents.isNotEmpty()) {
             val richTextContent = mindmapNode.richTextContents.first()
             val intent = Intent(activity, RichTextViewActivity::class.java)
             intent.putExtra("richTextContent", richTextContent)
             activity.startActivity(intent)
         }
     }
-
 
     companion object {
         const val INTENT_START_HELP: String = "fr.julien.quievreux.droidplane2.INTENT_START_HELP"

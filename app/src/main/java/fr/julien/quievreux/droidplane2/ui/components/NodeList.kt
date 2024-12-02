@@ -66,7 +66,7 @@ import fr.julien.quievreux.droidplane2.model.getNodeIconsResIdFromName
 import fr.julien.quievreux.droidplane2.ui.theme.ContrastAwareReplyTheme
 
 fun LazyListScope.nodeList(
-    nodes: List<MindmapNode>,
+    node: MindmapNode,
     fetchText: (MindmapNode) -> String?,
     updateClipBoard: (String) -> Unit,
     onNodeClick: (MindmapNode) -> Unit,
@@ -76,26 +76,22 @@ fun LazyListScope.nodeList(
     var isFoundInList = searchResultToShow == null
 
     items(
-        items = nodes,
-        key = { node ->
-            node.id
+        items = node.childMindmapNodes,
+        key = { child ->
+            child.id
         }
-    ) { node ->
-        if (node.id == searchResultToShow?.id) {
+    ) { child ->
+        if (child.id == searchResultToShow?.id) {
             isFoundInList = true
         }
-        fetchText(node)?.let { text ->
-            NodeItem(
-                fetchText = fetchText,
-                updateClipBoard = updateClipBoard,
-                isFoundInList = isFoundInList,
-                onNodeClick = onNodeClick,
-                onNodeContextMenuClick = onNodeContextMenuClick,
-                node = node,
-                text = text,
-
-                )
-        }
+        NodeItem(
+            fetchText = fetchText,
+            updateClipBoard = updateClipBoard,
+            isFoundInList = isFoundInList,
+            onNodeClick = onNodeClick,
+            onNodeContextMenuClick = onNodeContextMenuClick,
+            node = child,
+        )
     }
     //TODO create bug fix it
 //    if (!isFoundInList && searchResultToShow != null) {
@@ -112,9 +108,8 @@ fun NodeItem(
     onNodeClick: (MindmapNode) -> Unit,
     onNodeContextMenuClick: (ContextMenuAction) -> Unit,
     node: MindmapNode,
-    text: String,
 ) {
-
+    val text = fetchText(node) ?: ""
     val contextMenuDropDownItems = mutableListOf(
         ContextMenuDropDownItem(
             text = "copy $text",
@@ -352,11 +347,23 @@ private fun getDrawableNameFromMindmapIcon(iconName: String, context: Context): 
 @Composable
 @Preview
 private fun NodeListPreview() {
-    val node1 = MindmapNode(
+
+    var nodeParent = MindmapNode(
         parentNode = null,
+        id = "sqddqfsdfqsfqsd",
+        numericId = 119123123,
+        text = "Parent",
+        link = null,
+        treeIdAttribute = null,
+        creationDate = 1728740019071,
+        modificationDate = 1728740023499,
+    )
+
+    val node1 = MindmapNode(
+        parentNode = nodeParent,
         id = "sumo",
-        numericId = 1196,
-        text = "root",
+        numericId = 11963,
+        text = "node1",
         link = null,
         treeIdAttribute = null,
         creationDate = 1728740019071,
@@ -364,10 +371,10 @@ private fun NodeListPreview() {
     )
 
     val node2 = MindmapNode(
-        parentNode = null,
+        parentNode = nodeParent,
         id = "dqfqsd",
-        numericId = 1196,
-        text = "root",
+        numericId = 11962,
+        text = "node2",
         link = null,
         treeIdAttribute = null,
         creationDate = 1728740019071,
@@ -381,30 +388,31 @@ private fun NodeListPreview() {
 //    )
 
     val node3 = MindmapNode(
-        parentNode = null,
+        parentNode = nodeParent,
         id = "sqdfqsd",
         numericId = 1196,
-        text = "root",
+        text = "node3",
         link = null,
         treeIdAttribute = null,
         creationDate = 1728740019071,
         modificationDate = 1728740023499,
     )
 
-    val nodes = listOf(node1, node2, node3)
+   nodeParent = nodeParent.copy(childMindmapNodes = mutableListOf(node1, node2, node3))
+
     ContrastAwareReplyTheme {
         LazyColumn(
             modifier = Modifier.height(300.dp),
         ) {
             nodeList(
-                nodes = nodes,
-                fetchText = { _ ->
-                    "node"
+                node = nodeParent,
+                fetchText = { node ->
+                    node.text
                 },
                 updateClipBoard = {},
                 onNodeClick = {},
                 onNodeContextMenuClick = {},
-                searchResultToShow = node3,
+                searchResultToShow = null,
             )
         }
     }

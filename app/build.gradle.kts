@@ -14,6 +14,13 @@ android {
     buildFeatures {
         compose = true
     }
+    packaging {
+        // Exclure le fichier en conflit de la dépendance 'kotlinx-coroutines-debug'
+        resources.excludes.add("win32-x86-64/attach_hotspot_windows.dll")
+        resources.excludes.add("win32-x86/attach_hotspot_windows.dll")
+        resources.excludes.add("META-INF/licenses/*")
+        resources.excludes.add("META-INF/*")
+    }
 
     buildTypes {
         named("release") {
@@ -30,6 +37,12 @@ android {
 
     kotlinOptions {
         jvmTarget = "21"
+    }
+
+    testOptions {
+        unitTests.all {
+            it.useJUnitPlatform()
+        }
     }
 }
 
@@ -60,6 +73,7 @@ dependencies {
     implementation(libs.koin.compose)
     implementation(libs.koin.compose.viewmodel)
     implementation(libs.koin.compose.viewmodel.navigation)
+    implementation(libs.turbine)
 
     // UI Tests
     androidTestImplementation(libs.androidx.ui.test.junit4)

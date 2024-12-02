@@ -39,24 +39,7 @@ android {
 }
 
 dependencies {
-    implementation(libs.androidx.core.ktx)
-    implementation(libs.androidx.appcompat)
-    implementation(libs.material)
-
     implementation(project(":core"))
 
-    implementation(project.dependencies.platform(libs.koin.bom))
-    implementation(libs.koin.android)
-    implementation(libs.koin.core)
-
     testImplementation(project(":core"))
-
-    testImplementation(libs.junit)
-    testImplementation(libs.kotest)
-    testImplementation(libs.kotest.assertions)
-    testImplementation(libs.kotest.runner.junit5)
-    testImplementation(libs.mockk)
-
-    androidTestImplementation(libs.androidx.junit)
-    androidTestImplementation(libs.androidx.espresso.core)
 }

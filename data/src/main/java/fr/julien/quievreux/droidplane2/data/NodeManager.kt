@@ -1,33 +1,40 @@
 package fr.julien.quievreux.droidplane2.data
 
+import android.net.Uri
 import fr.julien.quievreux.droidplane2.core.log.Logger
-import fr.julien.quievreux.droidplane2.data.NodeUtils.fillArrowLinks
-import fr.julien.quievreux.droidplane2.data.XmlParseUtils.parseArrowLink
-import fr.julien.quievreux.droidplane2.data.XmlParseUtils.parseFont
-import fr.julien.quievreux.droidplane2.data.XmlParseUtils.parseIcon
-import fr.julien.quievreux.droidplane2.data.XmlParseUtils.parseRichContent
 import fr.julien.quievreux.droidplane2.data.model.MindmapIndexes
 import fr.julien.quievreux.droidplane2.data.model.MindmapNode
-import fr.julien.quievreux.droidplane2.data.model.NodeType
+import fr.julien.quievreux.droidplane2.data.model.NodeType.ArrowLink
+import fr.julien.quievreux.droidplane2.data.model.NodeType.Font
+import fr.julien.quievreux.droidplane2.data.model.NodeType.Icon
+import fr.julien.quievreux.droidplane2.data.search.SearchManager
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.SharingStarted
-import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
 import org.xmlpull.v1.XmlPullParser
 import org.xmlpull.v1.XmlPullParserFactory
 import java.io.InputStream
 import java.util.Stack
-import kotlin.random.Random
 
 class NodeManager(
-    private val logger: Logger?=null,
-    coroutineScope: CoroutineScope,
+    private val logger: Logger,
+    private val nodeUtils: NodeUtils,
+    private val xmlParseUtils: XmlParseUtils,
+    val coroutineScope: CoroutineScope,
 ) {
-    private val random = Random(System.currentTimeMillis())
+//    private val random = Random(System.currentTimeMillis())
 
+    private var currentMindMapUri: Uri? = null
+
+    private val _allNodes = MutableStateFlow(emptyList<MindmapNode>())
+
+    private val searchManager = SearchManager(
+        scope = coroutineScope,
+        logger = logger,
+        nodesSource = _allNodes,
+        fetchText = { node -> node.getNodeText(this) }
+    )
     /**
      * A map that resolves node IDs to Node objects
      */
@@ -35,29 +42,6 @@ class NodeManager(
 
     private var rootNode: MindmapNode? = null
 
-    private val _allNodes = MutableStateFlow(emptyList<MindmapNode>())
-
-    //first state whether the search is happening or not
-    private val _isSearching = MutableStateFlow(false)
-
-    //second state the text typed by the user
-    private val _searchText = MutableStateFlow("")
-    private val searchText = _searchText.asStateFlow()
-
-    val nodeFindList = searchText
-        .combine(_allNodes) { text, nodes ->//combine searchText with _nodeFindList
-            if (text.isBlank()) { //return the entery list of nodes if not is typed
-                nodes
-            } else {
-                nodes.filter { node ->// filter and return a list of nodes based on the text the user typed
-                    node.getNodeText(this)?.contains(text.trim(), ignoreCase = true) == true
-                }//.reversed()
-            }
-        }.stateIn( //basically convert the Flow returned from combine operator to StateFlow
-            scope = coroutineScope,
-            started = SharingStarted.WhileSubscribed(5000),//it will allow the StateFlow survive 5 seconds before it been canceled
-            initialValue = _allNodes.value
-        )
 
     fun getRootNode(): MindmapNode? = rootNode
 
@@ -68,8 +52,6 @@ class NodeManager(
      * @return
      */
     fun getNodeByID(id: String?): MindmapNode? = mindmapIndexes?.nodesByIdIndex?.get(id)
-
-    fun getNodeByNumericID(numericId: Int?): MindmapNode? = mindmapIndexes?.nodesByNumericIndex?.get(numericId)
 
     fun getNodeByNumericIndex(): Map<Int, MindmapNode>? {
         return mindmapIndexes?.nodesByNumericIndex
@@ -92,7 +74,7 @@ class NodeManager(
         inputStream: InputStream,
         onError: (Exception) -> Unit ,
         onParentNode: (MindmapNode) -> Unit,
-        onLoadFinished: () -> Unit,
+        onLoadFinished: (() -> Unit)? = null,
     ) {
         val xpp :XmlPullParser?
         try {
@@ -109,7 +91,7 @@ class NodeManager(
             loadMindMap(
                 xpp = it,
                 onParentNode = onParentNode,
-                onReadFinished = onLoadFinished,
+                onReadFinish = onLoadFinished,
                 onError = onError,
             )
         }
@@ -119,7 +101,7 @@ class NodeManager(
         xpp: XmlPullParser,
         onError: (Exception) -> Unit ,
         onParentNode: (MindmapNode) -> Unit,
-        onReadFinished: () -> Unit,
+        onReadFinish: (() -> Unit)? = null,
     ) {
         val nodeStack = Stack<MindmapNode>()
 
@@ -144,19 +126,19 @@ class NodeManager(
                         }
 
                         xpp.isRichContent() -> {
-                            parseRichContent(xpp, nodeStack)
+                            xmlParseUtils.parseRichContent(xpp, nodeStack)
                         }
 
-                        xpp.name == NodeType.Font.value -> {
-                            parseFont(xpp, nodeStack)
+                        xpp.name == Font.value -> {
+                            xmlParseUtils.parseFont(xpp, nodeStack)
                         }
 
-                        xpp.name == NodeType.Icon.value && xpp.getAttributeValue(null, "BUILTIN") != null -> {
-                            parseIcon(xpp, nodeStack)
+                        xpp.name == Icon.value && xpp.getAttributeValue(null, "BUILTIN") != null -> {
+                            xmlParseUtils.parseIcon(xpp, nodeStack)
                         }
 
-                        xpp.name == NodeType.ArrowLink.value -> {
-                            parseArrowLink(xpp, nodeStack)
+                        xpp.name == ArrowLink.value -> {
+                            xmlParseUtils.parseArrowLink(xpp, nodeStack)
                         }
 
                         else -> {
@@ -194,31 +176,29 @@ class NodeManager(
             //  Probably doesn't work anyways, as we already throw a runtime exception above if we receive garbage
         }
 
-        onReadFinished()
+        onReadFinish?.invoke()
         processMindMap()
     }
 
     private fun processMindMap() {
         // TODO: can we do this as we stream through the XML above?
         // load all nodes of root node into simplified MindmapNode, and index them by ID for faster lookup
-        updatemMindmapIndexes(NodeUtils.loadAndIndexNodesByIds(rootNode))
+        updatemMindmapIndexes(nodeUtils.loadAndIndexNodesByIds(rootNode))
 
         // Nodes can refer to other nodes with arrowlinks. We want to have the link on both ends of the link, so we can
         // now set the corresponding links
-        fillArrowLinks(getNodeByIdIndex())
+        nodeUtils.fillArrowLinks(getNodeByIdIndex())
     }
 
-    private fun parseNode(
+    public fun parseNode(
         nodeStack: Stack<MindmapNode>,
         xpp: XmlPullParser,
         onParentNode: (MindmapNode) -> Unit,
     ) {
-        var parentNode: MindmapNode? = null
-        if (!nodeStack.empty()) {
-            parentNode = nodeStack.peek()
-        }
+        val parentNode: MindmapNode? = getParentFromStack(nodeStack)
 
-        val newMindmapNode = NodeUtils.parseNodeTag(xpp, parentNode)
+        val newMindmapNode = nodeUtils.parseNodeTag(xpp, parentNode)
+
         nodeStack.push(newMindmapNode)
 
         // if we don't have a parent node, then this is the root node
@@ -239,6 +219,14 @@ class NodeManager(
                 it + newMindmapNode
             }
         }
+    }
+
+    private fun getParentFromStack(nodeStack: Stack<MindmapNode>): MindmapNode? {
+        var parentNode: MindmapNode? = null
+        if (!nodeStack.empty()) {
+            parentNode = nodeStack.peek()
+        }
+        return parentNode
     }
 
     //TODO Try with clone
@@ -271,28 +259,16 @@ class NodeManager(
         query: String,
         onResultFound: () -> Unit,
     ) {
-        _searchText.update {
-            query
-        }
-        _isSearching.update {
-            query.isNotEmpty()
-        }
-        logger?.e(
-            "toto", """
-query:$query 
-isSearching:${_isSearching.value} 
-find:${nodeFindList.value.joinToString(separator = "|", transform = { it.getNodeText(this).orEmpty() })} 
-        """.trimIndent()
-        )
-
-        if (nodeFindList.value.size == 1) {
-            onResultFound()
-        }
+        searchManager.search(query, onResultFound)
     }
 
-    fun getResultCount() = nodeFindList.value.size
+    fun getResultCount() = searchManager.getResultCount()
 
-    fun getSearchResult() = nodeFindList
+    fun getSearchResult(): List<MindmapNode> = searchManager.getSearchResult().value
+
+    fun getSearchResultFlow(): StateFlow<List<MindmapNode>> = searchManager.getSearchResult()
+
+    fun getSearchResultCount() = searchManager.getSearchResult().value.size
 
     companion object {
         const val UNDEFINED_NODE_ID: Int = 2000000000
@@ -311,4 +287,15 @@ find:${nodeFindList.value.joinToString(separator = "|", transform = { it.getNode
 //        return returnValue
 //    }
 
+    fun getMindmapDirectoryPath(debug: Boolean = false): String? {
+        val mindmapPath = currentMindMapUri?.path
+        if(debug)logger.d( "MainViewModel path $mindmapPath")
+        val mindmapDirectoryPath = mindmapPath?.substring(0, mindmapPath.lastIndexOf("/"))
+        if(debug)logger.d("MainViewModel directory path $mindmapDirectoryPath")
+        return mindmapDirectoryPath
+    }
+
+    fun setMapUri(data: Uri?) {
+        currentMindMapUri = data
+    }
 }

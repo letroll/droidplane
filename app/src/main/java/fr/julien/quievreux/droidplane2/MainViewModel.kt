@@ -21,15 +21,11 @@ import fr.julien.quievreux.droidplane2.model.ContextMenuAction.NodeLink
 import fr.julien.quievreux.droidplane2.data.model.MindmapIndexes
 import fr.julien.quievreux.droidplane2.data.model.MindmapNode
 import fr.julien.quievreux.droidplane2.data.model.isInternalLink
-import fr.julien.quievreux.droidplane2.extensions.default
-import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import org.koin.core.parameter.parametersOf
-import org.koin.java.KoinJavaComponent.inject
 import java.io.File
 import java.io.InputStream
 import java.util.Date
@@ -42,14 +38,12 @@ data class ViewIntentNode(
 /**
  * MainViewModel handles the loading and storing of a mind map document.
  */
-class MainViewModel(coroutineScope: CoroutineScope = Dispatchers.default()) : ViewModel(viewModelScope = coroutineScope) {
+class MainViewModel(
+    val nodeManager: NodeManager,
+) : ViewModel(viewModelScope = nodeManager.coroutineScope) {
 
     private val _uiState: MutableStateFlow<MainUiState> = MutableStateFlow(MainUiState())
     val uiState: StateFlow<MainUiState> = _uiState
-
-    private val nodeManager : NodeManager by inject(NodeManager::class.java) { parametersOf(viewModelScope) }
-
-    var currentMindMapUri: Uri? = null
 
     private fun setMindmapIsLoading(mindmapIsLoading: Boolean) {
         updateUiState {
@@ -64,12 +58,15 @@ class MainViewModel(coroutineScope: CoroutineScope = Dispatchers.default()) : Vi
      *
      * @param inputStream the inputStream to load
      */
-    fun loadMindMap(inputStream: InputStream) {
+    fun loadMindMap(
+        inputStream: InputStream,
+        onLoadFinished: (() -> Unit)? = null,
+    ) {
+        setMindmapIsLoading(true)
         viewModelScope.launch {
-            setMindmapIsLoading(true)
             nodeManager.loadMindMap(
                inputStream = inputStream,
-                onLoadFinished = {},
+                onLoadFinished = onLoadFinished,
                 onError = { exception ->
                    updateUiState {
                       it.copy(
@@ -88,20 +85,13 @@ class MainViewModel(coroutineScope: CoroutineScope = Dispatchers.default()) : Vi
                    }
                }
             )
-            setMindmapIsLoading(false)
         }
+        setMindmapIsLoading(false)
     }
 
     fun getSearchResult() = nodeManager.getSearchResult()
 
-    private fun getMindmapDirectoryPath(): String? {
-        // link is relative to viewModel file
-        val mindmapPath = currentMindMapUri?.path
-        Log.d(MainApplication.TAG, "MainViewModel path $mindmapPath")
-        val mindmapDirectoryPath = mindmapPath?.substring(0, mindmapPath.lastIndexOf("/"))
-        Log.d(MainApplication.TAG, "MainViewModel directory path $mindmapDirectoryPath")
-        return mindmapDirectoryPath
-    }
+    fun getSearchResultFlow() = nodeManager.getSearchResultFlow()
 
     fun onNodeClick(
         node: MindmapNode,
@@ -111,8 +101,9 @@ class MainViewModel(coroutineScope: CoroutineScope = Dispatchers.default()) : Vi
                 Log.e(
                     "toto", """
 -----------------------------------
-parent:${node.parentNode?.id}   
-children:${node.id}   
+parent id:${node.parentNode?.id}   
+node id:${node.id}   
+node text:${node.getNodeText(nodeManager)}   
 ${node.childMindmapNodes.joinToString(separator = "\n", transform = { "(${it.id})${it.getNodeText(nodeManager)}" })}
                 """.trimIndent()
                 )
@@ -286,15 +277,19 @@ ${node.childMindmapNodes.joinToString(separator = "\n", transform = { "(${it.id}
         Log.e(
             "toto", """
 showCurrentSearchResult:${_uiState.value.searchUiState.currentSearchResultIndex}
-nodeFindList:${nodeManager.nodeFindList.value.map { it.getNodeText(nodeManager) }.joinToString(separator = "|")}
+nodeFindList:${nodeManager.getSearchResult().map { it.getNodeText(nodeManager) }.joinToString(separator = "|")}
         """.trimIndent()
         )
-        if (_uiState.value.searchUiState.currentSearchResultIndex >= 0 && _uiState.value.searchUiState.currentSearchResultIndex < nodeManager.nodeFindList.value.size) {
-            downTo(nodeManager.nodeFindList.value[_uiState.value.searchUiState.currentSearchResultIndex], false)
+        if (isSearchResultIndexValid()) {
+            downTo(getCurrentSearchResultItem(), false)
         }
         //TODO Shows/hides the next/prev buttons
         //TODO highlight result in column
     }
+
+    private fun getCurrentSearchResultItem() = nodeManager.getSearchResult()[_uiState.value.searchUiState.currentSearchResultIndex]
+
+    private fun isSearchResultIndexValid() = _uiState.value.searchUiState.currentSearchResultIndex >= 0 && _uiState.value.searchUiState.currentSearchResultIndex < nodeManager.getSearchResultCount()
 
     /**
      * Navigate down the MainViewModel to the specified node, opening each of it's parent nodes along the way.
@@ -359,19 +354,19 @@ nodeFindList:${nodeManager.nodeFindList.value.map { it.getNodeText(nodeManager) 
     fun onNodeContextMenuClick(contextMenuAction: ContextMenuAction) {
         when (contextMenuAction) {
             is Edit -> {
-                nodeManager.getNodeByNumericID(contextMenuAction.node.numericId)?.let { nodeByNumericID ->
+                nodeManager.getNodeByID(contextMenuAction.node.id)?.let { node ->
                     setDialogState(
                         DialogType.Edit(
-                            node = nodeByNumericID,
-                            oldValue = nodeByNumericID.getNodeText(nodeManager).orEmpty(),
+                            node = node,
+                            oldValue = node.getNodeText(nodeManager).orEmpty(),
                         )
                     )
                 }
             }
 
             is NodeLink -> {
-                val nodeByNumericID = nodeManager.getNodeByNumericID(contextMenuAction.node.numericId)
-                downTo(nodeByNumericID, true)
+                val node = nodeManager.getNodeByID(contextMenuAction.node.id)
+                downTo(node, true)
             }
 
             is CopyText -> {/* already handled by activity */
@@ -430,7 +425,7 @@ nodeFindList:${nodeManager.nodeFindList.value.map { it.getNodeText(nodeManager) 
             // absolute filename
             mindmapNode.link?.path
         } else {
-            getMindmapDirectoryPath() + "/" + mindmapNode.link?.path
+            nodeManager.getMindmapDirectoryPath() + "/" + mindmapNode.link?.path
         }
         fileName?.let {
             val file = File(fileName)
@@ -471,7 +466,7 @@ nodeFindList:${nodeManager.nodeFindList.value.map { it.getNodeText(nodeManager) 
         updateDialogState { it.copy(dialogType = dialogType) }
     }
 
-    fun updateValue(
+    fun updateNodeText(
         node: MindmapNode,
         newValue: String,
     ) {
@@ -541,5 +536,6 @@ modif: ${updatedNode.modificationDate?.let { DateUtils.formatDate(it) }.orEmpty(
         }
     }
 
+    fun setMapUri(data: Uri?) = nodeManager.setMapUri(data)
 }
 

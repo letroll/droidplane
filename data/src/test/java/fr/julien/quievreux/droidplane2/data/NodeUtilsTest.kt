@@ -1,8 +1,12 @@
 package fr.julien.quievreux.droidplane2.data
 
-import io.kotest.core.spec.style.FunSpec
-import io.kotest.matchers.shouldBe
+import io.kotest.core.spec.style.StringSpec
 
-class NodeUtilsTest : FunSpec({
+class NodeUtilsTest : StringSpec() {
+    init {
+        coroutineTestScope = true
 
-})
+//        "parsing document without start should throw an error" {
+//        }
+    }
+}

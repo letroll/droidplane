@@ -6,7 +6,7 @@ import fr.julien.quievreux.droidplane2.data.model.MindmapNode
 data class MainUiState(
     val title: String = "",
     val defaultTitle: String = "",
-    val loading: Boolean = true,
+    val loading: Boolean = false,
     val leaving: Boolean = false,
     val canGoBack: Boolean = false,
     val rootNode: MindmapNode? = null,

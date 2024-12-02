@@ -1,4 +1,4 @@
-package fr.julien.quievreux.droidplane2.extensions
+package fr.julien.quievreux.droidplane2.core.extensions
 
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers

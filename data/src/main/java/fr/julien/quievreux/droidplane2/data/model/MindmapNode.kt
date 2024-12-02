@@ -17,7 +17,7 @@ data class MindmapNode(
     val id: String,
     val numericId: Int,
 
-    private val text: String?,
+    val text: String?,
     /**
      * If the node has a LINK attribute, it will be stored in Uri link
      */
@@ -43,8 +43,7 @@ data class MindmapNode(
     // TODO: this should probably live in a view controller, not here
     fun getNodeText(nodeManager: NodeManager): String? {
         // if this is a cloned node, get the text from the original node
-
-        if (treeIdAttribute != null && treeIdAttribute != "") {
+        if (isClone()) {
             // TODO this now fails when loading, because the background indexing is not done yet - so we maybe should mark this as "pending", and put it into a queue, to be updated once the linked node is there
             val linkedNode = nodeManager.getNodeByID(treeIdAttribute)
             if (linkedNode != null) {
@@ -54,12 +53,14 @@ data class MindmapNode(
 
         // if this is a rich text node, get the HTML content instead
         if (this.text == null && richTextContents.isNotEmpty()) {
-            val richTextContent = richTextContents[0]
+            val richTextContent = richTextContents.first()
             return Html.fromHtml(richTextContent).toString()
         }
 
         return text
     }
+
+    private fun isClone() = treeIdAttribute != null && treeIdAttribute != ""
 
     fun addRichTextContent(richTextContent: String) {
         richTextContents.add(richTextContent)

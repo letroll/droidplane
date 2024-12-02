@@ -2,6 +2,7 @@ package fr.julien.quievreux.droidplane2
 
 import android.app.Application
 import fr.julien.quievreux.droidplane2.core.di.coreKoinModule
+import fr.julien.quievreux.droidplane2.data.di.dataKoinModule
 import fr.julien.quievreux.droidplane2.di.appKoinModule
 import org.koin.android.ext.koin.androidContext
 import org.koin.android.ext.koin.androidLogger
@@ -24,7 +25,7 @@ class MainApplication : Application() {
         startKoin {
             androidLogger()
             androidContext(this@MainApplication)
-            modules(appKoinModule, coreKoinModule)
+            modules(appKoinModule, coreKoinModule, dataKoinModule)
         }
     }
 }

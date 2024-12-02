@@ -22,6 +22,7 @@ mockk = "1.13.13"
 tablerIcons = "1.1.1"
 coreKtx = "1.15.0"
 material = "1.12.0"
+turbine = "1.2.0"
 
 [libraries]
 
@@ -64,6 +65,7 @@ junit = { group = "junit", name = "junit", version.ref = "junit" }
 material = { group = "com.google.android.material", name = "material", version.ref = "material" }
 
 mockk = { group = "io.mockk", name = "mockk", version.ref = "mockk" }
+turbine = { group = "app.cash.turbine", name = "turbine", version.ref = "turbine" }
 
 [plugins]
 

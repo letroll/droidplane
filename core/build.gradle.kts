@@ -30,16 +30,21 @@ android {
 }
 
 dependencies {
+    api(libs.androidx.core.ktx)
+    api(libs.androidx.appcompat)
+    api(libs.material)
 
-    implementation(libs.androidx.core.ktx)
-    implementation(libs.androidx.appcompat)
-    implementation(libs.material)
+    api(project.dependencies.platform(libs.koin.bom))
+    api(libs.koin.android)
+    api(libs.koin.core)
 
-    implementation(project.dependencies.platform(libs.koin.bom))
-    implementation(libs.koin.android)
-    implementation(libs.koin.core)
 
-    testImplementation(libs.junit)
-    androidTestImplementation(libs.androidx.junit)
-    androidTestImplementation(libs.androidx.espresso.core)
+    api(libs.junit)
+    api(libs.kotest)
+    api(libs.kotest.assertions)
+    api(libs.kotest.runner.junit5)
+    api(libs.mockk)
+
+    api(libs.androidx.junit)
+    api(libs.androidx.espresso.core)
 }
