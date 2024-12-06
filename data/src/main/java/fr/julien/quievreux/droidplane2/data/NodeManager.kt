@@ -3,7 +3,7 @@ package fr.julien.quievreux.droidplane2.data
 import android.net.Uri
 import fr.julien.quievreux.droidplane2.core.log.Logger
 import fr.julien.quievreux.droidplane2.data.model.MindmapIndexes
-import fr.julien.quievreux.droidplane2.data.model.MindmapNode
+import fr.julien.quievreux.droidplane2.data.model.Node
 import fr.julien.quievreux.droidplane2.data.model.NodeType.ArrowLink
 import fr.julien.quievreux.droidplane2.data.model.NodeType.Font
 import fr.julien.quievreux.droidplane2.data.model.NodeType.Icon
@@ -27,7 +27,7 @@ class NodeManager(
 
     private var currentMindMapUri: Uri? = null
 
-    private val _allNodes = MutableStateFlow(emptyList<MindmapNode>())
+    private val _allNodes = MutableStateFlow(emptyList<Node>())
 
     private val searchManager = SearchManager(
         scope = coroutineScope,
@@ -40,7 +40,7 @@ class NodeManager(
      */
     private var mindmapIndexes: MindmapIndexes? = null
 
-    var rootNode: MindmapNode? = null
+    var rootNode: Node? = null
     private set
 
     fun getNodeByID(id: String?) = mindmapIndexes?.nodesByIdIndex?.get(id)
@@ -61,7 +61,7 @@ class NodeManager(
     suspend fun loadMindMap(
         inputStream: InputStream,
         onError: (Exception) -> Unit ,
-        onParentNodeUpdate: (MindmapNode) -> Unit,
+        onParentNodeUpdate: (Node) -> Unit,
         onLoadFinished: (() -> Unit)? = null,
     ) {
         val xpp :XmlPullParser?
@@ -88,10 +88,10 @@ class NodeManager(
     suspend fun loadMindMap(
         xpp: XmlPullParser,
         onError: (Exception) -> Unit ,
-        onParentNodeUpdate: (MindmapNode) -> Unit,
+        onParentNodeUpdate: (Node) -> Unit,
         onReadFinish: (() -> Unit)? = null,
     ) {
-        val nodeStack = Stack<MindmapNode>()
+        val nodeStack = Stack<Node>()
 
         // stream parse the XML
         var eventType = xpp.eventType
@@ -170,7 +170,7 @@ class NodeManager(
 
     private fun processMindMap() {
         // TODO: can we do this as we stream through the XML above?
-        // load all nodes of root node into simplified MindmapNode, and index them by ID for faster lookup
+        // load all nodes of root node into simplified Node, and index them by ID for faster lookup
         updatemMindmapIndexes(nodeUtils.loadAndIndexNodesByIds(rootNode))
 
         // Nodes can refer to other nodes with arrowlinks. We want to have the link on both ends of the link, so we can
@@ -179,11 +179,11 @@ class NodeManager(
     }
 
     public fun parseNode(
-        nodeStack: Stack<MindmapNode>,
+        nodeStack: Stack<Node>,
         xpp: XmlPullParser,
-        onParentNodeUpdate: (MindmapNode) -> Unit,
+        onParentNodeUpdate: (Node) -> Unit,
     ) {
-        val parentNode: MindmapNode? = getParentFromStack(nodeStack)
+        val parentNode: Node? = getParentFromStack(nodeStack)
 
         val newMindmapNode = nodeUtils.parseNodeTag(xpp, parentNode)
 
@@ -197,7 +197,7 @@ class NodeManager(
             //TODO change to immutable list
             parentNode.addChildMindmapNode(newMindmapNode)
 //            parentNode = parentNode.copy(
-//                childMindmapNodes = parentNode.childMindmapNodes + newMindmapNode
+//                childNodes = parentNode.childNodes + newMindmapNode
 //            )
 
             _allNodes.update {
@@ -206,15 +206,15 @@ class NodeManager(
         }
     }
 
-    fun updateNodeInstances(newMindmapNode: MindmapNode) {
-        rootNode = newMindmapNode
+    fun updateNodeInstances(newNode: Node) {
+        rootNode = newNode
         _allNodes.update {
-            listOf(newMindmapNode)
+            listOf(newNode)
         }
     }
 
-    private fun getParentFromStack(nodeStack: Stack<MindmapNode>): MindmapNode? {
-        var parentNode: MindmapNode? = null
+    private fun getParentFromStack(nodeStack: Stack<Node>): Node? {
+        var parentNode: Node? = null
         if (!nodeStack.empty()) {
             parentNode = nodeStack.peek()
         }
@@ -226,19 +226,19 @@ class NodeManager(
     /** Depth-first search in the core text of the nodes in this sub-tree.  */ // TODO: this doesn't work while viewModel is still loading
     fun findFilledNode(
         parentNodeId: String,
-    ): MindmapNode? = depthFirstSearchRecursive(rootNode, parentNodeId)
+    ): Node? = depthFirstSearchRecursive(rootNode, parentNodeId)
 
     private fun depthFirstSearchRecursive(
-        node: MindmapNode?,
+        node: Node?,
         targetId: String,
-    ): MindmapNode? {
+    ): Node? {
         if (node == null) {
             return null
         }
         if (node.id == targetId) {
             return node
         }
-        for (child in node.childMindmapNodes) {
+        for (child in node.childNodes) {
             val result = depthFirstSearchRecursive(child, targetId)
             if (result != null) {
                 return result
@@ -256,9 +256,9 @@ class NodeManager(
 
     fun getResultCount() = searchManager.getResultCount()
 
-    fun getSearchResult(): List<MindmapNode> = searchManager.getSearchResult().value
+    fun getSearchResult(): List<Node> = searchManager.getSearchResult().value
 
-    fun getSearchResultFlow(): StateFlow<List<MindmapNode>> = searchManager.getSearchResult()
+    fun getSearchResultFlow(): StateFlow<List<Node>> = searchManager.getSearchResult()
 
     fun getSearchResultCount() = searchManager.getSearchResult().value.size
 

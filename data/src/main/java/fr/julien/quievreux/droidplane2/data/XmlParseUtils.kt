@@ -1,6 +1,6 @@
 package fr.julien.quievreux.droidplane2.data
 
-import fr.julien.quievreux.droidplane2.data.model.MindmapNode
+import fr.julien.quievreux.droidplane2.data.model.Node
 import org.xmlpull.v1.XmlPullParser
 import java.util.Stack
 
@@ -11,13 +11,13 @@ interface XmlParseUtils {
     // if this is an empty tag, we won't need to bother trying to read its content
     // we don't even need to read the <richcontent> node's attributes, as we would
     // only be interested in it's children
-    fun parseRichContent(xpp: XmlPullParser, nodeStack: Stack<MindmapNode>)
+    fun parseRichContent(xpp: XmlPullParser, nodeStack: Stack<Node>)
 
-    fun parseFont(xpp: XmlPullParser, nodeStack: Stack<MindmapNode>)
+    fun parseFont(xpp: XmlPullParser, nodeStack: Stack<Node>)
 
-    fun parseArrowLink(xpp: XmlPullParser, nodeStack: Stack<MindmapNode>)
+    fun parseArrowLink(xpp: XmlPullParser, nodeStack: Stack<Node>)
 
-    fun parseIcon(xpp: XmlPullParser, nodeStack: Stack<MindmapNode>)
+    fun parseIcon(xpp: XmlPullParser, nodeStack: Stack<Node>)
 
     companion object {
         const val XML_PARSE_UTILS_TAG = "XmlParseUtils"

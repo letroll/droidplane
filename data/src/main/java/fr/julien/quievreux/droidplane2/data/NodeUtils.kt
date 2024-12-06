@@ -1,7 +1,7 @@
 package fr.julien.quievreux.droidplane2.data
 
 import fr.julien.quievreux.droidplane2.data.model.MindmapIndexes
-import fr.julien.quievreux.droidplane2.data.model.MindmapNode
+import fr.julien.quievreux.droidplane2.data.model.Node
 import org.xmlpull.v1.XmlPullParser
 import org.xmlpull.v1.XmlPullParserException
 import java.io.IOException
@@ -11,16 +11,16 @@ interface NodeUtils {
     @Throws(IOException::class, XmlPullParserException::class)
     fun loadRichContentNodes(xpp: XmlPullParser): String
 
-    fun fillArrowLinks(nodesById: Map<String, MindmapNode>? )
+    fun fillArrowLinks(nodesById: Map<String, Node>? )
 
     /**
      * Index all nodes (and child nodes) by their ID, for fast lookup
      *
      * @param root
      */
-    fun loadAndIndexNodesByIds(root: MindmapNode?): MindmapIndexes
+    fun loadAndIndexNodesByIds(root: Node?): MindmapIndexes
 
-    fun parseNodeTag(xpp: XmlPullParser, parentNode: MindmapNode?): MindmapNode
+    fun parseNodeTag(xpp: XmlPullParser, parentNode: Node?): Node
 
 /*    fun generateNodeID(proposedID: String?): String {
         if (proposedID != null && "" != proposedID && getNodeForID(proposedID) == null) {

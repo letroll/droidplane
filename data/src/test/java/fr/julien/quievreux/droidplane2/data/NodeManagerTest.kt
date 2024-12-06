@@ -2,7 +2,7 @@ package fr.julien.quievreux.droidplane2.data
 
 import fr.julien.quievreux.droidplane2.core.testutils.KStringSpec
 import fr.julien.quievreux.droidplane2.data.model.MindmapIndexes
-import fr.julien.quievreux.droidplane2.data.model.MindmapNode
+import fr.julien.quievreux.droidplane2.data.model.Node
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.shouldNotBe
 import io.mockk.coEvery
@@ -77,8 +77,8 @@ class NodeManagerTest : KStringSpec() {
             coEvery { fakeXmlPullParser.getAttributeValue(any(),any()) }.returns(null)
 //            var finishWithProcessing = false
             val nodeManager = initNodeManager()
-            val nodeStack = Stack<MindmapNode>()
-            var nodeResult : MindmapNode? = null
+            val nodeStack = Stack<Node>()
+            var nodeResult : Node? = null
             val job = launch {
                 nodeManager.parseNode(
                     nodeStack = nodeStack,
@@ -118,15 +118,15 @@ class NodeManagerTest : KStringSpec() {
             TODO("Not yet implemented")
         }
 
-        override fun fillArrowLinks(nodesById: Map<String, MindmapNode>?) {
+        override fun fillArrowLinks(nodesById: Map<String, Node>?) {
             TODO("Not yet implemented")
         }
 
-        override fun loadAndIndexNodesByIds(root: MindmapNode?): MindmapIndexes {
+        override fun loadAndIndexNodesByIds(root: Node?): MindmapIndexes {
             TODO("Not yet implemented")
         }
 
-        override fun parseNodeTag(xpp: XmlPullParser, parentNode: MindmapNode?): MindmapNode {
+        override fun parseNodeTag(xpp: XmlPullParser, parentNode: Node?): Node {
             TODO("Not yet implemented")
         }
 

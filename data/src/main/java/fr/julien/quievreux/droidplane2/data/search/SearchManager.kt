@@ -2,7 +2,7 @@ package fr.julien.quievreux.droidplane2.data.search
 
 import fr.julien.quievreux.droidplane2.core.async.uiStateIn
 import fr.julien.quievreux.droidplane2.core.log.Logger
-import fr.julien.quievreux.droidplane2.data.model.MindmapNode
+import fr.julien.quievreux.droidplane2.data.model.Node
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -13,8 +13,8 @@ import kotlinx.coroutines.flow.update
 class SearchManager(
     scope : CoroutineScope,
     private val logger: Logger,
-    nodesSource : StateFlow<List<MindmapNode>>,
-    private val fetchText: (MindmapNode) -> String?,
+    nodesSource : StateFlow<List<Node>>,
+    private val fetchText: (Node) -> String?,
 ) {
 
     //first state whether the search is happening or not
@@ -27,7 +27,7 @@ class SearchManager(
     private val nodeFindList = getSearchResultStateFlow(nodesSource, scope)
 
     private fun getSearchResultStateFlow(
-        nodesSource: StateFlow<List<MindmapNode>>,
+        nodesSource: StateFlow<List<Node>>,
         scope: CoroutineScope,
     ) = searchText
             .combine(nodesSource) { text, nodes ->//combine searchText with _nodeFindList

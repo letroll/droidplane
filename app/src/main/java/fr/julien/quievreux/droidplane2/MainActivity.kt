@@ -42,7 +42,7 @@ import fr.julien.quievreux.droidplane2.ContentNodeType.RichText
 import fr.julien.quievreux.droidplane2.MainUiState.DialogType.Edit
 import fr.julien.quievreux.droidplane2.MainUiState.DialogType.None
 import fr.julien.quievreux.droidplane2.core.log.Logger
-import fr.julien.quievreux.droidplane2.data.model.MindmapNode
+import fr.julien.quievreux.droidplane2.data.model.Node
 import fr.julien.quievreux.droidplane2.ui.components.AppTopBar
 import fr.julien.quievreux.droidplane2.ui.components.AppTopBarAction.Backpress
 import fr.julien.quievreux.droidplane2.ui.components.AppTopBarAction.Help
@@ -235,7 +235,7 @@ class MainActivity : FragmentActivity() {
             when (state.value.contentNodeType) {
                 RichText -> {
                     openRichText(
-                        mindmapNode = viewIntentNode.node,
+                        node = viewIntentNode.node,
                         activity = this@MainActivity
                     )
                 }
@@ -371,11 +371,11 @@ class MainActivity : FragmentActivity() {
     }
 
     private fun openRichText(
-        mindmapNode: MindmapNode,
+        node: Node,
         activity: FragmentActivity,
     ) {
-        if (mindmapNode.richTextContents.isNotEmpty()) {
-            val richTextContent = mindmapNode.richTextContents.first()
+        if (node.richTextContents.isNotEmpty()) {
+            val richTextContent = node.richTextContents.first()
             val intent = Intent(activity, RichTextViewActivity::class.java)
             intent.putExtra("richTextContent", richTextContent)
             activity.startActivity(intent)

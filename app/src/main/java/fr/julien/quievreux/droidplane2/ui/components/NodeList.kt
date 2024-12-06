@@ -58,7 +58,7 @@ import fr.julien.quievreux.droidplane2.model.ContextMenuAction.CopyText
 import fr.julien.quievreux.droidplane2.model.ContextMenuAction.Edit
 import fr.julien.quievreux.droidplane2.model.ContextMenuAction.NodeLink
 import fr.julien.quievreux.droidplane2.model.ContextMenuDropDownItem
-import fr.julien.quievreux.droidplane2.data.model.MindmapNode
+import fr.julien.quievreux.droidplane2.data.model.Node
 import fr.julien.quievreux.droidplane2.model.NodeIcons.Link
 import fr.julien.quievreux.droidplane2.model.NodeIcons.RicheText
 import fr.julien.quievreux.droidplane2.model.getNodeFontIconsFromName
@@ -66,17 +66,17 @@ import fr.julien.quievreux.droidplane2.model.getNodeIconsResIdFromName
 import fr.julien.quievreux.droidplane2.ui.theme.ContrastAwareReplyTheme
 
 fun LazyListScope.nodeList(
-    node: MindmapNode,
-    fetchText: (MindmapNode) -> String?,
+    node: Node,
+    fetchText: (Node) -> String?,
     updateClipBoard: (String) -> Unit,
-    onNodeClick: (MindmapNode) -> Unit,
+    onNodeClick: (Node) -> Unit,
     onNodeContextMenuClick: (ContextMenuAction) -> Unit,
-    searchResultToShow: MindmapNode?,
+    searchResultToShow: Node?,
 ) {
     var isFoundInList = searchResultToShow == null
 
     items(
-        items = node.childMindmapNodes,
+        items = node.childNodes,
         key = { child ->
             child.id
         }
@@ -102,12 +102,12 @@ fun LazyListScope.nodeList(
 @SuppressLint("DiscouragedApi")
 @Composable
 fun NodeItem(
-    fetchText: (MindmapNode) -> String?,
+    fetchText: (Node) -> String?,
     updateClipBoard: (String) -> Unit,
     isFoundInList: Boolean,
-    onNodeClick: (MindmapNode) -> Unit,
+    onNodeClick: (Node) -> Unit,
     onNodeContextMenuClick: (ContextMenuAction) -> Unit,
-    node: MindmapNode,
+    node: Node,
 ) {
     val text = fetchText(node) ?: ""
     val contextMenuDropDownItems = mutableListOf(
@@ -271,7 +271,7 @@ fun NodeItem(
                 style = applyTextStyle(node),
                 color = MaterialTheme.colorScheme.primary
             )
-            if (node.childMindmapNodes.size > 0) {
+            if (node.childNodes.size > 0) {
                 ToggleIcon(
                     isOpen = node.isSelected,
                     modifier = Modifier.padding(end = 8.dp)
@@ -326,7 +326,7 @@ fun NodeItem(
         modifier = Modifier.size(24.dp),
     )
 
-fun applyTextStyle(node: MindmapNode) = TextStyle(
+fun applyTextStyle(node: Node) = TextStyle(
     fontStyle = if (node.isItalic) FontStyle.Italic else FontStyle.Normal,
     fontWeight = if (node.isBold) FontWeight.Bold else FontWeight.Normal,
 )
@@ -348,7 +348,7 @@ private fun getDrawableNameFromMindmapIcon(iconName: String, context: Context): 
 @Preview
 private fun NodeListPreview() {
 
-    var nodeParent = MindmapNode(
+    var nodeParent = Node(
         parentNode = null,
         id = "sqddqfsdfqsfqsd",
         numericId = 119123123,
@@ -359,7 +359,7 @@ private fun NodeListPreview() {
         modificationDate = 1728740023499,
     )
 
-    val node1 = MindmapNode(
+    val node1 = Node(
         parentNode = nodeParent,
         id = "sumo",
         numericId = 11963,
@@ -370,7 +370,7 @@ private fun NodeListPreview() {
         modificationDate = 1728740023499,
     )
 
-    val node2 = MindmapNode(
+    val node2 = Node(
         parentNode = nodeParent,
         id = "dqfqsd",
         numericId = 11962,
@@ -384,10 +384,10 @@ private fun NodeListPreview() {
 
     node2.addChildMindmapNode(node1)
 //    node2 = node2.copy(
-//        childMindmapNodes = node2.childMindmapNodes +  node1
+//        childNodes = node2.childNodes +  node1
 //    )
 
-    val node3 = MindmapNode(
+    val node3 = Node(
         parentNode = nodeParent,
         id = "sqdfqsd",
         numericId = 1196,
@@ -398,7 +398,7 @@ private fun NodeListPreview() {
         modificationDate = 1728740023499,
     )
 
-   nodeParent = nodeParent.copy(childMindmapNodes = mutableListOf(node1, node2, node3))
+   nodeParent = nodeParent.copy(childNodes = mutableListOf(node1, node2, node3))
 
     ContrastAwareReplyTheme {
         LazyColumn(

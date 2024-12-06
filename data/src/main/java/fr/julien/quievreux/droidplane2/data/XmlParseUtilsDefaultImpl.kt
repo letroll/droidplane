@@ -2,7 +2,7 @@ package fr.julien.quievreux.droidplane2.data
 
 import android.util.Log
 import fr.julien.quievreux.droidplane2.data.XmlParseUtils.Companion.XML_PARSE_UTILS_TAG
-import fr.julien.quievreux.droidplane2.data.model.MindmapNode
+import fr.julien.quievreux.droidplane2.data.model.Node
 import fr.julien.quievreux.droidplane2.data.model.NodeAttribute
 import org.xmlpull.v1.XmlPullParser
 import java.util.Stack
@@ -17,7 +17,7 @@ class XmlParseUtilsDefaultImpl(
     // if this is an empty tag, we won't need to bother trying to read its content
     // we don't even need to read the <richcontent> node's attributes, as we would
     // only be interested in it's children
-    override fun parseRichContent(xpp: XmlPullParser, nodeStack: Stack<MindmapNode>) {
+    override fun parseRichContent(xpp: XmlPullParser, nodeStack: Stack<Node>) {
         if (xpp.isEmptyElementTag) {
             Log.d(XML_PARSE_UTILS_TAG, "Received empty richcontent node - skipping")
         } else {
@@ -31,7 +31,7 @@ class XmlParseUtilsDefaultImpl(
         }
     }
 
-    override fun parseFont(xpp: XmlPullParser, nodeStack: Stack<MindmapNode>) {
+    override fun parseFont(xpp: XmlPullParser, nodeStack: Stack<Node>) {
         val boldAttribute = xpp.getAttributeValue(null, NodeAttribute.BOLD.name)
 
         // if we have no parent node, something went seriously wrong - we can't have a font node that is not part of a viewModel node
@@ -48,7 +48,7 @@ class XmlParseUtilsDefaultImpl(
         }
     }
 
-    override fun parseArrowLink(xpp: XmlPullParser, nodeStack: Stack<MindmapNode>) {
+    override fun parseArrowLink(xpp: XmlPullParser, nodeStack: Stack<Node>) {
         val destinationId = xpp.getAttributeValue(null, NodeAttribute.DESTINATION.name)
 
         // if we have no parent node, something went seriously wrong - we can't have icons that is not part of a viewModel node
@@ -57,7 +57,7 @@ class XmlParseUtilsDefaultImpl(
         val parentNode = nodeStack.peek()
         parentNode.addArrowLinkDestinationId(destinationId)
     }
-    override fun parseIcon(xpp: XmlPullParser, nodeStack: Stack<MindmapNode>) {
+    override fun parseIcon(xpp: XmlPullParser, nodeStack: Stack<Node>) {
         val iconName = xpp.getAttributeValue(null, NodeAttribute.BUILTIN.name)
 
         // if we have no parent node, something went seriously wrong - we can't have icons that is not part of a viewModel node

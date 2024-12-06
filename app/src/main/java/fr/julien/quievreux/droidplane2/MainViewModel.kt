@@ -19,7 +19,7 @@ import fr.julien.quievreux.droidplane2.model.ContextMenuAction.CopyText
 import fr.julien.quievreux.droidplane2.model.ContextMenuAction.Edit
 import fr.julien.quievreux.droidplane2.model.ContextMenuAction.NodeLink
 import fr.julien.quievreux.droidplane2.data.model.MindmapIndexes
-import fr.julien.quievreux.droidplane2.data.model.MindmapNode
+import fr.julien.quievreux.droidplane2.data.model.Node
 import fr.julien.quievreux.droidplane2.data.model.isInternalLink
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -32,7 +32,7 @@ import java.util.Date
 
 data class ViewIntentNode(
     val intent: Intent,
-    val node: MindmapNode,
+    val node: Node,
 )
 
 /**
@@ -82,7 +82,7 @@ class MainViewModel(
         setMindmapIsLoading(false)
     }
 
-    private fun updateParentNode(parentNode: MindmapNode) {
+    private fun updateParentNode(parentNode: Node) {
         val title = parentNode.getNodeText(nodeManager).orEmpty()
         updateUiState {
             it.copy(
@@ -96,17 +96,17 @@ class MainViewModel(
     fun getSearchResultFlow() = nodeManager.getSearchResultFlow()
 
     fun onNodeClick(
-        node: MindmapNode,
+        node: Node,
     ) {
         when {
-            node.childMindmapNodes.size > 0 -> {
+            node.childNodes.size > 0 -> {
                 Log.e(
                     "toto", """
 -----------------------------------
 parent id:${node.parentNode?.id}   
 node id:${node.id}   
 node text:${node.getNodeText(nodeManager)}   
-${node.childMindmapNodes.joinToString(separator = "\n", transform = { "(${it.id})${it.getNodeText(nodeManager)}" })}
+${node.childNodes.joinToString(separator = "\n", transform = { "(${it.id})${it.getNodeText(nodeManager)}" })}
                 """.trimIndent()
                 )
                 showNode(node)
@@ -114,9 +114,9 @@ ${node.childMindmapNodes.joinToString(separator = "\n", transform = { "(${it.id}
 
             node.link != null -> {
                 if (node.isInternalLink()) {
-                    openInternalFragmentLink(mindmapNode = node)
+                    openInternalFragmentLink(node = node)
                 } else {
-                    openIntentLink(mindmapNode = node)
+                    openIntentLink(node = node)
                 }
             }
 
@@ -144,7 +144,7 @@ ${node.childMindmapNodes.joinToString(separator = "\n", transform = { "(${it.id}
      *
      * @param node
      */
-    private fun showNode(node: MindmapNode) {
+    private fun showNode(node: Node) {
         node.deselectAllChildNodes()
         updateUiState {
             it.copy(
@@ -161,7 +161,7 @@ ${node.childMindmapNodes.joinToString(separator = "\n", transform = { "(${it.id}
         node.isSelected = true //TODO needed?
     }
 
-    private fun enableHomeButtonIfNeeded(node: MindmapNode?) {
+    private fun enableHomeButtonIfNeeded(node: Node?) {
         updateUiState {
             it.copy(
                 canGoBack = node?.parentNode != null
@@ -297,12 +297,12 @@ nodeFindList:${nodeManager.getSearchResult().map { it.getNodeText(nodeManager) }
      * Navigate down the MainViewModel to the specified node, opening each of it's parent nodes along the way.
      * @param node
      */
-    private fun downTo(node: MindmapNode?, openLast: Boolean) {
+    private fun downTo(node: Node?, openLast: Boolean) {
         // first navigate back to the top (essentially closing all other nodes)
         top()
 
         // go upwards from the target node, and keep track of each node leading down to the target node
-        val nodeHierarchy: MutableList<MindmapNode> = mutableListOf()
+        val nodeHierarchy: MutableList<Node> = mutableListOf()
         var tmpNode = node
         while (tmpNode?.parentNode != null) {   // TODO: this gives a NPE when rotating the device
             nodeHierarchy.add(tmpNode)
@@ -316,13 +316,13 @@ nodeFindList:${nodeManager.getSearchResult().map { it.getNodeText(nodeManager) }
         for (mindmapNode in nodeHierarchy) {
             mindmapNode.isSelected = true
             scrollTo(mindmapNode)
-            if ((mindmapNode != node || openLast) && mindmapNode.childMindmapNodes.size > 0) {
+            if ((mindmapNode != node || openLast) && mindmapNode.childNodes.size > 0) {
                 onNodeClick(mindmapNode)
             }
         }
     }
 
-    private fun scrollTo(node: MindmapNode) {
+    private fun scrollTo(node: Node) {
         //TODO for column with a lot of elements
 //        if (nodeColumns.isEmpty()) {
 //            return
@@ -379,10 +379,10 @@ nodeFindList:${nodeManager.getSearchResult().map { it.getNodeText(nodeManager) }
     /**
      * Open this node's link as internal fragment
      */
-    private fun openInternalFragmentLink(mindmapNode: MindmapNode?) {
+    private fun openInternalFragmentLink(node: Node?) {
         // internal link, so this.link is of the form "#ID_123234534" this.link.getFragment() should give everything
         // after the "#" it is null if there is no "#", which should be the case for all other links
-        val fragment = mindmapNode?.link?.fragment
+        val fragment = node?.link?.fragment
         val linkedInternal = nodeManager.getNodeByID(fragment)
 
         if (linkedInternal != null) {
@@ -405,29 +405,29 @@ nodeFindList:${nodeManager.getSearchResult().map { it.getNodeText(nodeManager) }
      * Open this node's link as intent
      */
     private fun openIntentLink(
-        mindmapNode: MindmapNode,
+        node: Node,
     ) {
         val openUriIntent = Intent(ACTION_VIEW)
-        openUriIntent.setData(mindmapNode.link)
+        openUriIntent.setData(node.link)
         updateUiState {
             it.copy(
                 viewIntentNode = ViewIntentNode(
                     intent = openUriIntent,
-                    node = mindmapNode,
+                    node = node,
                 ),
                 contentNodeType = Classic
             )
         }
     }
 
-    fun getNodeText(mindmapNode: MindmapNode) = mindmapNode.getNodeText(nodeManager)
+    fun getNodeText(node: Node) = node.getNodeText(nodeManager)
 
-    fun openRelativeFile(mindmapNode: MindmapNode) {
-        val fileName: String? = if (mindmapNode.link?.path?.startsWith("/") == true) {
+    fun openRelativeFile(node: Node) {
+        val fileName: String? = if (node.link?.path?.startsWith("/") == true) {
             // absolute filename
-            mindmapNode.link?.path
+            node.link?.path
         } else {
-            nodeManager.getMindmapDirectoryPath() + "/" + mindmapNode.link?.path
+            nodeManager.getMindmapDirectoryPath() + "/" + node.link?.path
         }
         fileName?.let {
             val file = File(fileName)
@@ -456,7 +456,7 @@ nodeFindList:${nodeManager.getSearchResult().map { it.getNodeText(nodeManager) }
                 it.copy(
                     viewIntentNode = ViewIntentNode(
                         intent = intent,
-                        node = mindmapNode
+                        node = node
                     ),
                     contentNodeType = RelativeFile
                 )
@@ -469,7 +469,7 @@ nodeFindList:${nodeManager.getSearchResult().map { it.getNodeText(nodeManager) }
     }
 
     fun updateNodeText(
-        node: MindmapNode,
+        node: Node,
         newValue: String,
     ) {
         viewModelScope.launch(Dispatchers.IO) {
@@ -492,8 +492,8 @@ modif: ${updatedNode.modificationDate?.let { DateUtils.formatDate(it) }.orEmpty(
             nodesByIdIndex[updatedNode.id] = updatedNode
             nodesByNumericIndex[updatedNode.numericId] = updatedNode
 
-            val updatedChildren = mutableListOf<MindmapNode>()
-            var parentNodeToShow : MindmapNode?=null
+            val updatedChildren = mutableListOf<Node>()
+            var parentNodeToShow : Node?=null
             //TODO modif root
             //TODO preserve icon
             //TODO preserve link
@@ -503,7 +503,7 @@ modif: ${updatedNode.modificationDate?.let { DateUtils.formatDate(it) }.orEmpty(
             //update in parent also, if not the root, because it's what we show which is the list if(updatedNode.isRoot().not()){
             updatedNode.parentNode?.let { parentNode ->
                 updatedChildren.addAll(
-                    parentNode.childMindmapNodes.map { child ->
+                    parentNode.childNodes.map { child ->
                         if (child.id == updatedNode.id) {
                             updatedNode
                         } else {
@@ -513,7 +513,7 @@ modif: ${updatedNode.modificationDate?.let { DateUtils.formatDate(it) }.orEmpty(
                 )
 
                 val updatedParent = parentNode.copy(
-                    childMindmapNodes = updatedChildren
+                    childNodes = updatedChildren
                 )
 
                 parentNodeToShow = updatedParent

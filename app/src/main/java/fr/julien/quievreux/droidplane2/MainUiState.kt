@@ -1,7 +1,7 @@
 package fr.julien.quievreux.droidplane2
 
 import fr.julien.quievreux.droidplane2.ContentNodeType.Classic
-import fr.julien.quievreux.droidplane2.data.model.MindmapNode
+import fr.julien.quievreux.droidplane2.data.model.Node
 
 data class MainUiState(
     val title: String = "",
@@ -9,7 +9,7 @@ data class MainUiState(
     val loading: Boolean = false,
     val leaving: Boolean = false,
     val canGoBack: Boolean = false,
-    val rootNode: MindmapNode? = null,
+    val rootNode: Node? = null,
     val error: String = "",
     val errorAction: ErrorAction? = null,
     val viewIntentNode: ViewIntentNode? = null,
@@ -33,7 +33,7 @@ data class MainUiState(
     sealed class DialogType{
         data object None:DialogType()
         data class Edit(
-            val node: MindmapNode,
+            val node: Node,
             val oldValue: String,
         ):DialogType()
     }

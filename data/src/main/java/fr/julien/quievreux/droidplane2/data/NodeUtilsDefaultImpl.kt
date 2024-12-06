@@ -3,7 +3,7 @@ package fr.julien.quievreux.droidplane2.data
 import android.net.Uri
 import android.util.Pair
 import fr.julien.quievreux.droidplane2.data.model.MindmapIndexes
-import fr.julien.quievreux.droidplane2.data.model.MindmapNode
+import fr.julien.quievreux.droidplane2.data.model.Node
 import fr.julien.quievreux.droidplane2.data.model.NodeAttribute
 import org.xmlpull.v1.XmlPullParser
 import org.xmlpull.v1.XmlPullParserException
@@ -73,7 +73,7 @@ class NodeUtilsDefaultImpl : NodeUtils {
         return richTextContent
     }
 
-    override fun fillArrowLinks(nodesById: Map<String, MindmapNode>?) {
+    override fun fillArrowLinks(nodesById: Map<String, Node>?) {
         nodesById?.let {
             for (nodeId in nodesById.keys) {
                 val mindmapNode = nodesById[nodeId]
@@ -95,18 +95,18 @@ class NodeUtilsDefaultImpl : NodeUtils {
      *
      * @param root
      */
-    override fun loadAndIndexNodesByIds(root: MindmapNode?): MindmapIndexes {
+    override fun loadAndIndexNodesByIds(root: Node?): MindmapIndexes {
         // TODO: check if this optimization was necessary - otherwise go back to old implementation
 
-        // TODO: this causes us to load all viewModel nodes, defeating the lazy loading in.MindmapNode.getChildNodes
+        // TODO: this causes us to load all viewModel nodes, defeating the lazy loading in.Node.getChildNodes
 
-        val stack = Stack<MindmapNode?>()
+        val stack = Stack<Node?>()
         stack.push(root)
 
         // try first to just extract all IDs and the respective node, and
         // only insert into the hashmap once we know the size of the hashmap
-        val idAndNode: MutableList<Pair<String, MindmapNode>> = mutableListOf()
-        val numericIdAndNode: MutableList<Pair<Int, MindmapNode>> = mutableListOf()
+        val idAndNode: MutableList<Pair<String, Node>> = mutableListOf()
+        val numericIdAndNode: MutableList<Pair<Int, Node>> = mutableListOf()
 
         while (!stack.isEmpty()) {
             val node = stack.pop()
@@ -115,15 +115,15 @@ class NodeUtilsDefaultImpl : NodeUtils {
             node?.let {
                 numericIdAndNode.add(Pair(node.numericId, node))
 
-                for (mindmapNode in node.childMindmapNodes) {
+                for (mindmapNode in node.childNodes) {
                     stack.push(mindmapNode)
                 }
             }
 
         }
 
-        val newNodesById: MutableMap<String, MindmapNode> = HashMap(idAndNode.size)
-        val newNodesByNumericId: MutableMap<Int, MindmapNode> = HashMap(numericIdAndNode.size)
+        val newNodesById: MutableMap<String, Node> = HashMap(idAndNode.size)
+        val newNodesByNumericId: MutableMap<Int, Node> = HashMap(numericIdAndNode.size)
 
         for (i in idAndNode) {
             newNodesById[i.first] = i.second
@@ -135,7 +135,7 @@ class NodeUtilsDefaultImpl : NodeUtils {
         return MindmapIndexes(newNodesById, newNodesByNumericId)
     }
 
-    override fun parseNodeTag(xpp: XmlPullParser, parentNode: MindmapNode?): MindmapNode {
+    override fun parseNodeTag(xpp: XmlPullParser, parentNode: Node?): Node {
         val id = xpp.getNodeAttribute(NodeAttribute.ID).orEmpty()
         val numericId = try {
             if (id.isNotEmpty()) {
@@ -165,7 +165,7 @@ class NodeUtilsDefaultImpl : NodeUtils {
         // get tree ID (of cloned node)
         val treeIdAttribute = xpp.getNodeAttribute(NodeAttribute.TREE_ID)
 
-        val newMindmapNode = MindmapNode(
+        val newNode = Node(
             parentNode = parentNode,
             id = id,
             numericId = numericId,
@@ -175,7 +175,7 @@ class NodeUtilsDefaultImpl : NodeUtils {
             creationDate = creationDate,
             modificationDate = modificationDate,
         )
-        return newMindmapNode
+        return newNode
     }
 }
 

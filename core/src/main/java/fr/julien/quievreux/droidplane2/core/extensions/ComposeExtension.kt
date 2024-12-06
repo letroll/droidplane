@@ -23,10 +23,17 @@ fun Float.toDp(density: Density): Dp = with(density) { this@toDp.toDp() }
 //    return with(LocalDensity.current) { this@toPx.toPx() }
 //}
 
-public fun Dp.toPx(
-    resources: Resources,
-): Int = applyDimension(
-    android.util.TypedValue.COMPLEX_UNIT_DIP,
-    value,
-    resources.displayMetrics,
-).toInt()
+//@Composable
+//fun Dp.toPx() = with(LocalDensity.current) { this@toPx.toPx() }
+
+
+//@Composable
+//fun Int.toDp() = with(LocalDensity.current) { this@toDp.toDp() }
+
+//public fun Dp.toPx(
+//    resources: Resources,
+//): Int = applyDimension(
+//    android.util.TypedValue.COMPLEX_UNIT_DIP,
+//    value,
+//    resources.displayMetrics,
+//).toInt()

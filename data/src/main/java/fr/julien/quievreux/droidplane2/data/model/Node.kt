@@ -9,8 +9,8 @@ import fr.julien.quievreux.droidplane2.data.NodeManager
  * and tag "node".
  */
 //TODO make it stable
-data class MindmapNode(
-    val parentNode: MindmapNode?,
+data class Node(
+    val parentNode: Node?,
     /**
      * The ID of the node (ID attribute)
      */
@@ -26,7 +26,7 @@ data class MindmapNode(
      * If the node clones another node, it doesn't have text or richtext, but a TREE_ID
      */
     private val treeIdAttribute: String?,
-    val childMindmapNodes: MutableList<MindmapNode> = mutableListOf(),
+    val childNodes: MutableList<Node> = mutableListOf(),
     val richTextContents: MutableList<String> = mutableListOf(),
     val iconNames: MutableList<String> = mutableListOf(),
     val creationDate: Long?,
@@ -36,8 +36,8 @@ data class MindmapNode(
     // TODO: this has nothing to do with the model
     var isSelected: Boolean = false,
     val arrowLinkDestinationIds: MutableList<String> = mutableListOf(),
-    val arrowLinkDestinationNodes: MutableList<MindmapNode> = mutableListOf(),
-    val arrowLinkIncomingNodes: MutableList<MindmapNode> = mutableListOf(),
+    val arrowLinkDestinationNodes: MutableList<Node> = mutableListOf(),
+    val arrowLinkIncomingNodes: MutableList<Node> = mutableListOf(),
 ) {
 
     // TODO: this should probably live in a view controller, not here
@@ -66,16 +66,16 @@ data class MindmapNode(
         richTextContents.add(richTextContent)
     }
 
-    val arrowLinks: List<MindmapNode>
+    val arrowLinks: List<Node>
         get() {
-            val combinedArrowLists = ArrayList<MindmapNode>()
+            val combinedArrowLists = ArrayList<Node>()
             combinedArrowLists.addAll(arrowLinkDestinationNodes)
             combinedArrowLists.addAll(arrowLinkIncomingNodes)
             return combinedArrowLists
         }
 
-    fun addChildMindmapNode(newMindmapNode: MindmapNode) {
-        childMindmapNodes.add(newMindmapNode)
+    fun addChildMindmapNode(newNode: Node) {
+        childNodes.add(newNode)
     }
 
     fun addIconName(iconName: String) {
@@ -86,8 +86,8 @@ data class MindmapNode(
         arrowLinkDestinationIds.add(destinationId)
     }
 
-    fun deselectAllChildNodes(): MindmapNode {
-        childMindmapNodes.forEach {
+    fun deselectAllChildNodes(): Node {
+        childNodes.forEach {
             it.isSelected = false
         }
         return this
@@ -95,5 +95,5 @@ data class MindmapNode(
 }
 
 // if the link has a "#ID123", it's an internal link within the document
-fun MindmapNode.isInternalLink(): Boolean = link?.fragment != null && link.fragment?.startsWith("ID") == true
-fun MindmapNode.isRoot(): Boolean = parentNode == null
+fun Node.isInternalLink(): Boolean = link?.fragment != null && link.fragment?.startsWith("ID") == true
+fun Node.isRoot(): Boolean = parentNode == null

@@ -17,6 +17,7 @@ import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalInspectionMode
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntSize
@@ -33,6 +34,10 @@ fun MindMap() {
     var parentSize by remember { mutableStateOf(IntSize.Zero) }
     val parentCenterX by remember { derivedStateOf { (parentSize.width / 2).toFloat() } }
     val parentCenterY by remember { derivedStateOf { (parentSize.height / 2).toFloat() } }
+
+    if (LocalInspectionMode.current) {
+
+    }
 
     Box(
         modifier = Modifier
@@ -56,8 +61,6 @@ fun MindMap() {
         Canvas(modifier = Modifier.fillMaxSize()) {
             val centerX = size.width / 2  // Dynamically calculate the center X
             val centerY = size.height / 2 // Dynamically calculate the center Y
-//            val radius = size.width.coerceAtMost(size.height) / 4  // Radius proportional to canvas size
-
 
             // Draw lines connecting the root to its children
             childPositions.forEach { (childX, childY) ->
@@ -78,8 +81,7 @@ fun MindMap() {
                 .size(cellSizeDp)
         )
 
-// Child nodes positioned in a circular layout
-        // Displaying child nodes
+        // Child nodes positioned in a circular layout
         childPositions.forEachIndexed { index, (childX, childY) ->
             Box(
                 modifier = Modifier
@@ -95,10 +97,8 @@ fun MindMap() {
     }
 }
 
-@Composable
-fun Dp.toPx(): Float {
-    return with(LocalDensity.current) { this@toPx.toPx() }
-}
+@Composable //keep here, put in another module break preview
+fun Dp.toPx(): Float = with(LocalDensity.current) { this@toPx.toPx() }
 
 // Function to calculate circular positions for nodes
 fun calculateCircularPositions(centerX: Float, centerY: Float, radius: Float, count: Int): List<Pair<Float, Float>> {
