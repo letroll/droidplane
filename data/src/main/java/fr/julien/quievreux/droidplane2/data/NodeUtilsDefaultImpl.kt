@@ -4,12 +4,13 @@ import android.net.Uri
 import android.util.Pair
 import fr.julien.quievreux.droidplane2.data.model.MindmapIndexes
 import fr.julien.quievreux.droidplane2.data.model.MindmapNode
+import fr.julien.quievreux.droidplane2.data.model.NodeAttribute
 import org.xmlpull.v1.XmlPullParser
 import org.xmlpull.v1.XmlPullParserException
 import java.io.IOException
 import java.util.Stack
 
-class NodeUtilsDefaultImpl : NodeUtils{
+class NodeUtilsDefaultImpl : NodeUtils {
 
     @Throws(IOException::class, XmlPullParserException::class)
     override fun loadRichContentNodes(xpp: XmlPullParser): String {
@@ -72,7 +73,7 @@ class NodeUtilsDefaultImpl : NodeUtils{
         return richTextContent
     }
 
-    override fun fillArrowLinks(nodesById: Map<String, MindmapNode>? ) {
+    override fun fillArrowLinks(nodesById: Map<String, MindmapNode>?) {
         nodesById?.let {
             for (nodeId in nodesById.keys) {
                 val mindmapNode = nodesById[nodeId]
@@ -135,28 +136,34 @@ class NodeUtilsDefaultImpl : NodeUtils{
     }
 
     override fun parseNodeTag(xpp: XmlPullParser, parentNode: MindmapNode?): MindmapNode {
-        val id = xpp.getAttributeValue(null, "ID")
+        val id = xpp.getNodeAttribute(NodeAttribute.ID).orEmpty()
         val numericId = try {
-            id.replace("\\D+".toRegex(), "").toInt()
+            if (id.isNotEmpty()) {
+                id.replace("\\D+".toRegex(), "").toInt()
+            } else {
+                -1
+            }
         } catch (e: NumberFormatException) {
             id.hashCode()
         }
 
-        val text = xpp.getAttributeValue(null, "TEXT")
+        val text = xpp.getNodeAttribute(NodeAttribute.TEXT)
 
-        val creationDate = xpp.getAttributeValue(null, "CREATED")?.toLong()
-        val modificationDate = xpp.getAttributeValue(null, "MODIFIED")?.toLong()
+        val creationDate = xpp.getNodeAttribute(NodeAttribute.CREATED)?.toLong()
+        val modificationDate = xpp.getNodeAttribute(NodeAttribute.MODIFIED)?.toLong()
 
         // get link
-        val linkAttribute = xpp.getAttributeValue(null, "LINK")
+        val linkAttribute = xpp.getNodeAttribute(NodeAttribute.LINK)
         val link = if (linkAttribute != null && linkAttribute != "") {
             Uri.parse(linkAttribute)
         } else {
             null
         }
 
+        //TODO look if cloned text is synchonized with original text, if not obtain text from original node
+        // and stop calling original in method getNodeText
         // get tree ID (of cloned node)
-        val treeIdAttribute = xpp.getAttributeValue(null, "TREE_ID")
+        val treeIdAttribute = xpp.getNodeAttribute(NodeAttribute.TREE_ID)
 
         val newMindmapNode = MindmapNode(
             parentNode = parentNode,
@@ -171,3 +178,5 @@ class NodeUtilsDefaultImpl : NodeUtils{
         return newMindmapNode
     }
 }
+
+fun XmlPullParser.getNodeAttribute(attribute: NodeAttribute): String? = this.getAttributeValue(null, attribute.text)

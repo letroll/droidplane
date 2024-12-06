@@ -74,22 +74,24 @@ class MainViewModel(
                       )
                    }
                 },
-               onParentNode = { parentNode ->
-                   val title = parentNode.getNodeText(nodeManager).orEmpty()
-                   updateUiState {
-                       it.copy(
-                           title = title,
-                           defaultTitle = title,
-                           rootNode = parentNode,
-                       )
-                   }
+               onParentNodeUpdate = { parentNode ->
+                   updateParentNode(parentNode)
                }
             )
         }
         setMindmapIsLoading(false)
     }
 
-    fun getSearchResult() = nodeManager.getSearchResult()
+    private fun updateParentNode(parentNode: MindmapNode) {
+        val title = parentNode.getNodeText(nodeManager).orEmpty()
+        updateUiState {
+            it.copy(
+                title = title,
+                defaultTitle = title,
+                rootNode = parentNode,
+            )
+        }
+    }
 
     fun getSearchResultFlow() = nodeManager.getSearchResultFlow()
 
@@ -332,7 +334,7 @@ nodeFindList:${nodeManager.getSearchResult().map { it.getNodeText(nodeManager) }
     fun top() {
         updateUiState {
             it.copy(
-                rootNode = nodeManager.getRootNode(),
+                rootNode = nodeManager.rootNode,
             )
         }
     }
@@ -528,8 +530,10 @@ modif: ${updatedNode.modificationDate?.let { DateUtils.formatDate(it) }.orEmpty(
                 nodesByNumericIndex = nodesByNumericIndex
             ))
 
-            parentNodeToShow?.let {
-                onNodeClick(it)
+            parentNodeToShow?.let { newParentNode ->
+                nodeManager.updateNodeInstances(newParentNode)
+                updateParentNode(newParentNode)
+//                onNodeClick(it)
             }
 
             setMindmapIsLoading(false)

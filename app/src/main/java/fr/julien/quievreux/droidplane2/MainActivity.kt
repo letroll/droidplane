@@ -75,6 +75,7 @@ class MainActivity : FragmentActivity() {
 
     private val viewModel: MainViewModel by viewModel()
     private val logger by inject<Logger>()
+    private val useNewView = true
 
     private val clipboardManager by lazy {
         getSystemService(CLIPBOARD_SERVICE) as ClipboardManager
@@ -198,17 +199,27 @@ class MainActivity : FragmentActivity() {
                                 } else {
                                     nodeFindList.value[state.value.searchUiState.currentSearchResultIndex]
                                 }
-                                nodeList(
-                                    node = node,
-                                    searchResultToShow = searchResultToShow,
-                                    fetchText = viewModel::getNodeText,
-                                    updateClipBoard = ::updateClipboard,
-                                    onNodeClick = viewModel::onNodeClick,
-                                    onNodeContextMenuClick = viewModel::onNodeContextMenuClick,
-                                )
+                                if (useNewView) {
+                                    nodeList(
+                                        node = node,
+                                        searchResultToShow = searchResultToShow,
+                                        fetchText = viewModel::getNodeText,
+                                        updateClipBoard = ::updateClipboard,
+                                        onNodeClick = viewModel::onNodeClick,
+                                        onNodeContextMenuClick = viewModel::onNodeContextMenuClick,
+                                    )
+                                } else {
+                                    nodeList(
+                                        node = node,
+                                        searchResultToShow = searchResultToShow,
+                                        fetchText = viewModel::getNodeText,
+                                        updateClipBoard = ::updateClipboard,
+                                        onNodeClick = viewModel::onNodeClick,
+                                        onNodeContextMenuClick = viewModel::onNodeContextMenuClick,
+                                    )
+                                }
                             }
                         }
-
                     }
                 )
             }

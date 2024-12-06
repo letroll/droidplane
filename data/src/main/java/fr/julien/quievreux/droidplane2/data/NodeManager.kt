@@ -40,26 +40,14 @@ class NodeManager(
      */
     private var mindmapIndexes: MindmapIndexes? = null
 
-    private var rootNode: MindmapNode? = null
+    var rootNode: MindmapNode? = null
+    private set
 
+    fun getNodeByID(id: String?) = mindmapIndexes?.nodesByIdIndex?.get(id)
 
-    fun getRootNode(): MindmapNode? = rootNode
+    fun getNodeByNumericIndex() = mindmapIndexes?.nodesByNumericIndex
 
-    /**
-     * Returns the node for a given Node ID
-     *
-     * @param id
-     * @return
-     */
-    fun getNodeByID(id: String?): MindmapNode? = mindmapIndexes?.nodesByIdIndex?.get(id)
-
-    fun getNodeByNumericIndex(): Map<Int, MindmapNode>? {
-        return mindmapIndexes?.nodesByNumericIndex
-    }
-
-    fun getNodeByIdIndex(): Map<String, MindmapNode>? {
-        return mindmapIndexes?.nodesByIdIndex
-    }
+    fun getNodeByIdIndex() = mindmapIndexes?.nodesByIdIndex
 
     fun updatemMindmapIndexes(mindmapIndexes: MindmapIndexes) {
         this.mindmapIndexes = mindmapIndexes
@@ -73,7 +61,7 @@ class NodeManager(
     suspend fun loadMindMap(
         inputStream: InputStream,
         onError: (Exception) -> Unit ,
-        onParentNode: (MindmapNode) -> Unit,
+        onParentNodeUpdate: (MindmapNode) -> Unit,
         onLoadFinished: (() -> Unit)? = null,
     ) {
         val xpp :XmlPullParser?
@@ -90,7 +78,7 @@ class NodeManager(
         xpp?.let {
             loadMindMap(
                 xpp = it,
-                onParentNode = onParentNode,
+                onParentNodeUpdate = onParentNodeUpdate,
                 onReadFinish = onLoadFinished,
                 onError = onError,
             )
@@ -100,7 +88,7 @@ class NodeManager(
     suspend fun loadMindMap(
         xpp: XmlPullParser,
         onError: (Exception) -> Unit ,
-        onParentNode: (MindmapNode) -> Unit,
+        onParentNodeUpdate: (MindmapNode) -> Unit,
         onReadFinish: (() -> Unit)? = null,
     ) {
         val nodeStack = Stack<MindmapNode>()
@@ -112,7 +100,7 @@ class NodeManager(
             when (eventType) {
                 XmlPullParser.START_DOCUMENT -> {
                     hasStartDocument = true
-                    logger?.e("Received XML Start Document")
+                    logger.e("Received XML Start Document")
                 }
 
                 XmlPullParser.START_TAG -> {
@@ -121,7 +109,7 @@ class NodeManager(
                             parseNode(
                                 nodeStack = nodeStack,
                                 xpp = xpp,
-                                onParentNode = onParentNode,
+                                onParentNodeUpdate = onParentNodeUpdate,
                             )
                         }
 
@@ -142,7 +130,7 @@ class NodeManager(
                         }
 
                         else -> {
-                            logger?.d( "Received unknown node " + xpp.name)
+                            logger.d( "Received unknown node " + xpp.name)
                         }
                     }
                 }
@@ -193,7 +181,7 @@ class NodeManager(
     public fun parseNode(
         nodeStack: Stack<MindmapNode>,
         xpp: XmlPullParser,
-        onParentNode: (MindmapNode) -> Unit,
+        onParentNodeUpdate: (MindmapNode) -> Unit,
     ) {
         val parentNode: MindmapNode? = getParentFromStack(nodeStack)
 
@@ -203,11 +191,8 @@ class NodeManager(
 
         // if we don't have a parent node, then this is the root node
         if (parentNode == null) {
-            onParentNode(newMindmapNode)
-            rootNode = newMindmapNode
-            _allNodes.update {
-                listOf(newMindmapNode)
-            }
+            onParentNodeUpdate(newMindmapNode)
+            updateNodeInstances(newMindmapNode)
         } else {
             //TODO change to immutable list
             parentNode.addChildMindmapNode(newMindmapNode)
@@ -218,6 +203,13 @@ class NodeManager(
             _allNodes.update {
                 it + newMindmapNode
             }
+        }
+    }
+
+    fun updateNodeInstances(newMindmapNode: MindmapNode) {
+        rootNode = newMindmapNode
+        _allNodes.update {
+            listOf(newMindmapNode)
         }
     }
 
@@ -298,4 +290,5 @@ class NodeManager(
     fun setMapUri(data: Uri?) {
         currentMindMapUri = data
     }
+
 }

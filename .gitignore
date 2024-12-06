@@ -57,9 +57,9 @@ Thumbs.db
 # Mindmap backup files
 .backup
 
-/.idea/modules/app/droidplane.app.iml
 /.idea/inspectionProfiles/Project_Default.xml
 /.idea/studiobot.xml
 /.idea/.name
 /.idea/.gitignore
 /.idea/droidplane.iml
+/.idea/modules/app/droidplane2.app.iml

@@ -34,6 +34,14 @@ dependencies {
     api(libs.androidx.appcompat)
     api(libs.material)
 
+    val composeBom = platform("androidx.compose:compose-bom:2024.09.03")
+    implementation(composeBom)
+    testImplementation(composeBom)
+    androidTestImplementation(composeBom)
+    implementation(libs.androidx.activity.compose)
+    implementation(libs.androidx.ui.tooling.preview)
+    debugImplementation(libs.androidx.ui.tooling)
+
     api(project.dependencies.platform(libs.koin.bom))
     api(libs.koin.android)
     api(libs.koin.core)

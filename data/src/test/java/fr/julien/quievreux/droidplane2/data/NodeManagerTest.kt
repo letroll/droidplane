@@ -1,6 +1,5 @@
 package fr.julien.quievreux.droidplane2.data
 
-import androidx.test.core.app.ActivityScenario.launch
 import fr.julien.quievreux.droidplane2.core.testutils.KStringSpec
 import fr.julien.quievreux.droidplane2.data.model.MindmapIndexes
 import fr.julien.quievreux.droidplane2.data.model.MindmapNode
@@ -32,7 +31,7 @@ class NodeManagerTest : KStringSpec() {
             val job = launch {
                 nodeManager.loadMindMap(
                     xpp = fakeXmlPullParser,
-                    onParentNode = {},
+                    onParentNodeUpdate = {},
                     onError = { exception ->
                         possibleException = exception
                     },
@@ -56,7 +55,7 @@ class NodeManagerTest : KStringSpec() {
             val job = launch {
                 nodeManager.loadMindMap(
                     xpp = fakeXmlPullParser,
-                    onParentNode = {},
+                    onParentNodeUpdate = {},
                     onError = { },
                     onReadFinish = {
                         finishWithProcessing = true
@@ -75,6 +74,7 @@ class NodeManagerTest : KStringSpec() {
 //            coEvery { fakeXmlPullParser.eventType }.returns(XmlPullParser.END_TAG)
 //            coEvery { fakeXmlPullParser.next() }.returns(XmlPullParser.END_DOCUMENT)
             coEvery { fakeXmlPullParser.getAttributeValue(any(),any()) }.returns(null)
+            coEvery { fakeXmlPullParser.getAttributeValue(any(),any()) }.returns(null)
 //            var finishWithProcessing = false
             val nodeManager = initNodeManager()
             val nodeStack = Stack<MindmapNode>()
@@ -83,7 +83,7 @@ class NodeManagerTest : KStringSpec() {
                 nodeManager.parseNode(
                     nodeStack = nodeStack,
                     xpp = fakeXmlPullParser,
-                    onParentNode = { result ->
+                    onParentNodeUpdate = { result ->
                         nodeResult = result
                     }
                 )
@@ -104,7 +104,7 @@ class NodeManagerTest : KStringSpec() {
 
     }
 
-    private fun initNodeManager(nodeUtils:NodeUtils= getFakeNodeUtils()): NodeManager {
+    private fun initNodeManager(nodeUtils:NodeUtils= NodeUtilsDefaultImpl()): NodeManager {
         return NodeManager(
             logger = mockk(relaxed = true),
             nodeUtils = nodeUtils,
