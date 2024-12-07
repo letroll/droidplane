@@ -8,6 +8,7 @@ import fr.julien.quievreux.droidplane2.data.NodeManager
 import fr.julien.quievreux.droidplane2.data.NodeUtilsDefaultImpl
 import fr.julien.quievreux.droidplane2.core.extensions.default
 import fr.julien.quievreux.droidplane2.core.testutils.KStringSpec
+import fr.julien.quievreux.droidplane2.helper.FakeDataSource
 import io.kotest.matchers.shouldBe
 import io.mockk.mockk
 import kotlinx.coroutines.Dispatchers

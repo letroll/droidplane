@@ -1,6 +1,44 @@
-package fr.julien.quievreux.droidplane2
+package fr.julien.quievreux.droidplane2.helper
+
+import fr.julien.quievreux.droidplane2.data.model.Node
 
 object FakeDataSource {
+
+    fun fakeNodeChildren(): MutableList<Node> = mutableListOf(
+        fakeNode("Opening Files"),
+        fakeNode("Navigating"),
+        fakeNode("Editing"),
+    )
+
+    fun fakeNode(
+        text: String = "DroidPlane",
+        childNodes: MutableList<Node> = mutableListOf(),
+    ): Node {
+        return Node(
+            parentNode = null,
+            id = "taciti",
+            numericId = 7900,
+            text = text,
+            link = null,
+            treeIdAttribute = null,
+            childNodes = childNodes,
+            richTextContents = mutableListOf(),
+            iconNames = mutableListOf(),
+            creationDate = null,
+            modificationDate = null,
+            isBold = false,
+            isItalic = false,
+            isSelected = false,
+            arrowLinkDestinationIds = mutableListOf(),
+            arrowLinkDestinationNodes = mutableListOf(),
+            arrowLinkIncomingNodes = mutableListOf()
+        )
+    }
+
+    fun fakeRootNode(): Node = fakeNode(
+        childNodes = fakeNodeChildren()
+    )
+
     val mindMap = """
 <map version="freeplane 1.11.5">
 <!--To view this file, download free mind mapping software Freeplane from https://www.freeplane.org -->

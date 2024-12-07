@@ -52,6 +52,7 @@ import fr.julien.quievreux.droidplane2.ui.components.AppTopBarAction.SearchPrevi
 import fr.julien.quievreux.droidplane2.ui.components.AppTopBarAction.Top
 import fr.julien.quievreux.droidplane2.ui.components.AppTopBarAction.Up
 import fr.julien.quievreux.droidplane2.ui.components.CustomDialog
+import fr.julien.quievreux.droidplane2.ui.components.MindMap
 import fr.julien.quievreux.droidplane2.ui.components.nodeList
 import fr.julien.quievreux.droidplane2.ui.theme.ContrastAwareReplyTheme
 import fr.julien.quievreux.droidplane2.ui.theme.primaryContainerLight
@@ -186,29 +187,25 @@ class MainActivity : FragmentActivity() {
                     //                    contentColor =,
                     //                    contentWindowInsets =,
                     content = { innerPadding ->
-                        LazyColumn(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .background(MaterialTheme.colorScheme.surfaceContainer)
-                                .padding(innerPadding),
-                        ) {
-                            state.value.rootNode?.let { node ->
+                        state.value.rootNode?.let { node ->
+                            if (useNewView) {
+                                MindMap(
+                                    rootNode = node,
+                                    fetchText = viewModel::getNodeText,
+                                )
+                            } else {
+                            LazyColumn(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .background(MaterialTheme.colorScheme.surfaceContainer)
+                                    .padding(innerPadding),
+                            ) {
                                 logger.e("list updated")
                                 val searchResultToShow = if (nodeFindList.value.isEmpty() || (state.value.searchUiState.currentSearchResultIndex in 0 until nodeFindList.value.size - 1)) {
                                     null
                                 } else {
                                     nodeFindList.value[state.value.searchUiState.currentSearchResultIndex]
                                 }
-                                if (useNewView) {
-                                    nodeList(
-                                        node = node,
-                                        searchResultToShow = searchResultToShow,
-                                        fetchText = viewModel::getNodeText,
-                                        updateClipBoard = ::updateClipboard,
-                                        onNodeClick = viewModel::onNodeClick,
-                                        onNodeContextMenuClick = viewModel::onNodeContextMenuClick,
-                                    )
-                                } else {
                                     nodeList(
                                         node = node,
                                         searchResultToShow = searchResultToShow,

@@ -1,6 +1,7 @@
 package fr.julien.quievreux.droidplane2.data
 
 import android.net.Uri
+import android.text.Html
 import fr.julien.quievreux.droidplane2.core.log.Logger
 import fr.julien.quievreux.droidplane2.data.model.MindmapIndexes
 import fr.julien.quievreux.droidplane2.data.model.Node
@@ -33,7 +34,7 @@ class NodeManager(
         scope = coroutineScope,
         logger = logger,
         nodesSource = _allNodes,
-        fetchText = { node -> node.getNodeText(this) }
+        fetchText = { node -> getNodeText(node) }
     )
     /**
      * A map that resolves node IDs to Node objects
@@ -211,6 +212,25 @@ class NodeManager(
         _allNodes.update {
             listOf(newNode)
         }
+    }
+
+    fun getNodeText(node: Node): String? {
+        // if this is a cloned node, get the text from the original node
+        if (node.isClone()) {
+            // TODO this now fails when loading, because the background indexing is not done yet - so we maybe should mark this as "pending", and put it into a queue, to be updated once the linked node is there
+            val linkedNode = getNodeByID(node.treeIdAttribute)
+            if (linkedNode != null) {
+                return getNodeText(linkedNode)
+            }
+        }
+
+        // if this is a rich text node, get the HTML content instead
+        if (node.text == null && node.richTextContents.isNotEmpty()) {
+            val richTextContent = node.richTextContents.first()
+            return Html.fromHtml(richTextContent).toString()
+        }
+
+        return node.text
     }
 
     private fun getParentFromStack(nodeStack: Stack<Node>): Node? {

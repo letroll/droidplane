@@ -83,7 +83,7 @@ class MainViewModel(
     }
 
     private fun updateParentNode(parentNode: Node) {
-        val title = parentNode.getNodeText(nodeManager).orEmpty()
+        val title = getNodeText(parentNode).orEmpty()
         updateUiState {
             it.copy(
                 title = title,
@@ -105,8 +105,8 @@ class MainViewModel(
 -----------------------------------
 parent id:${node.parentNode?.id}   
 node id:${node.id}   
-node text:${node.getNodeText(nodeManager)}   
-${node.childNodes.joinToString(separator = "\n", transform = { "(${it.id})${it.getNodeText(nodeManager)}" })}
+node text:${getNodeText(node)}   
+${node.childNodes.joinToString(separator = "\n", transform = { "(${it.id})${getNodeText(it)}" })}
                 """.trimIndent()
                 )
                 showNode(node)
@@ -133,7 +133,7 @@ ${node.childNodes.joinToString(separator = "\n", transform = { "(${it.id})${it.g
             }
 
             else -> {
-                setTitle(node.getNodeText(nodeManager))
+                setTitle(getNodeText(node))
             }
         }
     }
@@ -155,7 +155,7 @@ ${node.childNodes.joinToString(separator = "\n", transform = { "(${it.id})${it.g
         enableHomeButtonIfNeeded(node)
 
         // get the title of the parent of the rightmost column (i.e. the selected node in the 2nd-rightmost column)
-        setTitle(node.getNodeText(nodeManager))
+        setTitle(getNodeText(node))
 
         // mark node as selected
         node.isSelected = true //TODO needed?
@@ -205,8 +205,9 @@ ${node.childNodes.joinToString(separator = "\n", transform = { "(${it.id})${it.g
                 enableHomeButtonIfNeeded(parent)
 
                 // get the title of the parent of the rightmost column (i.e. the selected node in the 2nd-rightmost column)
-                setTitle(parent?.getNodeText(nodeManager))
-
+                parent?.let{
+                    setTitle(getNodeText(it))
+                }
             } ?: run {
                 if (force) {
                     leaveApp()
@@ -279,7 +280,7 @@ ${node.childNodes.joinToString(separator = "\n", transform = { "(${it.id})${it.g
         Log.e(
             "toto", """
 showCurrentSearchResult:${_uiState.value.searchUiState.currentSearchResultIndex}
-nodeFindList:${nodeManager.getSearchResult().map { it.getNodeText(nodeManager) }.joinToString(separator = "|")}
+nodeFindList:${nodeManager.getSearchResult().map { getNodeText(it) }.joinToString(separator = "|")}
         """.trimIndent()
         )
         if (isSearchResultIndexValid()) {
@@ -360,7 +361,7 @@ nodeFindList:${nodeManager.getSearchResult().map { it.getNodeText(nodeManager) }
                     setDialogState(
                         DialogType.Edit(
                             node = node,
-                            oldValue = node.getNodeText(nodeManager).orEmpty(),
+                            oldValue = getNodeText(node).orEmpty(),
                         )
                     )
                 }
@@ -420,7 +421,7 @@ nodeFindList:${nodeManager.getSearchResult().map { it.getNodeText(nodeManager) }
         }
     }
 
-    fun getNodeText(node: Node) = node.getNodeText(nodeManager)
+    fun getNodeText(node: Node) = nodeManager.getNodeText(node)
 
     fun openRelativeFile(node: Node) {
         val fileName: String? = if (node.link?.path?.startsWith("/") == true) {
@@ -481,7 +482,7 @@ nodeFindList:${nodeManager.getSearchResult().map { it.getNodeText(nodeManager) }
 
             Log.e(
                 "toto", """
-show:${updatedNode.getNodeText(nodeManager)}
+show:${getNodeText(updatedNode)}
 modif: ${updatedNode.modificationDate?.let { DateUtils.formatDate(it) }.orEmpty()}
         """.trimIndent()
             )

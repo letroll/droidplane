@@ -25,7 +25,7 @@ data class Node(
     /**
      * If the node clones another node, it doesn't have text or richtext, but a TREE_ID
      */
-    private val treeIdAttribute: String?,
+    val treeIdAttribute: String?,
     val childNodes: MutableList<Node> = mutableListOf(),
     val richTextContents: MutableList<String> = mutableListOf(),
     val iconNames: MutableList<String> = mutableListOf(),
@@ -40,27 +40,7 @@ data class Node(
     val arrowLinkIncomingNodes: MutableList<Node> = mutableListOf(),
 ) {
 
-    // TODO: this should probably live in a view controller, not here
-    fun getNodeText(nodeManager: NodeManager): String? {
-        // if this is a cloned node, get the text from the original node
-        if (isClone()) {
-            // TODO this now fails when loading, because the background indexing is not done yet - so we maybe should mark this as "pending", and put it into a queue, to be updated once the linked node is there
-            val linkedNode = nodeManager.getNodeByID(treeIdAttribute)
-            if (linkedNode != null) {
-                return linkedNode.getNodeText(nodeManager)
-            }
-        }
-
-        // if this is a rich text node, get the HTML content instead
-        if (this.text == null && richTextContents.isNotEmpty()) {
-            val richTextContent = richTextContents.first()
-            return Html.fromHtml(richTextContent).toString()
-        }
-
-        return text
-    }
-
-    private fun isClone() = treeIdAttribute != null && treeIdAttribute != ""
+    fun isClone() = treeIdAttribute != null && treeIdAttribute != ""
 
     fun addRichTextContent(richTextContent: String) {
         richTextContents.add(richTextContent)
