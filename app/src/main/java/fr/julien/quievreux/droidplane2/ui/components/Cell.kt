@@ -14,23 +14,23 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
-// Composable for a cell
-@Composable
-fun Cell(text: String, modifier: Modifier = Modifier) {
-    Box(
-        modifier = modifier
-            .size(100.dp)
-            .background(Color.LightGray, shape = RoundedCornerShape(8.dp))
-            .border(2.dp, Color.Black, shape = RoundedCornerShape(8.dp)),
-        contentAlignment = Alignment.Center
-    ) {
-        Text(text = text, color = Color.Black, fontSize = 16.sp)
-    }
-}
-
-
-@Preview(showBackground = true, widthDp = 200, heightDp = 200)
-@Composable
-fun PreviewCell() {
-    Cell(text = "Sample Cell")
-}
+//// Composable for a cell
+//@Composable
+//fun Cell(text: String, modifier: Modifier = Modifier) {
+//    Box(
+//        modifier = modifier
+//            .size(100.dp)
+//            .background(Color.LightGray, shape = RoundedCornerShape(8.dp))
+//            .border(2.dp, Color.Black, shape = RoundedCornerShape(8.dp)),
+//        contentAlignment = Alignment.Center
+//    ) {
+//        Text(text = text, color = Color.Black, fontSize = 16.sp)
+//    }
+//}
+//
+//
+//@Preview(showBackground = true, widthDp = 200, heightDp = 200)
+//@Composable
+//fun PreviewCell() {
+//    Cell(text = "Sample Cell")
+//}

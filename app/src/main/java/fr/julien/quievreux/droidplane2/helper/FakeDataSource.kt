@@ -4,11 +4,12 @@ import fr.julien.quievreux.droidplane2.data.model.Node
 
 object FakeDataSource {
 
-    fun fakeNodeChildren(): MutableList<Node> = mutableListOf(
+    fun fakeNodeChildren(count: Int = 5): MutableList<Node> = mutableListOf(
         fakeNode("Opening Files"),
         fakeNode("Navigating"),
         fakeNode("Editing"),
-    )
+        fakeNode("Test"),
+    ).take(count).toMutableList()
 
     fun fakeNode(
         text: String = "DroidPlane",
