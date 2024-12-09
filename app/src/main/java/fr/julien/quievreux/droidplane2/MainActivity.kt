@@ -76,7 +76,7 @@ class MainActivity : FragmentActivity() {
 
     private val viewModel: MainViewModel by viewModel()
     private val logger by inject<Logger>()
-    private val useNewView = true
+    private val useNewView = false
 
     private val clipboardManager by lazy {
         getSystemService(CLIPBOARD_SERVICE) as ClipboardManager
@@ -152,7 +152,7 @@ class MainActivity : FragmentActivity() {
                     modifier = Modifier,
                     topBar = {
                         AppTopBar(
-                            text = state.value.rootNode?.let { viewModel.getNodeText(it) } ?: stringResource(R.string.app_name),
+                            text = state.value.title.ifEmpty { stringResource(R.string.app_name) },
                             hasBackIcon = state.value.canGoBack,
                             onQuery = { query ->
                                 viewModel.search(query)
@@ -194,18 +194,18 @@ class MainActivity : FragmentActivity() {
                                     fetchText = viewModel::getNodeText,
                                 )
                             } else {
-                            LazyColumn(
-                                modifier = Modifier
-                                    .fillMaxSize()
-                                    .background(MaterialTheme.colorScheme.surfaceContainer)
-                                    .padding(innerPadding),
-                            ) {
-                                logger.e("list updated")
-                                val searchResultToShow = if (nodeFindList.value.isEmpty() || (state.value.searchUiState.currentSearchResultIndex in 0 until nodeFindList.value.size - 1)) {
-                                    null
-                                } else {
-                                    nodeFindList.value[state.value.searchUiState.currentSearchResultIndex]
-                                }
+                                LazyColumn(
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .background(MaterialTheme.colorScheme.surfaceContainer)
+                                        .padding(innerPadding),
+                                ) {
+                                    logger.e("list updated")
+                                    val searchResultToShow = if (nodeFindList.value.isEmpty() || (state.value.searchUiState.currentSearchResultIndex in 0 until nodeFindList.value.size - 1)) {
+                                        null
+                                    } else {
+                                        nodeFindList.value[state.value.searchUiState.currentSearchResultIndex]
+                                    }
                                     nodeList(
                                         node = node,
                                         searchResultToShow = searchResultToShow,

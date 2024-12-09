@@ -195,15 +195,19 @@ class NodeManager(
             onParentNodeUpdate(newMindmapNode)
             updateNodeInstances(newMindmapNode)
         } else {
-            //TODO change to immutable list
-            parentNode.addChildMindmapNode(newMindmapNode)
-//            parentNode = parentNode.copy(
-//                childNodes = parentNode.childNodes + newMindmapNode
-//            )
+            addChild(parentNode, newMindmapNode)
+        }
+    }
 
-            _allNodes.update {
-                it + newMindmapNode
-            }
+    private fun addChild(parentNode: Node, newMindmapNode: Node) {
+        //TODO change to immutable list
+        parentNode.addChildMindmapNode(newMindmapNode)
+        //            parentNode = parentNode.copy(
+        //                childNodes = parentNode.childNodes + newMindmapNode
+        //            )
+
+        _allNodes.update {
+            it + newMindmapNode
         }
     }
 
@@ -215,22 +219,24 @@ class NodeManager(
     }
 
     fun getNodeText(node: Node): String? {
-        // if this is a cloned node, get the text from the original node
-        if (node.isClone()) {
-            // TODO this now fails when loading, because the background indexing is not done yet - so we maybe should mark this as "pending", and put it into a queue, to be updated once the linked node is there
-            val linkedNode = getNodeByID(node.treeIdAttribute)
-            if (linkedNode != null) {
-                return getNodeText(linkedNode)
+        return getNodeByID(node.id)?.let { actualNode ->
+            // if this is a cloned node, get the text from the original node
+            if (actualNode.isClone()) {
+                // TODO this now fails when loading, because the background indexing is not done yet - so we maybe should mark this as "pending", and put it into a queue, to be updated once the linked node is there
+                val linkedNode = getNodeByID(actualNode.treeIdAttribute)
+                if (linkedNode != null) {
+                    getNodeText(linkedNode)
+                }
             }
-        }
 
-        // if this is a rich text node, get the HTML content instead
-        if (node.text == null && node.richTextContents.isNotEmpty()) {
-            val richTextContent = node.richTextContents.first()
-            return Html.fromHtml(richTextContent).toString()
-        }
+            // if this is a rich text node, get the HTML content instead
+            if (actualNode.text == null && actualNode.richTextContents.isNotEmpty()) {
+                val richTextContent = actualNode.richTextContents.first()
+                Html.fromHtml(richTextContent).toString()
+            }
 
-        return node.text
+            actualNode.text
+        }
     }
 
     private fun getParentFromStack(nodeStack: Stack<Node>): Node? {

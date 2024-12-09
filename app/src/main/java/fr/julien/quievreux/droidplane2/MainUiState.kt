@@ -5,7 +5,6 @@ import fr.julien.quievreux.droidplane2.data.model.Node
 
 data class MainUiState(
     val title: String = "",
-    val defaultTitle: String = "",
     val loading: Boolean = false,
     val leaving: Boolean = false,
     val canGoBack: Boolean = false,

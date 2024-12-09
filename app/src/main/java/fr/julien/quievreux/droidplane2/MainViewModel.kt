@@ -87,7 +87,6 @@ class MainViewModel(
         updateUiState {
             it.copy(
                 title = title,
-                defaultTitle = title,
                 rootNode = parentNode,
             )
         }
@@ -106,6 +105,7 @@ class MainViewModel(
 parent id:${node.parentNode?.id}   
 node id:${node.id}   
 node text:${getNodeText(node)}   
+node text from manager:${nodeManager.getNodeByID(node.id)?.let { getNodeText(it) }}   
 ${node.childNodes.joinToString(separator = "\n", transform = { "(${it.id})${getNodeText(it)}" })}
                 """.trimIndent()
                 )
@@ -172,7 +172,7 @@ ${node.childNodes.joinToString(separator = "\n", transform = { "(${it.id})${getN
     private fun setTitle(title: String?) {
         updateUiState {
             it.copy(
-                title = title ?: it.defaultTitle
+                title = title.orEmpty()
             )
         }
     }
@@ -469,6 +469,19 @@ nodeFindList:${nodeManager.getSearchResult().map { getNodeText(it) }.joinToStrin
         updateDialogState { it.copy(dialogType = dialogType) }
     }
 
+    private fun updateNodeInIndexes(node: Node) {
+        val nodesByIdIndex = (nodeManager.getNodeByIdIndex()?.toMutableMap() ?: mutableMapOf())
+        val nodesByNumericIndex = (nodeManager.getNodeByNumericIndex()?.toMutableMap() ?: mutableMapOf())
+        nodesByIdIndex[node.id] = node
+        nodesByNumericIndex[node.numericId] = node
+
+        nodeManager.updatemMindmapIndexes(MindmapIndexes(
+            nodesByIdIndex = nodesByIdIndex,
+            nodesByNumericIndex = nodesByNumericIndex
+        ))
+
+    }
+
     fun updateNodeText(
         node: Node,
         newValue: String,
@@ -487,13 +500,15 @@ modif: ${updatedNode.modificationDate?.let { DateUtils.formatDate(it) }.orEmpty(
         """.trimIndent()
             )
 
-            val nodesByIdIndex = (nodeManager.getNodeByIdIndex()?.toMutableMap() ?: mutableMapOf())
-            val nodesByNumericIndex = (nodeManager.getNodeByNumericIndex()?.toMutableMap() ?: mutableMapOf())
+            updateNodeInIndexes(updatedNode)
 
-            nodesByIdIndex[updatedNode.id] = updatedNode
-            nodesByNumericIndex[updatedNode.numericId] = updatedNode
 
-            val updatedChildren = mutableListOf<Node>()
+            Log.e(
+                "toto", """
+show text from node manager:${nodeManager.getNodeByID(updatedNode.id)?.let{nodeManager.getNodeText(it)}}
+        """.trimIndent()
+            )
+
             var parentNodeToShow : Node?=null
             //TODO modif root
             //TODO preserve icon
@@ -503,40 +518,27 @@ modif: ${updatedNode.modificationDate?.let { DateUtils.formatDate(it) }.orEmpty(
 
             //update in parent also, if not the root, because it's what we show which is the list if(updatedNode.isRoot().not()){
             updatedNode.parentNode?.let { parentNode ->
-                updatedChildren.addAll(
-                    parentNode.childNodes.map { child ->
-                        if (child.id == updatedNode.id) {
-                            updatedNode
-                        } else {
-                            child
-                        }
-                    }
-                )
+                val childIndex = parentNode.childNodes.indexOfFirst { it.id == updatedNode.id }
+                if (childIndex != -1) {
+                    val updatedChildren = parentNode.childNodes.toMutableList()
+                    updatedChildren[childIndex] = updatedNode
 
-                val updatedParent = parentNode.copy(
-                    childNodes = updatedChildren
-                )
+                    val updatedParent = parentNode.copy(
+                        childNodes = updatedChildren
+                    )
 
-                parentNodeToShow = updatedParent
+                    parentNodeToShow = updatedParent
 
-                nodesByIdIndex[parentNode.id] = updatedParent
-
-                nodesByNumericIndex[parentNode.numericId] = updatedParent
+                    updateNodeInIndexes(updatedParent)
+                }
             }?:run{
                parentNodeToShow = updatedNode
             }
 
-            nodeManager.updatemMindmapIndexes(MindmapIndexes(
-                nodesByIdIndex = nodesByIdIndex,
-                nodesByNumericIndex = nodesByNumericIndex
-            ))
-
             parentNodeToShow?.let { newParentNode ->
                 nodeManager.updateNodeInstances(newParentNode)
                 updateParentNode(newParentNode)
-//                onNodeClick(it)
             }
-
             setMindmapIsLoading(false)
         }
     }
