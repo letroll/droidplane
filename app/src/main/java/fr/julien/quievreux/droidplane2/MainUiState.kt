@@ -1,7 +1,9 @@
 package fr.julien.quievreux.droidplane2
 
-import fr.julien.quievreux.droidplane2.ContentNodeType.Classic
+import fr.julien.quievreux.droidplane2.model.ContentNodeType.Classic
 import fr.julien.quievreux.droidplane2.data.model.Node
+import fr.julien.quievreux.droidplane2.model.ContentNodeType
+import fr.julien.quievreux.droidplane2.model.ViewIntentNode
 
 data class MainUiState(
     val title: String = "",

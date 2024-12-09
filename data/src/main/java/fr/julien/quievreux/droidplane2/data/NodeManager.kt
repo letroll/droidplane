@@ -10,12 +10,15 @@ import fr.julien.quievreux.droidplane2.data.model.NodeType.Font
 import fr.julien.quievreux.droidplane2.data.model.NodeType.Icon
 import fr.julien.quievreux.droidplane2.data.search.SearchManager
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.withContext
 import org.xmlpull.v1.XmlPullParser
 import org.xmlpull.v1.XmlPullParserFactory
 import java.io.InputStream
+import java.io.OutputStream
 import java.util.Stack
 
 class NodeManager(
@@ -36,13 +39,14 @@ class NodeManager(
         nodesSource = _allNodes,
         fetchText = { node -> getNodeText(node) }
     )
+
     /**
      * A map that resolves node IDs to Node objects
      */
     private var mindmapIndexes: MindmapIndexes? = null
 
     var rootNode: Node? = null
-    private set
+        private set
 
     fun getNodeByID(id: String?) = mindmapIndexes?.nodesByIdIndex?.get(id)
 
@@ -61,11 +65,11 @@ class NodeManager(
      */
     suspend fun loadMindMap(
         inputStream: InputStream,
-        onError: (Exception) -> Unit ,
+        onError: (Exception) -> Unit,
         onParentNodeUpdate: (Node) -> Unit,
         onLoadFinished: (() -> Unit)? = null,
     ) {
-        val xpp :XmlPullParser?
+        val xpp: XmlPullParser?
         try {
             // set up XML pull parsing
             val factory = XmlPullParserFactory.newInstance()
@@ -88,7 +92,7 @@ class NodeManager(
 
     suspend fun loadMindMap(
         xpp: XmlPullParser,
-        onError: (Exception) -> Unit ,
+        onError: (Exception) -> Unit,
         onParentNodeUpdate: (Node) -> Unit,
         onReadFinish: (() -> Unit)? = null,
     ) {
@@ -131,13 +135,13 @@ class NodeManager(
                         }
 
                         else -> {
-                            logger.d( "Received unknown node " + xpp.name)
+                            logger.d("Received unknown node " + xpp.name)
                         }
                     }
                 }
 
                 XmlPullParser.END_TAG -> {
-                    if(hasStartDocument.not()){
+                    if (hasStartDocument.not()) {
                         onError(RuntimeException("Received END_DOCUMENT without START_DOCUMENT"))
                     }
                     if (xpp.name == "node") {
@@ -306,15 +310,62 @@ class NodeManager(
 //    }
 
     fun getMindmapDirectoryPath(debug: Boolean = false): String? {
+        if (debug) logger.e("uri:$currentMindMapUri")
         val mindmapPath = currentMindMapUri?.path
-        if(debug)logger.d( "MainViewModel path $mindmapPath")
+        if (debug) logger.e("path $mindmapPath")
         val mindmapDirectoryPath = mindmapPath?.substring(0, mindmapPath.lastIndexOf("/"))
-        if(debug)logger.d("MainViewModel directory path $mindmapDirectoryPath")
+        if (debug) logger.e("directory path $mindmapDirectoryPath")
         return mindmapDirectoryPath
+    }
+
+    fun getMindmapFileName(debug: Boolean = false): String? {
+        if (debug) logger.e("uri:$currentMindMapUri")
+        val mindmapPath = currentMindMapUri?.path
+        if (debug) logger.e("path $mindmapPath")
+        val mindmapFileName = mindmapPath?.substring(mindmapPath.lastIndexOf("/")+1, mindmapPath.length)
+        if (debug) logger.e("filename $mindmapFileName")
+        return mindmapFileName
     }
 
     fun setMapUri(data: Uri?) {
         currentMindMapUri = data
+    }
+
+    suspend fun savedMindMap(
+        outputStream: OutputStream,
+        onError: (Exception) -> Unit,
+        onSaveFinished: (() -> Unit)? = null,
+    ) {
+        logger.e("write")
+        try {
+            withContext(Dispatchers.IO) {
+                // set up XML pull parsing
+                val factory = XmlPullParserFactory.newInstance()
+                factory.isNamespaceAware = true
+                val serializer = factory.newSerializer()
+                serializer.setOutput(outputStream, "UTF-8")
+
+                rootNode?.let {
+                    serializer.startDocument("UTF-8", true)
+
+                    serializer.startTag(null, "root")
+                    serializer.attribute(null, "id", "123")
+
+                    serializer.startTag(null, "element")
+                    serializer.text("Some text")
+                    serializer.endTag(null, "element")
+
+                    serializer.endTag(null, "root")
+                    serializer.endDocument()
+                }
+
+                outputStream.flush()
+                outputStream.close()
+                onSaveFinished?.invoke()
+            }
+        } catch (e: Exception) {
+            onError(e)
+        }
     }
 
 }

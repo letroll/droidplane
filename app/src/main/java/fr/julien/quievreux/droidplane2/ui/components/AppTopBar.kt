@@ -46,6 +46,7 @@ import fr.julien.quievreux.droidplane2.ui.components.AppTopBarAction.SearchPrevi
 import fr.julien.quievreux.droidplane2.ui.components.AppTopBarAction.Top
 import fr.julien.quievreux.droidplane2.ui.components.AppTopBarAction.Up
 import fr.julien.quievreux.droidplane2.R
+import fr.julien.quievreux.droidplane2.ui.components.AppTopBarAction.Save
 
 enum class AppTopBarAction {
     SearchNext,
@@ -54,6 +55,7 @@ enum class AppTopBarAction {
     Top,
     Open,
     Help,
+    Save,
     Backpress,
 }
 
@@ -253,6 +255,15 @@ fun AppTopBar(
                     },
                     text = {
                         Text(stringResource(R.string.help))
+                    },
+                )
+                DropdownMenuItem(
+                    onClick = {
+                        showMenu = false
+                        onBarAction(Save)
+                    },
+                    text = {
+                        Text(stringResource(R.string.save))
                     },
                 )
             }

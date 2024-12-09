@@ -1,6 +1,7 @@
 package fr.julien.quievreux.droidplane2
 
 import android.annotation.SuppressLint
+import android.app.Activity
 import android.app.AlertDialog.Builder
 import android.content.ActivityNotFoundException
 import android.content.ClipData
@@ -9,6 +10,7 @@ import android.content.Intent
 import android.content.Intent.ACTION_EDIT
 import android.content.Intent.ACTION_OPEN_DOCUMENT
 import android.content.Intent.ACTION_VIEW
+import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Bundle
 import androidx.activity.SystemBarStyle
@@ -36,17 +38,21 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.res.stringResource
 import androidx.fragment.app.FragmentActivity
-import fr.julien.quievreux.droidplane2.ContentNodeType.Classic
-import fr.julien.quievreux.droidplane2.ContentNodeType.RelativeFile
-import fr.julien.quievreux.droidplane2.ContentNodeType.RichText
 import fr.julien.quievreux.droidplane2.MainUiState.DialogType.Edit
 import fr.julien.quievreux.droidplane2.MainUiState.DialogType.None
+import fr.julien.quievreux.droidplane2.core.PermissionUtils.checkStoragePermissions
+import fr.julien.quievreux.droidplane2.core.PermissionUtils.requestForStoragePermissions
 import fr.julien.quievreux.droidplane2.core.log.Logger
 import fr.julien.quievreux.droidplane2.data.model.Node
+import fr.julien.quievreux.droidplane2.helper.FileRegister
+import fr.julien.quievreux.droidplane2.model.ContentNodeType.Classic
+import fr.julien.quievreux.droidplane2.model.ContentNodeType.RelativeFile
+import fr.julien.quievreux.droidplane2.model.ContentNodeType.RichText
 import fr.julien.quievreux.droidplane2.ui.components.AppTopBar
 import fr.julien.quievreux.droidplane2.ui.components.AppTopBarAction.Backpress
 import fr.julien.quievreux.droidplane2.ui.components.AppTopBarAction.Help
 import fr.julien.quievreux.droidplane2.ui.components.AppTopBarAction.Open
+import fr.julien.quievreux.droidplane2.ui.components.AppTopBarAction.Save
 import fr.julien.quievreux.droidplane2.ui.components.AppTopBarAction.SearchNext
 import fr.julien.quievreux.droidplane2.ui.components.AppTopBarAction.SearchPrevious
 import fr.julien.quievreux.droidplane2.ui.components.AppTopBarAction.Top
@@ -57,11 +63,13 @@ import fr.julien.quievreux.droidplane2.ui.components.nodeList
 import fr.julien.quievreux.droidplane2.ui.theme.ContrastAwareReplyTheme
 import fr.julien.quievreux.droidplane2.ui.theme.primaryContainerLight
 import fr.julien.quievreux.droidplane2.ui.theme.primaryLight
-import fr.julien.quievreux.droidplane2.view.RichTextViewActivity
+import fr.julien.quievreux.droidplane2.ui.view.RichTextViewActivity
+import io.kotest.mpp.file
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import org.koin.android.ext.android.inject
 import org.koin.androidx.viewmodel.ext.android.viewModel
+import java.io.File
 import java.io.FileNotFoundException
 import java.io.InputStream
 
@@ -72,7 +80,7 @@ import java.io.InputStream
  * before it got restarted. A restart can happen when the screen is rotated, and we want to continue wherever we were
  * before the screen rotate.
  */
-class MainActivity : FragmentActivity() {
+class MainActivity : FragmentActivity(), FileRegister {
 
     private val viewModel: MainViewModel by viewModel()
     private val logger by inject<Logger>()
@@ -91,6 +99,20 @@ class MainActivity : FragmentActivity() {
         }
     }
 
+    private val saveFileLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+        if (result.resultCode == Activity.RESULT_OK) {
+            result.data?.data?.let { uri ->
+                contentResolver.openOutputStream(uri)?.use { outputStream ->
+                    viewModel.getFileToSave()?.let { file ->
+                        logger.e("Saving file ${file.name} content:${file.readText()}")
+                        outputStream.write(file.readText().toByteArray())
+                    }
+
+                }
+            }
+        }
+    }
+
     @SuppressLint("RememberReturnType")
     public override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -103,8 +125,11 @@ class MainActivity : FragmentActivity() {
         setContentView(R.layout.activity_main)
 
         viewModel.apply {
+            viewModel.setFileRegister(this@MainActivity)
             if (isAnExternalMindMapEdit()) {
-                viewModel.setMapUri(intent.data)
+                setMapUri(intent.data)
+            }else{
+                setMapUri(Uri.parse("android.resource://$packageName/raw/example.mm"))
             }
 
             getDocumentInputStream(isAnExternalMindMapEdit())?.let { loadMindMap(it) }
@@ -173,6 +198,8 @@ class MainActivity : FragmentActivity() {
                                     Open -> openFile()
 
                                     Help -> showHelp()
+
+                                    Save -> viewModel.saveFile()
                                 }
                             },
                         )
@@ -379,7 +406,58 @@ class MainActivity : FragmentActivity() {
         }
     }
 
+    private fun launchFileSavingIntent(filename: String) {
+        val intent = Intent(Intent.ACTION_CREATE_DOCUMENT).apply {
+            addCategory(Intent.CATEGORY_OPENABLE)
+//            type = "text/plain" // Set the MIME type
+            type = "*/*" // Set the MIME type
+            putExtra(Intent.EXTRA_TITLE, filename)
+        }
+        saveFileLauncher.launch(intent)
+    }
+
+    // Handle permission request result
+    override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<String>, grantResults: IntArray) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        when (requestCode) {
+            CREATE_FILE_REQUEST_CODE -> {
+                if (grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                    // Permission granted, launch file saving intent
+                    viewModel.getFileToSave()?.name?.let { fileName ->
+                        launchFileSavingIntent(fileName)
+                    }
+
+                } else {
+                    // Permission denied, handle accordingly
+                }
+            }
+
+            else -> super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        }
+
+    }
+
     companion object {
         const val INTENT_START_HELP: String = "fr.julien.quievreux.droidplane2.INTENT_START_HELP"
+        const val CREATE_FILE_REQUEST_CODE = 1
     }
+
+    override fun registerFile(file: File) {
+        if (checkStoragePermissions(this)) {
+            logger.e("Need write external storage permission")
+            // Permission is not granted, request it
+//            ActivityCompat.requestPermissions(this@MainActivity, arrayOf(WRITE_EXTERNAL_STORAGE), CREATE_FILE_REQUEST_CODE)
+            requestForStoragePermissions(
+                this,
+                logger,
+            )
+        } else {
+            logger.e("Permission granted, proceed with file saving")
+            // Permission is already granted, proceed with file saving
+            launchFileSavingIntent(file.name)
+        }
+    }
+
+    override fun getfilesDir(): String = filesDir.path
+
 }

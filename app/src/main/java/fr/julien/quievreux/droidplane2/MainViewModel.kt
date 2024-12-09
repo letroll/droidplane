@@ -7,8 +7,8 @@ import android.util.Log
 import android.webkit.MimeTypeMap
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import fr.julien.quievreux.droidplane2.ContentNodeType.Classic
-import fr.julien.quievreux.droidplane2.ContentNodeType.RelativeFile
+import fr.julien.quievreux.droidplane2.model.ContentNodeType.Classic
+import fr.julien.quievreux.droidplane2.model.ContentNodeType.RelativeFile
 import fr.julien.quievreux.droidplane2.MainUiState.DialogType
 import fr.julien.quievreux.droidplane2.MainUiState.DialogUiState
 import fr.julien.quievreux.droidplane2.MainUiState.SearchUiState
@@ -21,19 +21,18 @@ import fr.julien.quievreux.droidplane2.model.ContextMenuAction.NodeLink
 import fr.julien.quievreux.droidplane2.data.model.MindmapIndexes
 import fr.julien.quievreux.droidplane2.data.model.Node
 import fr.julien.quievreux.droidplane2.data.model.isInternalLink
+import fr.julien.quievreux.droidplane2.helper.FileRegister
+import fr.julien.quievreux.droidplane2.model.ContentNodeType
+import fr.julien.quievreux.droidplane2.model.ViewIntentNode
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.io.File
+import java.io.FileOutputStream
 import java.io.InputStream
 import java.util.Date
-
-data class ViewIntentNode(
-    val intent: Intent,
-    val node: Node,
-)
 
 /**
  * MainViewModel handles the loading and storing of a mind map document.
@@ -44,6 +43,9 @@ class MainViewModel(
 
     private val _uiState: MutableStateFlow<MainUiState> = MutableStateFlow(MainUiState())
     val uiState: StateFlow<MainUiState> = _uiState
+
+    private var fileRegister: FileRegister? = null
+    private var fileToSave:File?=null
 
     private fun setMindmapIsLoading(mindmapIsLoading: Boolean) {
         updateUiState {
@@ -65,18 +67,18 @@ class MainViewModel(
         setMindmapIsLoading(true)
         viewModelScope.launch {
             nodeManager.loadMindMap(
-               inputStream = inputStream,
+                inputStream = inputStream,
                 onLoadFinished = onLoadFinished,
                 onError = { exception ->
-                   updateUiState {
-                      it.copy(
-                          error = exception.message?:exception.stackTraceToString()
-                      )
-                   }
+                    updateUiState {
+                        it.copy(
+                            error = exception.message ?: exception.stackTraceToString()
+                        )
+                    }
                 },
-               onParentNodeUpdate = { parentNode ->
-                   updateParentNode(parentNode)
-               }
+                onParentNodeUpdate = { parentNode ->
+                    updateParentNode(parentNode)
+                }
             )
         }
         setMindmapIsLoading(false)
@@ -205,7 +207,7 @@ ${node.childNodes.joinToString(separator = "\n", transform = { "(${it.id})${getN
                 enableHomeButtonIfNeeded(parent)
 
                 // get the title of the parent of the rightmost column (i.e. the selected node in the 2nd-rightmost column)
-                parent?.let{
+                parent?.let {
                     setTitle(getNodeText(it))
                 }
             } ?: run {
@@ -475,10 +477,12 @@ nodeFindList:${nodeManager.getSearchResult().map { getNodeText(it) }.joinToStrin
         nodesByIdIndex[node.id] = node
         nodesByNumericIndex[node.numericId] = node
 
-        nodeManager.updatemMindmapIndexes(MindmapIndexes(
-            nodesByIdIndex = nodesByIdIndex,
-            nodesByNumericIndex = nodesByNumericIndex
-        ))
+        nodeManager.updatemMindmapIndexes(
+            MindmapIndexes(
+                nodesByIdIndex = nodesByIdIndex,
+                nodesByNumericIndex = nodesByNumericIndex
+            )
+        )
 
     }
 
@@ -505,11 +509,11 @@ modif: ${updatedNode.modificationDate?.let { DateUtils.formatDate(it) }.orEmpty(
 
             Log.e(
                 "toto", """
-show text from node manager:${nodeManager.getNodeByID(updatedNode.id)?.let{nodeManager.getNodeText(it)}}
+show text from node manager:${nodeManager.getNodeByID(updatedNode.id)?.let { nodeManager.getNodeText(it) }}
         """.trimIndent()
             )
 
-            var parentNodeToShow : Node?=null
+            var parentNodeToShow: Node? = null
             //TODO modif root
             //TODO preserve icon
             //TODO preserve link
@@ -531,8 +535,8 @@ show text from node manager:${nodeManager.getNodeByID(updatedNode.id)?.let{nodeM
 
                     updateNodeInIndexes(updatedParent)
                 }
-            }?:run{
-               parentNodeToShow = updatedNode
+            } ?: run {
+                parentNodeToShow = updatedNode
             }
 
             parentNodeToShow?.let { newParentNode ->
@@ -544,5 +548,32 @@ show text from node manager:${nodeManager.getNodeByID(updatedNode.id)?.let{nodeM
     }
 
     fun setMapUri(data: Uri?) = nodeManager.setMapUri(data)
+
+    fun saveFile() {
+        nodeManager.getMindmapFileName()?.let { filename ->
+            fileRegister?.let { register ->
+                val file = File(register.getfilesDir(), filename)
+                val outputStream = FileOutputStream(file)
+                viewModelScope.launch {
+                    nodeManager.savedMindMap(
+                        outputStream,
+                        onError = {
+                            Log.e("toto", "error saving file:$it")
+                        },
+                        onSaveFinished = {
+                            fileToSave = file
+                            fileRegister?.registerFile(file)
+                        }
+                    )
+                }
+            }
+        }
+    }
+
+    fun setFileRegister(fileRegister: FileRegister) {
+        this.fileRegister = fileRegister
+    }
+
+    fun getFileToSave(): File? = fileToSave
 }
 

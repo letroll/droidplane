@@ -1,4 +1,4 @@
-package fr.julien.quievreux.droidplane2.view
+package fr.julien.quievreux.droidplane2.ui.view
 
 import android.app.Activity
 import android.os.Bundle

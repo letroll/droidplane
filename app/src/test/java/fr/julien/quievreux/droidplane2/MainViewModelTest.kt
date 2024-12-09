@@ -1,7 +1,7 @@
 package fr.julien.quievreux.droidplane2
 
 import app.cash.turbine.test
-import fr.julien.quievreux.droidplane2.ContentNodeType.Classic
+import fr.julien.quievreux.droidplane2.model.ContentNodeType.Classic
 import fr.julien.quievreux.droidplane2.MainUiState.DialogUiState
 import fr.julien.quievreux.droidplane2.MainUiState.SearchUiState
 import fr.julien.quievreux.droidplane2.data.NodeManager
@@ -32,7 +32,6 @@ class MainViewModelTest : KStringSpec() {
                     leaving shouldBe false
                     canGoBack shouldBe false
                     title shouldBe ""
-                    defaultTitle shouldBe ""
                     error shouldBe ""
                     rootNode shouldBe null
                     errorAction shouldBe null
