@@ -12,6 +12,7 @@ import fr.julien.quievreux.droidplane2.model.ContentNodeType.RelativeFile
 import fr.julien.quievreux.droidplane2.MainUiState.DialogType
 import fr.julien.quievreux.droidplane2.MainUiState.DialogUiState
 import fr.julien.quievreux.droidplane2.MainUiState.SearchUiState
+import fr.julien.quievreux.droidplane2.core.log.Logger
 import fr.julien.quievreux.droidplane2.data.NodeManager
 import fr.julien.quievreux.droidplane2.helper.DateUtils
 import fr.julien.quievreux.droidplane2.model.ContextMenuAction
@@ -39,13 +40,14 @@ import java.util.Date
  */
 class MainViewModel(
     val nodeManager: NodeManager,
+    val logger: Logger,
 ) : ViewModel(viewModelScope = nodeManager.coroutineScope) {
 
     private val _uiState: MutableStateFlow<MainUiState> = MutableStateFlow(MainUiState())
     val uiState: StateFlow<MainUiState> = _uiState
 
     private var fileRegister: FileRegister? = null
-    private var fileToSave:File?=null
+    private var fileToSave: File? = null
 
     private fun setMindmapIsLoading(mindmapIsLoading: Boolean) {
         updateUiState {
@@ -72,7 +74,7 @@ class MainViewModel(
                 onError = { exception ->
                     updateUiState {
                         it.copy(
-                            error = exception.message ?: exception.stackTraceToString()
+                            error = exception.message ?: "exception without message"//exception.stackTraceToString()
                         )
                     }
                 },
@@ -101,16 +103,6 @@ class MainViewModel(
     ) {
         when {
             node.childNodes.size > 0 -> {
-                Log.e(
-                    "toto", """
------------------------------------
-parent id:${node.parentNode?.id}   
-node id:${node.id}   
-node text:${getNodeText(node)}   
-node text from manager:${nodeManager.getNodeByID(node.id)?.let { getNodeText(it) }}   
-${node.childNodes.joinToString(separator = "\n", transform = { "(${it.id})${getNodeText(it)}" })}
-                """.trimIndent()
-                )
                 showNode(node)
             }
 
@@ -279,7 +271,7 @@ ${node.childNodes.joinToString(separator = "\n", transform = { "(${it.id})${getN
     }
 
     private fun showCurrentSearchResult() {
-        Log.e(
+        logger.e(
             "toto", """
 showCurrentSearchResult:${_uiState.value.searchUiState.currentSearchResultIndex}
 nodeFindList:${nodeManager.getSearchResult().map { getNodeText(it) }.joinToString(separator = "|")}
@@ -389,7 +381,7 @@ nodeFindList:${nodeManager.getSearchResult().map { getNodeText(it) }.joinToStrin
         val linkedInternal = nodeManager.getNodeByID(fragment)
 
         if (linkedInternal != null) {
-            Log.d(MainApplication.TAG, "Opening internal node, $linkedInternal, with ID: $fragment")
+            logger.e("Opening internal node, $linkedInternal, with ID: $fragment")
 
             // the internal linked node might be anywhere in the viewModel, i.e. on a completely separate branch than
             // we are on currently. We need to go to the Top, and then descend into the viewModel to reach the right
@@ -435,14 +427,14 @@ nodeFindList:${nodeManager.getSearchResult().map { getNodeText(it) }.joinToStrin
         fileName?.let {
             val file = File(fileName)
             if (!file.exists()) {
-                Log.e(MainApplication.TAG, "File $fileName does not exist.")
+                logger.e("File $fileName does not exist.")
                 return
             }
             if (!file.canRead()) {
-                Log.e(MainApplication.TAG, "Can not read file $fileName.")
+                logger.e("Can not read file $fileName.")
                 return
             }
-            Log.d(MainApplication.TAG, "Opening file " + Uri.fromFile(file))
+            logger.e("Opening file " + Uri.fromFile(file))
             // http://stackoverflow.com/a/3571239/1067124
             var extension = ""
             val i = fileName.lastIndexOf('.')
@@ -555,7 +547,7 @@ show text from node manager:${nodeManager.getNodeByID(updatedNode.id)?.let { nod
                 val file = File(register.getfilesDir(), filename)
                 val outputStream = FileOutputStream(file)
                 viewModelScope.launch {
-                    nodeManager.savedMindMap(
+                    nodeManager.serializeMindmap(
                         outputStream,
                         onError = {
                             Log.e("toto", "error saving file:$it")

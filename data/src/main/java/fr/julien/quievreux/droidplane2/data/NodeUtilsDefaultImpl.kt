@@ -5,19 +5,20 @@ import android.util.Pair
 import fr.julien.quievreux.droidplane2.data.model.MindmapIndexes
 import fr.julien.quievreux.droidplane2.data.model.Node
 import fr.julien.quievreux.droidplane2.data.model.NodeAttribute
+import fr.julien.quievreux.droidplane2.data.model.NodeAttribute.*
+import fr.julien.quievreux.droidplane2.data.model.RichContent
+import fr.julien.quievreux.droidplane2.data.model.RichContentType
 import org.xmlpull.v1.XmlPullParser
-import org.xmlpull.v1.XmlPullParserException
-import java.io.IOException
 import java.util.Stack
 
 class NodeUtilsDefaultImpl : NodeUtils {
 
-    @Throws(IOException::class, XmlPullParserException::class)
-    override fun loadRichContentNodes(xpp: XmlPullParser): String {
+    override fun loadRichContent(xpp: XmlPullParser): Result<RichContent> {
         // as we are stream processing the XML, we need to consume the full XML until the
         // richcontent tag is closed (i.e. until we're back at the current parsing depth)
         // eagerly parse until richcontent node is closed
         val startingDepth = xpp.depth
+        val richContentType = xpp.getNodeAttribute(TYPE)?.let { RichContentType.fromString(it) }?:RichContentType.NODE
         var richTextContent = ""
 
         var richContentSubParserEventType = xpp.next()
@@ -26,9 +27,9 @@ class NodeUtilsDefaultImpl : NodeUtils {
             // EVENT TYPES as reported by next()
 
             when (richContentSubParserEventType) {
-                XmlPullParser.START_DOCUMENT -> throw IllegalStateException("Received START_DOCUMENT but were already within the document")
+                XmlPullParser.START_DOCUMENT -> return Result.failure(IllegalStateException("Received START_DOCUMENT but were already within the document"))
 
-                XmlPullParser.END_DOCUMENT -> throw IllegalStateException("Received END_DOCUMENT but expected to just parse a sub-document")
+                XmlPullParser.END_DOCUMENT -> return Result.failure(IllegalStateException("Received END_DOCUMENT but expected to just parse a sub-document"))
 
                 XmlPullParser.START_TAG -> {
                     var tagString = ""
@@ -62,7 +63,7 @@ class NodeUtilsDefaultImpl : NodeUtils {
                     richTextContent += text
                 }
 
-                else -> throw IllegalStateException("Received unexpected event type $richContentSubParserEventType")
+                else -> return Result.failure(IllegalStateException("Received unexpected event type $richContentSubParserEventType"))
 
             }
 
@@ -70,7 +71,7 @@ class NodeUtilsDefaultImpl : NodeUtils {
 
             // stop parsing once we have come out far enough from the XML to be at the starting depth again
         } while (xpp.depth != startingDepth)
-        return richTextContent
+        return Result.success(RichContent(richContentType,richTextContent))
     }
 
     override fun fillArrowLinks(nodesById: Map<String, Node>?) {
@@ -135,8 +136,8 @@ class NodeUtilsDefaultImpl : NodeUtils {
         return MindmapIndexes(newNodesById, newNodesByNumericId)
     }
 
-    override fun parseNodeTag(xpp: XmlPullParser, parentNode: Node?): Node {
-        val id = xpp.getNodeAttribute(NodeAttribute.ID).orEmpty()
+    override fun parseNodeTag(xpp: XmlPullParser, parentNode: Node?): Result<Node> = try {
+        val id = xpp.getNodeAttribute(ID).orEmpty()
         val numericId = try {
             if (id.isNotEmpty()) {
                 id.replace("\\D+".toRegex(), "").toInt()
@@ -144,26 +145,29 @@ class NodeUtilsDefaultImpl : NodeUtils {
                 -1
             }
         } catch (e: NumberFormatException) {
-            id.hashCode()
+            e.printStackTrace()
+            -1
         }
 
-        val text = xpp.getNodeAttribute(NodeAttribute.TEXT)
+        val text = xpp.getNodeAttribute(TEXT)
 
-        val creationDate = xpp.getNodeAttribute(NodeAttribute.CREATED)?.toLong()
-        val modificationDate = xpp.getNodeAttribute(NodeAttribute.MODIFIED)?.toLong()
+        val creationDate = xpp.getNodeAttribute(CREATED)?.takeIf { it.isNotEmpty() }?.toLong()
+        val modificationDate = xpp.getNodeAttribute(MODIFIED)?.takeIf { it.isNotEmpty() }?.toLong()
+
+        val position = xpp.getNodeAttribute(POSITION)?.takeIf { it.isNotEmpty() }
 
         // get link
-        val linkAttribute = xpp.getNodeAttribute(NodeAttribute.LINK)
-        val link = if (linkAttribute != null && linkAttribute != "") {
-            Uri.parse(linkAttribute)
-        } else {
+        val linkAttribute = xpp.getNodeAttribute(LINK)
+        val link = if (linkAttribute.isNullOrEmpty()) {
             null
+        } else {
+            Uri.parse(linkAttribute)
         }
 
         //TODO look if cloned text is synchonized with original text, if not obtain text from original node
         // and stop calling original in method getNodeText
         // get tree ID (of cloned node)
-        val treeIdAttribute = xpp.getNodeAttribute(NodeAttribute.TREE_ID)
+        val treeIdAttribute = xpp.getNodeAttribute(TREE_ID)
 
         val newNode = Node(
             parentNode = parentNode,
@@ -174,8 +178,11 @@ class NodeUtilsDefaultImpl : NodeUtils {
             treeIdAttribute = treeIdAttribute,
             creationDate = creationDate,
             modificationDate = modificationDate,
+            position = position,
         )
-        return newNode
+        Result.success(newNode)
+    } catch (exception: Exception) {
+        Result.failure(exception)
     }
 }
 

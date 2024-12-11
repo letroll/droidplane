@@ -1,10 +1,11 @@
 package fr.julien.quievreux.droidplane2.data
 
 import fr.julien.quievreux.droidplane2.data.model.NodeAttribute.TYPE
+import fr.julien.quievreux.droidplane2.data.model.RichContentType.*
 import org.xmlpull.v1.XmlPullParser
 
-fun XmlPullParser.isRichContent():Boolean = (name == "richcontent"
-    && (getAttributeValue(null, TYPE.name) == "NODE"
-    || getAttributeValue(null, TYPE.name) == "NOTE"
-    || getAttributeValue(null, TYPE.name) == "DETAILS"
-    ))
+fun XmlPullParser.isRichContent(): Boolean = name == "richcontent" && (
+        getAttributeValue(null, TYPE.name) == NODE.text ||
+        getAttributeValue(null, TYPE.name) == NOTE.text ||
+        getAttributeValue(null, TYPE.name) == DETAILS.text
+    )

@@ -13,7 +13,8 @@ val dataKoinModule = module {
 
     single<XmlParseUtils> {
         XmlParseUtilsDefaultImpl(
-            nodeUtils = get()
+            nodeUtils = get(),
+            logger = get(),
         )
     }
 }

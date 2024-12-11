@@ -357,6 +357,7 @@ private fun NodeListPreview() {
         treeIdAttribute = null,
         creationDate = 1728740019071,
         modificationDate = 1728740023499,
+        position = null,
     )
 
     val node1 = Node(
@@ -368,6 +369,7 @@ private fun NodeListPreview() {
         treeIdAttribute = null,
         creationDate = 1728740019071,
         modificationDate = 1728740023499,
+        position = null,
     )
 
     val node2 = Node(
@@ -379,6 +381,7 @@ private fun NodeListPreview() {
         treeIdAttribute = null,
         creationDate = 1728740019071,
         modificationDate = 1728740023499,
+        position = null,
     )
 
 
@@ -396,6 +399,7 @@ private fun NodeListPreview() {
         treeIdAttribute = null,
         creationDate = 1728740019071,
         modificationDate = 1728740023499,
+        position = null,
     )
 
    nodeParent = nodeParent.copy(childNodes = mutableListOf(node1, node2, node3))

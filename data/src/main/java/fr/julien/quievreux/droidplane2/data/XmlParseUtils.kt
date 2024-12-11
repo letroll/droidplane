@@ -19,8 +19,4 @@ interface XmlParseUtils {
 
     fun parseIcon(xpp: XmlPullParser, nodeStack: Stack<Node>)
 
-    companion object {
-        const val XML_PARSE_UTILS_TAG = "XmlParseUtils"
-    }
-
 }

@@ -1,8 +1,10 @@
 package fr.julien.quievreux.droidplane2.data
 
+import fr.julien.quievreux.droidplane2.core.log.Logger
 import fr.julien.quievreux.droidplane2.core.testutils.KStringSpec
 import fr.julien.quievreux.droidplane2.data.model.MindmapIndexes
 import fr.julien.quievreux.droidplane2.data.model.Node
+import fr.julien.quievreux.droidplane2.data.model.RichContent
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.shouldNotBe
 import io.mockk.coEvery
@@ -104,17 +106,20 @@ class NodeManagerTest : KStringSpec() {
 
     }
 
-    private fun initNodeManager(nodeUtils:NodeUtils= NodeUtilsDefaultImpl()): NodeManager {
+    private fun initNodeManager(
+        nodeUtils:NodeUtils= NodeUtilsDefaultImpl(),
+        logger: Logger = mockk(relaxed = true),
+    ): NodeManager {
         return NodeManager(
-            logger = mockk(relaxed = true),
+            logger = logger,
             nodeUtils = nodeUtils,
-            xmlParseUtils = XmlParseUtilsDefaultImpl(nodeUtils),
+            xmlParseUtils = XmlParseUtilsDefaultImpl(nodeUtils,logger),
             coroutineScope = TestScope(),
         )
     }
 
     private fun getFakeNodeUtils(): NodeUtils = object :NodeUtils{
-        override fun loadRichContentNodes(xpp: XmlPullParser): String {
+        override fun loadRichContent(xpp: XmlPullParser): Result<RichContent> {
             TODO("Not yet implemented")
         }
 
@@ -126,7 +131,7 @@ class NodeManagerTest : KStringSpec() {
             TODO("Not yet implemented")
         }
 
-        override fun parseNodeTag(xpp: XmlPullParser, parentNode: Node?): Node {
+        override fun parseNodeTag(xpp: XmlPullParser, parentNode: Node?): Result<Node> {
             TODO("Not yet implemented")
         }
 

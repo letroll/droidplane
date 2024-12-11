@@ -7,8 +7,9 @@ import fr.julien.quievreux.droidplane2.MainUiState.SearchUiState
 import fr.julien.quievreux.droidplane2.data.NodeManager
 import fr.julien.quievreux.droidplane2.data.NodeUtilsDefaultImpl
 import fr.julien.quievreux.droidplane2.core.extensions.default
+import fr.julien.quievreux.droidplane2.core.log.Logger
 import fr.julien.quievreux.droidplane2.core.testutils.KStringSpec
-import fr.julien.quievreux.droidplane2.helper.FakeDataSource
+import fr.julien.quievreux.droidplane2.data.FakeDataSource
 import io.kotest.matchers.shouldBe
 import io.mockk.mockk
 import kotlinx.coroutines.Dispatchers
@@ -61,14 +62,16 @@ class MainViewModelTest : KStringSpec() {
 
     private fun initMainViewModel(): MainViewModel {
         val nodeUtils = NodeUtilsDefaultImpl()
+        val logger = mockk<Logger>(relaxed = true)
         return MainViewModel(
             nodeManager = NodeManager(
-                logger = mockk(relaxed = true),
+                logger = logger,
                 nodeUtils = nodeUtils,
                 xmlParseUtils = mockk(relaxed = true),
                 coroutineScope = Dispatchers.default()
 
-            )
+            ),
+            logger = logger
         )
     }
 }

@@ -1,7 +1,6 @@
 package fr.julien.quievreux.droidplane2.data
 
-import android.util.Log
-import fr.julien.quievreux.droidplane2.data.XmlParseUtils.Companion.XML_PARSE_UTILS_TAG
+import fr.julien.quievreux.droidplane2.core.log.Logger
 import fr.julien.quievreux.droidplane2.data.model.Node
 import fr.julien.quievreux.droidplane2.data.model.NodeAttribute
 import org.xmlpull.v1.XmlPullParser
@@ -9,7 +8,8 @@ import java.util.Stack
 
 class XmlParseUtilsDefaultImpl(
     val nodeUtils: NodeUtils,
-) : XmlParseUtils{
+    val logger: Logger,
+) : XmlParseUtils {
 
     // extract the richcontent (HTML) of the node. This works both for nodes with a rich text content
     // (TYPE="NODE"), for "Notes" (TYPE="NOTE"), for "Details" (TYPE="DETAILS").
@@ -19,15 +19,21 @@ class XmlParseUtilsDefaultImpl(
     // only be interested in it's children
     override fun parseRichContent(xpp: XmlPullParser, nodeStack: Stack<Node>) {
         if (xpp.isEmptyElementTag) {
-            Log.d(XML_PARSE_UTILS_TAG, "Received empty richcontent node - skipping")
+            logger.e( "Received empty richcontent node - skipping")
         } else {
-            val richTextContent = nodeUtils.loadRichContentNodes(xpp)
+            nodeUtils.loadRichContent(xpp).onSuccess { richContent ->
+                // if we have no parent node, something went seriously wrong - we can't have a richcontent that is not part of a viewModel node
+                check(!nodeStack.empty()) { "Received richtext without a parent node" }
 
-            // if we have no parent node, something went seriously wrong - we can't have a richcontent that is not part of a viewModel node
-            check(!nodeStack.empty()) { "Received richtext without a parent node" }
-
-            val parentNode = nodeStack.peek()
-            parentNode.addRichTextContent(richTextContent)
+                val parentNode = nodeStack.peek()
+                parentNode.addRichContent(
+                    richContent.contentType,
+                    richContent.content
+                )
+            }
+                .onFailure {
+                    logger.e("loadRichContentNodes failed with:$it")
+                }
         }
     }
 

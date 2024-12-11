@@ -5,6 +5,10 @@ import android.text.Html
 import fr.julien.quievreux.droidplane2.core.log.Logger
 import fr.julien.quievreux.droidplane2.data.model.MindmapIndexes
 import fr.julien.quievreux.droidplane2.data.model.Node
+import fr.julien.quievreux.droidplane2.data.model.NodeAttribute
+import fr.julien.quievreux.droidplane2.data.model.NodeAttribute.*
+import fr.julien.quievreux.droidplane2.data.model.NodeTag
+import fr.julien.quievreux.droidplane2.data.model.NodeTag.*
 import fr.julien.quievreux.droidplane2.data.model.NodeType.ArrowLink
 import fr.julien.quievreux.droidplane2.data.model.NodeType.Font
 import fr.julien.quievreux.droidplane2.data.model.NodeType.Icon
@@ -17,6 +21,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.withContext
 import org.xmlpull.v1.XmlPullParser
 import org.xmlpull.v1.XmlPullParserFactory
+import org.xmlpull.v1.XmlSerializer
 import java.io.InputStream
 import java.io.OutputStream
 import java.util.Stack
@@ -63,7 +68,7 @@ class NodeManager(
      *
      * @param inputStream the inputStream to load
      */
-    suspend fun loadMindMap(
+    fun loadMindMap(
         inputStream: InputStream,
         onError: (Exception) -> Unit,
         onParentNodeUpdate: (Node) -> Unit,
@@ -76,101 +81,102 @@ class NodeManager(
             factory.isNamespaceAware = true
             xpp = factory.newPullParser()
             xpp.setInput(inputStream, "UTF-8")
-
-        } catch (e: Exception) {
-            throw RuntimeException(e)
-        }
-        xpp?.let {
-            loadMindMap(
-                xpp = it,
-                onParentNodeUpdate = onParentNodeUpdate,
-                onReadFinish = onLoadFinished,
-                onError = onError,
-            )
+            xpp?.let {
+                loadMindMap(
+                    xpp = it,
+                    onParentNodeUpdate = onParentNodeUpdate,
+                    onReadFinish = onLoadFinished,
+                    onError = onError,
+                )
+            }
+        } catch (exeception: Exception) {
+            onError(exeception)
         }
     }
 
-    suspend fun loadMindMap(
+    fun loadMindMap(
         xpp: XmlPullParser,
         onError: (Exception) -> Unit,
         onParentNodeUpdate: (Node) -> Unit,
         onReadFinish: (() -> Unit)? = null,
     ) {
-        val nodeStack = Stack<Node>()
+        try {
+            val nodeStack = Stack<Node>()
+            var eventType = xpp.eventType
+            var hasStartDocument = false
+            while (eventType != XmlPullParser.END_DOCUMENT) {
+                when (eventType) {
+                    XmlPullParser.START_DOCUMENT -> {
+                        hasStartDocument = true
+                        logger.e("Received XML Start Document")
+                    }
 
-        // stream parse the XML
-        var eventType = xpp.eventType
-        var hasStartDocument = false
-        while (eventType != XmlPullParser.END_DOCUMENT) {
-            when (eventType) {
-                XmlPullParser.START_DOCUMENT -> {
-                    hasStartDocument = true
-                    logger.e("Received XML Start Document")
-                }
+                    XmlPullParser.START_TAG -> {
+                        when {
+                            xpp.name == NODE.text -> {
+                                parseNode(
+                                    nodeStack = nodeStack,
+                                    xpp = xpp,
+                                    onParentNodeUpdate = onParentNodeUpdate,
+                                )
+                            }
 
-                XmlPullParser.START_TAG -> {
-                    when {
-                        xpp.name == "node" -> {
-                            parseNode(
-                                nodeStack = nodeStack,
-                                xpp = xpp,
-                                onParentNodeUpdate = onParentNodeUpdate,
-                            )
+                            xpp.isRichContent() -> {
+                                xmlParseUtils.parseRichContent(xpp, nodeStack)
+                            }
+
+                            xpp.name == Font.value -> {
+                                xmlParseUtils.parseFont(xpp, nodeStack)
+                            }
+
+                            xpp.name == Icon.value && xpp.getAttributeValue(null, "BUILTIN") != null -> {
+                                xmlParseUtils.parseIcon(xpp, nodeStack)
+                            }
+
+                            xpp.name == ArrowLink.value -> {
+                                xmlParseUtils.parseArrowLink(xpp, nodeStack)
+                            }
+
+                            else -> {
+                                logger.d("Received unknown node " + xpp.name)
+                            }
                         }
+                    }
 
-                        xpp.isRichContent() -> {
-                            xmlParseUtils.parseRichContent(xpp, nodeStack)
+                    XmlPullParser.END_TAG -> {
+                        if (hasStartDocument.not()) {
+                            onError(Exception("Received END_DOCUMENT without START_DOCUMENT"))
                         }
+                        if (xpp.name == "node") {
+                            nodeStack.pop()
+                        }
+                    }
 
-                        xpp.name == Font.value -> {
-                            xmlParseUtils.parseFont(xpp, nodeStack)
-                        }
+                    XmlPullParser.TEXT -> {
+                        // do we have TEXT nodes in the viewModel at all?
+                    }
 
-                        xpp.name == Icon.value && xpp.getAttributeValue(null, "BUILTIN") != null -> {
-                            xmlParseUtils.parseIcon(xpp, nodeStack)
-                        }
-
-                        xpp.name == ArrowLink.value -> {
-                            xmlParseUtils.parseArrowLink(xpp, nodeStack)
-                        }
-
-                        else -> {
-                            logger.d("Received unknown node " + xpp.name)
-                        }
+                    else -> {
+                        onError(IllegalStateException("Received unknown event $eventType"))
                     }
                 }
 
-                XmlPullParser.END_TAG -> {
-                    if (hasStartDocument.not()) {
-                        onError(RuntimeException("Received END_DOCUMENT without START_DOCUMENT"))
-                    }
-                    if (xpp.name == "node") {
-                        nodeStack.pop()
-                    }
-                }
-
-                XmlPullParser.TEXT -> {
-                    // do we have TEXT nodes in the viewModel at all?
-                }
-
-                else -> {
-                    onError(IllegalStateException("Received unknown event $eventType"))
-                }
+                eventType = xpp.next()
             }
 
-            eventType = xpp.next()
-        }
+            // stack should now be empty
+            if (!nodeStack.empty()) {
+                onError(Exception("Stack should be empty"))
+                // TODO: we could try to be lenient here to allow opening partial documents
+                //  (which sometimes happens when dropbox doesn't fully sync).
+                //  Probably doesn't work anyways, as we already throw a runtime exception above if we receive garbage
+            }
 
-        // stack should now be empty
-        if (!nodeStack.empty()) {
-            onError(RuntimeException("Stack should be empty"))
-            // TODO: we could try to be lenient here to allow opening partial documents
-            //  (which sometimes happens when dropbox doesn't fully sync).
-            //  Probably doesn't work anyways, as we already throw a runtime exception above if we receive garbage
+            onReadFinish?.invoke()
+            processMindMap()
+        } catch (exception: Exception) {
+            onError(exception)
         }
-
-        onReadFinish?.invoke()
-        processMindMap()
     }
 
     private fun processMindMap() {
@@ -183,24 +189,27 @@ class NodeManager(
         nodeUtils.fillArrowLinks(getNodeByIdIndex())
     }
 
-    public fun parseNode(
+    fun parseNode(
         nodeStack: Stack<Node>,
         xpp: XmlPullParser,
         onParentNodeUpdate: (Node) -> Unit,
     ) {
         val parentNode: Node? = getParentFromStack(nodeStack)
 
-        val newMindmapNode = nodeUtils.parseNodeTag(xpp, parentNode)
+        nodeUtils.parseNodeTag(xpp, parentNode)
+            .onSuccess { newMindmapNode ->
+                nodeStack.push(newMindmapNode)
 
-        nodeStack.push(newMindmapNode)
-
-        // if we don't have a parent node, then this is the root node
-        if (parentNode == null) {
-            onParentNodeUpdate(newMindmapNode)
-            updateNodeInstances(newMindmapNode)
-        } else {
-            addChild(parentNode, newMindmapNode)
-        }
+                // if we don't have a parent node, then this is the root node
+                if (parentNode == null) {
+                    onParentNodeUpdate(newMindmapNode)
+                    updateNodeInstances(newMindmapNode)
+                } else {
+                    addChild(parentNode, newMindmapNode)
+                }
+            }.onFailure {
+                logger.e("Failed to parse node:$it")
+            }
     }
 
     private fun addChild(parentNode: Node, newMindmapNode: Node) {
@@ -223,23 +232,25 @@ class NodeManager(
     }
 
     fun getNodeText(node: Node): String? {
-        return getNodeByID(node.id)?.let { actualNode ->
+        getNodeByID(node.id)?.let { actualNode ->
             // if this is a cloned node, get the text from the original node
             if (actualNode.isClone()) {
                 // TODO this now fails when loading, because the background indexing is not done yet - so we maybe should mark this as "pending", and put it into a queue, to be updated once the linked node is there
                 val linkedNode = getNodeByID(actualNode.treeIdAttribute)
                 if (linkedNode != null) {
-                    getNodeText(linkedNode)
+                    return getNodeText(linkedNode)
                 }
             }
 
             // if this is a rich text node, get the HTML content instead
             if (actualNode.text == null && actualNode.richTextContents.isNotEmpty()) {
                 val richTextContent = actualNode.richTextContents.first()
-                Html.fromHtml(richTextContent).toString()
+                return Html.fromHtml(richTextContent).toString()
             }
 
-            actualNode.text
+            return actualNode.text
+        } ?: run {
+            return node.text
         }
     }
 
@@ -322,50 +333,134 @@ class NodeManager(
         if (debug) logger.e("uri:$currentMindMapUri")
         val mindmapPath = currentMindMapUri?.path
         if (debug) logger.e("path $mindmapPath")
-        val mindmapFileName = mindmapPath?.substring(mindmapPath.lastIndexOf("/")+1, mindmapPath.length)
+        val mindmapFileName = mindmapPath?.substring(mindmapPath.lastIndexOf("/") + 1, mindmapPath.length)
         if (debug) logger.e("filename $mindmapFileName")
         return mindmapFileName
     }
 
     fun setMapUri(data: Uri?) {
         currentMindMapUri = data
+        logger.e("uri:$currentMindMapUri")
     }
 
-    suspend fun savedMindMap(
+    suspend fun serializeMindmap(
         outputStream: OutputStream,
         onError: (Exception) -> Unit,
         onSaveFinished: (() -> Unit)? = null,
     ) {
-        logger.e("write")
-        try {
-            withContext(Dispatchers.IO) {
-                // set up XML pull parsing
-                val factory = XmlPullParserFactory.newInstance()
-                factory.isNamespaceAware = true
-                val serializer = factory.newSerializer()
-                serializer.setOutput(outputStream, "UTF-8")
+        rootNode?.let { node ->
+            try {
+                withContext(Dispatchers.IO) {
+                    val factory = XmlPullParserFactory.newInstance()
+                    val serializer = factory.newSerializer()
 
-                rootNode?.let {
+                    serializer.setOutput(outputStream, "UTF-8")
                     serializer.startDocument("UTF-8", true)
 
-                    serializer.startTag(null, "root")
-                    serializer.attribute(null, "id", "123")
+                    serializer.startNodeTag(MAP)
 
-                    serializer.startTag(null, "element")
-                    serializer.text("Some text")
-                    serializer.endTag(null, "element")
+                    serializeNode(
+                        serializer,
+                        node,
+                        onError,
+                    )
 
-                    serializer.endTag(null, "root")
+                    // Iterate through nodes and serialize them
+//                val nodesByIdIndex = getNodeByIdIndex()
+//                nodesByIdIndex?.values?.forEach { node ->
+//                    serializeNode(serializer, node)
+//                }
+
+                    serializer.endNodeTag(MAP)
                     serializer.endDocument()
-                }
 
-                outputStream.flush()
-                outputStream.close()
-                onSaveFinished?.invoke()
+                    outputStream.flush()
+                    outputStream.close()
+                }
+            } catch (e: Exception) {
+                onError(e)
             }
-        } catch (e: Exception) {
-            onError(e)
+            onSaveFinished?.invoke()
         }
     }
 
+    private fun serializeNode(
+        serializer: XmlSerializer,
+        node: Node,
+        onError: (Exception) -> Unit,
+    ) {
+        try {
+            serializer.startNodeTag(NODE)
+            serializer.nodeAttribute(ID, node.id)
+            serializer.nodeAttribute(CREATED, node.creationDate?.toString().orEmpty())
+            serializer.nodeAttribute(MODIFIED, node.modificationDate?.toString().orEmpty())
+            node.position?.let {
+                serializer.nodeAttribute(POSITION, it)
+            }
+
+            if (node.richTextContents.isEmpty()) {
+                serializer.nodeAttribute(TEXT, getNodeText(node).orEmpty())
+            }else{
+                serializer.startNodeTag(RICH_CONTENT)
+                serializer.nodeAttribute(TYPE, node.richContentType?.text.orEmpty())
+                node.richTextContents.forEach { richTextContent ->
+                    val cleanedText = richTextContent.replace('\u00A0', ' ').replace("&#160;", " ")
+
+                    serializer.cdsect(cleanedText)
+                }
+                serializer.endNodeTag(RICH_CONTENT)
+            }
+
+            //TODO Add other attributes as needed (icon, link, format, etc.)
+            node.link?.let { link -> serializer.nodeAttribute(LINK, link.toString()) }
+            if (node.arrowLinkDestinationIds.isNotEmpty()) {
+                node.arrowLinkDestinationIds.forEach { arrowLinkId ->
+                    serializer.startNodeTag(ARROWLINK)
+                    serializer.nodeAttribute(DESTINATION, arrowLinkId)
+                    // Add other arrowLink attributes as needed
+                    serializer.endNodeTag(ARROWLINK)
+                }
+            }
+            // Add serialization for other node properties as needed
+
+            if (node.iconNames.isNotEmpty()) {
+                node.iconNames.forEach { iconName ->
+                    serializer.startNodeTag(ICON)
+                    serializer.nodeAttribute(BUILTIN, iconName)
+                    serializer.endNodeTag(ICON)
+                }
+            }
+            if (node.isItalic || node.isBold) {
+                serializer.startNodeTag(FONT)
+                if (node.isItalic) serializer.nodeAttribute(ITALIC, "true")
+                if (node.isBold) serializer.nodeAttribute(BOLD, "true")
+                serializer.endNodeTag(FONT)
+            }
+
+            // Handle child nodes recursively
+            if (node.childNodes.isNotEmpty()) {
+                node.childNodes.forEach { childNode ->
+                    serializeNode(serializer, childNode, onError)
+                }
+            }
+            serializer.endNodeTag(NODE)
+        } catch (exception: Exception) {
+            onError(exception)
+        }
+    }
+
+    private fun XmlSerializer.startNodeTag(nodeTag: NodeTag){
+        startTag(null, nodeTag.text)
+    }
+
+    private fun XmlSerializer.endNodeTag(nodeTag: NodeTag){
+        endTag(null, nodeTag.text)
+    }
+
+    private fun XmlSerializer.nodeAttribute(
+        nodeAttribute: NodeAttribute,
+        value: String,
+    ){
+        attribute(null, nodeAttribute.text, value)
+    }
 }

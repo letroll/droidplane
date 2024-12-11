@@ -1,15 +1,16 @@
 package fr.julien.quievreux.droidplane2.data.model
 
 enum class NodeAttribute(val text:String) {
-    BUILTIN("BUILTIN"),
     BOLD("BOLD"),
-    ITALIC("ITALIC"),
-    DESTINATION("DESTINATION"),
-    TYPE("TYPE"),
-    ID("ID"),
-    TEXT("TEXT"),
+    BUILTIN("BUILTIN"),
     CREATED("CREATED"),
-    MODIFIED("MODIFIED"),
+    DESTINATION("DESTINATION"),
+    ID("ID"),
+    ITALIC("ITALIC"),
     LINK("LINK"),
+    MODIFIED("MODIFIED"),
+    POSITION("POSITION"),
+    TEXT("TEXT"),
     TREE_ID("TREE_ID"),
+    TYPE("TYPE"),
 }

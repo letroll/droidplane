@@ -47,7 +47,7 @@ object PermissionUtils {
                 val uri = Uri.fromParts("package", activity.packageName, null)
                 intent.setData(uri)
                 storageActivityResultLauncher.launch(intent)
-            } catch (e: java.lang.Exception) {
+            } catch (e: Exception) {
                 val intent = Intent()
                 intent.setAction(Settings.ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION)
                 storageActivityResultLauncher.launch(intent)

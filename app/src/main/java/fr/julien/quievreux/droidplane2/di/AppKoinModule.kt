@@ -16,6 +16,7 @@ val appKoinModule = module {
     viewModel{
         MainViewModel(
             nodeManager = get(),
+            logger = get(),
         )
     }
 

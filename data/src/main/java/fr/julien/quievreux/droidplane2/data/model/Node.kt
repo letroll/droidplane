@@ -1,8 +1,6 @@
 package fr.julien.quievreux.droidplane2.data.model
 
 import android.net.Uri
-import android.text.Html
-import fr.julien.quievreux.droidplane2.data.NodeManager
 
 /**
  * A MindMapNode is a special type of DOM Node. A DOM Node can be converted to a MindMapNode if it has type ELEMENT,
@@ -28,11 +26,13 @@ data class Node(
     val treeIdAttribute: String?,
     val childNodes: MutableList<Node> = mutableListOf(),
     val richTextContents: MutableList<String> = mutableListOf(),
+    var richContentType: RichContentType?=null,
     val iconNames: MutableList<String> = mutableListOf(),
     val creationDate: Long?,
     val modificationDate: Long?,
     var isBold: Boolean = false,
     var isItalic: Boolean = false,
+    val position: String?,
     // TODO: this has nothing to do with the model
     var isSelected: Boolean = false,
     val arrowLinkDestinationIds: MutableList<String> = mutableListOf(),
@@ -42,7 +42,11 @@ data class Node(
 
     fun isClone() = treeIdAttribute != null && treeIdAttribute != ""
 
-    fun addRichTextContent(richTextContent: String) {
+    fun addRichContent(
+        richContentType: RichContentType,
+        richTextContent: String,
+    ) {
+        this.richContentType = richContentType
         richTextContents.add(richTextContent)
     }
 

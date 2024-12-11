@@ -2,7 +2,7 @@ package fr.julien.quievreux.droidplane2.ui.components
 
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.platform.LocalConfiguration
-import fr.julien.quievreux.droidplane2.helper.FakeDataSource
+import fr.julien.quievreux.droidplane2.data.FakeDataSource
 
 @Composable
 fun MindMapScreen() {

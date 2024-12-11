@@ -1,6 +1,7 @@
-package fr.julien.quievreux.droidplane2.helper
+package fr.julien.quievreux.droidplane2.data
 
 import fr.julien.quievreux.droidplane2.data.model.Node
+import fr.julien.quievreux.droidplane2.data.model.RichContentType
 
 object FakeDataSource {
 
@@ -24,6 +25,7 @@ object FakeDataSource {
             treeIdAttribute = null,
             childNodes = childNodes,
             richTextContents = mutableListOf(),
+            richContentType = RichContentType.NODE,
             iconNames = mutableListOf(),
             creationDate = null,
             modificationDate = null,
@@ -32,7 +34,8 @@ object FakeDataSource {
             isSelected = false,
             arrowLinkDestinationIds = mutableListOf(),
             arrowLinkDestinationNodes = mutableListOf(),
-            arrowLinkIncomingNodes = mutableListOf()
+            arrowLinkIncomingNodes = mutableListOf(),
+            position = null,
         )
     }
 

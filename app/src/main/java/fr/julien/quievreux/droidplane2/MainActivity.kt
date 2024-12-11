@@ -89,7 +89,6 @@ class MainActivity : FragmentActivity(), FileRegister {
     private val clipboardManager by lazy {
         getSystemService(CLIPBOARD_SERVICE) as ClipboardManager
     }
-
     private val launcher = registerForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
         uri?.let {
             val openFileIntent = Intent(this, MainActivity::class.java)
@@ -322,7 +321,10 @@ class MainActivity : FragmentActivity(), FileRegister {
                     }
                 } ?: run {
                     scope.launch {
-                        snackbarHostState.showSnackbar(message)
+                        snackbarHostState.showSnackbar(
+                            message = message,
+                            duration = Indefinite
+                        )
                     }
                 }
             }
@@ -339,9 +341,7 @@ class MainActivity : FragmentActivity(), FileRegister {
         }
     }
 
-    private fun openFile() {
-        launcher.launch("*/*")
-    }
+    private fun openFile() = launcher.launch("*/*")
 
     private fun getDocumentInputStream(isAnExternalMindMapEdit: Boolean): InputStream? {
         return if (isAnExternalMindMapEdit) {

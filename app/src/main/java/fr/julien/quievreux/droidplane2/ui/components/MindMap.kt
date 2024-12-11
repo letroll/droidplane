@@ -14,7 +14,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.*
-import fr.julien.quievreux.droidplane2.helper.FakeDataSource
+import fr.julien.quievreux.droidplane2.data.FakeDataSource
 import kotlin.math.cos
 import kotlin.math.sin
 import fr.julien.quievreux.droidplane2.data.model.Node
