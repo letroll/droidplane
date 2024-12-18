@@ -3,8 +3,10 @@ package fr.julien.quievreux.droidplane2.ui.components
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
@@ -15,82 +17,96 @@ import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.*
 import fr.julien.quievreux.droidplane2.data.FakeDataSource
-import kotlin.math.cos
-import kotlin.math.sin
 import fr.julien.quievreux.droidplane2.data.model.Node
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.sp
-import kotlin.math.PI
 
 @Composable
 fun MindMap(
     rootNode: Node,
     fetchText: (Node) -> String?,
+    modifier: Modifier = Modifier,
+    paddingStart: Dp = 16.dp,
 ) {
+    var offsetX by remember { mutableFloatStateOf(0f) }
+    var offsetY by remember { mutableFloatStateOf(0f) }
+    var scale by remember { mutableFloatStateOf(1f) }
     var parentSize by remember { mutableStateOf(IntSize.Zero) }
-    val parentCenterX by remember { derivedStateOf { (parentSize.width / 2).toFloat() } }
+    var rootNodeSize by remember { mutableStateOf(IntSize.Zero) }
     val parentCenterY by remember { derivedStateOf { (parentSize.height / 2).toFloat() } }
+    val paddingLeftPx = with(LocalDensity.current) { paddingStart.toPx() }
 
     Box(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxSize()
+            .background(color = MaterialTheme.colorScheme.onBackground)
             .onSizeChanged {
                 parentSize = it
             }
+            .pointerInput(Unit) {
+                detectTransformGestures { _, pan, zoom, _ ->
+                    offsetX += pan.x
+                    offsetY += pan.y
+                    scale = (scale * zoom).coerceIn(0.5f, 3f)
+                }
+            }
+            .graphicsLayer(
+                translationX = offsetX,
+                translationY = offsetY,
+                scaleX = scale,
+                scaleY = scale,
+            )
     ) {
-        // Calculate the minimum radius to prevent overlapping
         val rootText = fetchText(rootNode) ?: "Root"
-        val rootSizePx = with(LocalDensity.current) { calculateCellSizePx(rootText) }
-        val childSizesPx = rootNode.childNodes.map { fetchText(it)?.let { text -> calculateCellSizePx(text) } ?: rootSizePx }
-        val maxChildSizePx = childSizesPx.maxOrNull() ?: rootSizePx
+        val rootSizePx = calculateCellSizePx(fetchText(rootNode) ?: "Root")
 
-        // Calculate the radius to avoid overlaps with shortest connections
-        val minRadius = rootSizePx / 2 + maxChildSizePx / 2 + 16.dp.toPx()
-        val radius = maxOf(parentSize.width.coerceAtMost(parentSize.height) / 3f, minRadius)
+        Cell(
+            text = rootText,
+            modifier = Modifier
+                .graphicsLayer(translationX = paddingLeftPx, translationY = parentCenterY - rootSizePx / 2)
+                .onSizeChanged {
+                    rootNodeSize = it
+                }
+        )
 
-        // Calculate positions for child nodes
-        val childPositions = calculateCircularPositions(parentCenterX, parentCenterY, radius, rootNode.childNodes.size)
+        val childCount = rootNode.childNodes.size
+        val totalSpacing = 20.dp.toPx() * (childCount - 1) // Total space between children
+        val totalChildHeight = rootNode.childNodes.size * rootNodeSize.height
+        val availableSpace = totalSpacing + totalChildHeight
+        val topOffset = parentCenterY - availableSpace / 2
+        val verticalSpacing = 40.dp.toPx()
 
         Canvas(modifier = Modifier.fillMaxSize()) {
-            val centerX = size.width / 2  // Dynamically calculate the center X
-            val centerY = size.height / 2 // Dynamically calculate the center Y
+            rootNode.childNodes.forEachIndexed { index, childNode ->
+                val startX = paddingLeftPx + rootNodeSize.width
+                val startY = parentCenterY
+                val endX = startX + verticalSpacing// Horizontal spacing
+                val endY = topOffset + index * (rootNodeSize.height) + (index* (rootNodeSize.height / 2)) // Consistent spacing
 
-            // Draw lines connecting the root to its children
-            childPositions.forEachIndexed { index, (childX, childY) ->
                 drawConnection(
-                    startX = centerX,
-                    startY = centerY,
-                    endX = childX,
-                    endY = childY
+                    startX = startX,
+                    startY = startY,
+                    endX = endX,
+                    endY = endY,
                 )
             }
         }
 
-        // Root node
-        Box(
-            modifier = Modifier
-                .align(Alignment.Center)
-        ) {
-            Cell(
-                text = rootText,
-                modifier = Modifier.align(Alignment.Center),
-            )
-        }
-
-        // Child nodes positioned in a circular layout
         rootNode.childNodes.forEachIndexed { index, childNode ->
-            val (childX, childY) = childPositions[index]
             val childText = fetchText(childNode) ?: "Child ${index + 1}"
-            val childSizePx = calculateCellSizePx(childText)
+            val gapFromRoot = 40.dp.toPx() // Gap between root and children
+            val translationX = paddingLeftPx + rootNodeSize.width + gapFromRoot // Horizontal spacing
+            val translationY = topOffset + index * (rootNodeSize.height + 20.dp.toPx())
 
             Box(
                 modifier = Modifier
                     .graphicsLayer(
-                        translationX = childX - (childSizePx / 2),
-                        translationY = childY - (childSizePx / 2)
+                        translationX = translationX,
+                        translationY = translationY,
                     )
             ) {
                 Cell(
@@ -99,6 +115,34 @@ fun MindMap(
             }
         }
     }
+}
+
+@Composable
+fun Dp.toPx(): Float {
+    return with(LocalDensity.current) { this@toPx.toPx() }
+}
+
+fun calculateCellSizePx(
+    text: String,
+): Float {
+    val textPaint = android.text.TextPaint().apply {
+        textSize = 16f
+    }
+    val textWidth = textPaint.measureText(text)
+    val padding = 32f // Padding in pixels
+    return textWidth + padding
+}
+
+fun calculateCellHeightPx(
+    text: String,
+    callback: (Float) -> Unit
+) {
+    val textPaint = android.text.TextPaint().apply {
+        textSize = 16f
+    }
+    val lineHeight = textPaint.fontMetrics.run { descent - ascent + leading }
+    val padding = 32f // Padding in pixels
+    callback(lineHeight + padding)
 }
 
 @Composable
@@ -128,42 +172,6 @@ fun Cell(
     }
 }
 
-@Composable fun calculateCellSizePx(
-    text: String,
-): Float {
-    val textPaint = android.text.TextPaint().apply {
-        textSize = 16.sp.toPx()
-    }
-    val textWidth = textPaint.measureText(text)
-    val padding = 32f // Padding in pixels
-    return textWidth + padding
-}
-
-@Composable fun TextUnit.toPx(): Float = with(LocalDensity.current) { this@toPx.toPx() }
-
-// Function to calculate circular positions for nodes
-fun calculateCircularPositions(
-    centerX: Float,
-    centerY: Float,
-    radius: Float,
-    count: Int,
-): List<Pair<Float, Float>> {
-    val positions = mutableListOf<Pair<Float, Float>>()
-    for (i in 0 until count) {
-        val angle = 2 * PI * i / count
-        val xOffset = (radius * cos(angle)).toFloat()
-        val yOffset = (radius * sin(angle)).toFloat()
-        val x = centerX + xOffset
-        val y = centerY + yOffset
-        positions.add(Pair(x, y))
-    }
-    return positions
-}
-
-@Composable //keep here, put in another module break preview
-fun Dp.toPx(): Float = with(LocalDensity.current) { this@toPx.toPx() }
-
-// Function to draw a connection between two points
 fun DrawScope.drawConnection(
     startX: Float,
     startY: Float,
@@ -190,5 +198,6 @@ fun PreviewMindMap() {
         fetchText = { node ->
             node.text
         },
+        paddingStart = 16.dp
     )
 }

@@ -3,6 +3,7 @@ package fr.julien.quievreux.droidplane2.di
 import fr.julien.quievreux.droidplane2.MainViewModel
 import fr.julien.quievreux.droidplane2.data.NodeManager
 import fr.julien.quievreux.droidplane2.core.extensions.default
+import fr.julien.quievreux.droidplane2.ui.view.MindMapViewModel
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import org.koin.core.module.dsl.viewModel
@@ -16,6 +17,12 @@ val appKoinModule = module {
     viewModel{
         MainViewModel(
             nodeManager = get(),
+            logger = get(),
+        )
+    }
+
+    viewModel{
+        MindMapViewModel(
             logger = get(),
         )
     }

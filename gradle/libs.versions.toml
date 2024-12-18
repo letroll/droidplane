@@ -3,6 +3,7 @@ activityCompose = "1.9.3"
 agp = "8.7.2"
 appcompat = "1.7.0"
 constraintlayout = "2.2.0"
+coreKtx = "1.15.0"
 espressoCore = "3.6.1"
 fontAwesome = "1.1.1"
 googleServices = "4.4.2"
@@ -16,12 +17,12 @@ kotlinGradlePlugin = "2.0.20"
 legacySupportV4 = "1.0.0"
 lifecycleExtensions = "2.2.0"
 lifecycleViewmodelKtx = "2.8.7"
-minSdkVersion = "21"
-targetSdkVersion = "35"
+material = "1.12.0"
+minSdkVersion = "26"# without view mindmap can be "21"
+mindMapView = "0.1.0"
 mockk = "1.13.13"
 tablerIcons = "1.1.1"
-coreKtx = "1.15.0"
-material = "1.12.0"
+targetSdkVersion = "35"
 turbine = "1.2.0"
 
 [libraries]
@@ -63,6 +64,7 @@ kotlin-gradle-plugin = { module = "org.jetbrains.kotlin:kotlin-gradle-plugin", v
 tabler-icons = { module = "br.com.devsrsouza.compose.icons:tabler-icons", version.ref = "tablerIcons" }
 junit = { group = "junit", name = "junit", version.ref = "junit" }
 material = { group = "com.google.android.material", name = "material", version.ref = "material" }
+mindmapview = { group = "com.github.hegleB", name = "MindMapView", version.ref = "mindMapView" }
 
 mockk = { group = "io.mockk", name = "mockk", version.ref = "mockk" }
 turbine = { group = "app.cash.turbine", name = "turbine", version.ref = "turbine" }

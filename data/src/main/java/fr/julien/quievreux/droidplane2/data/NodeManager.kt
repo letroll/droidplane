@@ -22,8 +22,9 @@ import kotlinx.coroutines.withContext
 import org.xmlpull.v1.XmlPullParser
 import org.xmlpull.v1.XmlPullParserFactory
 import org.xmlpull.v1.XmlSerializer
+import java.io.File
+import java.io.FileOutputStream
 import java.io.InputStream
-import java.io.OutputStream
 import java.util.Stack
 
 class NodeManager(
@@ -344,13 +345,16 @@ class NodeManager(
     }
 
     suspend fun serializeMindmap(
-        outputStream: OutputStream,
+        filePath:String,
+        filename:String,
         onError: (Exception) -> Unit,
-        onSaveFinished: (() -> Unit)? = null,
+        onSaveFinished: ((File) -> Unit)? = null,
     ) {
+        var file = File(filePath,filename)
         rootNode?.let { node ->
             try {
                 withContext(Dispatchers.IO) {
+                    val outputStream = FileOutputStream(file)
                     val factory = XmlPullParserFactory.newInstance()
                     val serializer = factory.newSerializer()
 
@@ -365,22 +369,58 @@ class NodeManager(
                         onError,
                     )
 
-                    // Iterate through nodes and serialize them
-//                val nodesByIdIndex = getNodeByIdIndex()
-//                nodesByIdIndex?.values?.forEach { node ->
-//                    serializeNode(serializer, node)
-//                }
-
                     serializer.endNodeTag(MAP)
                     serializer.endDocument()
 
                     outputStream.flush()
                     outputStream.close()
+
+                    replaceTextInLargeFile(
+                        filePath="$filePath/$filename",
+                        oldText = "<![CDATA[",
+                        newText = "",
+                        onError = onError,
+                    )
+                    replaceTextInLargeFile(
+                        filePath="$filePath/$filename",
+                        oldText = "]]>",
+                        newText = "",
+                        onError = onError,
+                    )
+                    file = File(filePath,filename)
                 }
             } catch (e: Exception) {
                 onError(e)
             }
-            onSaveFinished?.invoke()
+            onSaveFinished?.invoke(file)
+        }
+    }
+
+    private fun replaceTextInLargeFile(
+        filePath: String,
+        oldText: String,
+        newText: String,
+        onError: (Exception) -> Unit,
+    ) {
+        val file = File(filePath)
+        val tempFile = File("${file.parent}/tempfile.txt")
+
+        file.useLines { lines ->
+            tempFile.bufferedWriter().use { writer ->
+                lines.forEach { line ->
+                    // Remplacer le texte dans chaque ligne
+                    writer.write(line.replace(oldText, newText))
+                    writer.newLine()
+                }
+            }
+        }
+
+        // Remplacer l'ancien fichier par le fichier temporaire
+        if (file.delete()) {
+            tempFile.renameTo(file)
+            println("Texte remplacé avec succès !")
+        } else {
+            onError(Exception("Échec du remplacement du fichier !"))
         }
     }
 

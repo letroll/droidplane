@@ -31,8 +31,8 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.io.File
-import java.io.FileOutputStream
 import java.io.InputStream
+import java.io.OutputStream
 import java.util.Date
 
 /**
@@ -48,6 +48,7 @@ class MainViewModel(
 
     private var fileRegister: FileRegister? = null
     private var fileToSave: File? = null
+    private var nodeBeforeFileSave:Node? = null
 
     private fun setMindmapIsLoading(mindmapIsLoading: Boolean) {
         updateUiState {
@@ -541,22 +542,25 @@ show text from node manager:${nodeManager.getNodeByID(updatedNode.id)?.let { nod
 
     fun setMapUri(data: Uri?) = nodeManager.setMapUri(data)
 
-    fun saveFile() {
-        nodeManager.getMindmapFileName()?.let { filename ->
-            fileRegister?.let { register ->
-                val file = File(register.getfilesDir(), filename)
-                val outputStream = FileOutputStream(file)
-                viewModelScope.launch {
-                    nodeManager.serializeMindmap(
-                        outputStream,
-                        onError = {
-                            Log.e("toto", "error saving file:$it")
-                        },
-                        onSaveFinished = {
-                            fileToSave = file
-                            fileRegister?.registerFile(file)
-                        }
-                    )
+    fun launchSaveFile() {
+        nodeBeforeFileSave = nodeManager.rootNode
+        nodeBeforeFileSave?.let {
+            top()
+            nodeManager.getMindmapFileName()?.let { filename ->
+                fileRegister?.let { register ->
+                    viewModelScope.launch {
+                        nodeManager.serializeMindmap(
+                            filePath = register.getfilesDir(),
+                            filename = filename,
+                            onError = {
+                                Log.e("toto", "error saving file:$it")
+                            },
+                            onSaveFinished = { file ->
+                                fileToSave = file
+                                fileRegister?.registerFile(file)
+                            }
+                        )
+                    }
                 }
             }
         }
@@ -566,6 +570,16 @@ show text from node manager:${nodeManager.getNodeByID(updatedNode.id)?.let { nod
         this.fileRegister = fileRegister
     }
 
-    fun getFileToSave(): File? = fileToSave
+    fun saveFile(outputStream: OutputStream) {
+        fileToSave?.let { file ->
+            logger.e("Saving file ${file.name} content:${file.readText()}")
+            outputStream.write(file.readText().toByteArray())
+        }
+        nodeBeforeFileSave?.let {
+            onNodeClick(it)
+        }
+    }
+
+    fun getNameOfFileToSave(): String? = fileToSave?.name
 }
 

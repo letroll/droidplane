@@ -1,6 +1,5 @@
 package fr.julien.quievreux.droidplane2.ui.components
 
-import android.R
 import android.util.Log
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -37,6 +36,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
+import fr.julien.quievreux.droidplane2.R
 import fr.julien.quievreux.droidplane2.ui.theme.ContrastAwareReplyTheme
 
 /*
@@ -55,7 +55,9 @@ Usage :
  */
 @Composable
 fun CustomDialog(
+    titre: String,
     value: String,
+    canBeEmpty: Boolean = false,
     onDismiss: () -> Unit,
     setValue: (String) -> Unit,
 ) {
@@ -63,7 +65,9 @@ fun CustomDialog(
     val txtFieldError = remember { mutableStateOf("") }
     var txtField by remember { mutableStateOf(value) }
 
-    Dialog(onDismissRequest = { onDismiss() }) {
+    Dialog(onDismissRequest = {
+//        onDismiss()
+    }) {
         Surface(
             shape = RoundedCornerShape(16.dp),
             color = Color.White
@@ -79,7 +83,7 @@ fun CustomDialog(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
-                            text = "Set value",
+                            text = titre,
                             style = TextStyle(
                                 fontSize = 24.sp,
                                 fontFamily = FontFamily.Default,
@@ -89,7 +93,7 @@ fun CustomDialog(
                         Icon(
                             imageVector = Icons.Filled.Clear,
                             contentDescription = "",
-                            tint = colorResource(R.color.darker_gray),
+                            tint = colorResource(R.color.gray4),
                             modifier = Modifier
                                 .width(30.dp)
                                 .height(30.dp)
@@ -138,7 +142,7 @@ fun CustomDialog(
                     Box(modifier = Modifier.padding(40.dp, 0.dp, 40.dp, 0.dp)) {
                         Button(
                             onClick = {
-                                if (txtField.isEmpty()) {
+                                if (txtField.isEmpty() && !canBeEmpty) {
                                     txtFieldError.value = "Field can not be empty"
                                     return@Button
                                 }
@@ -163,7 +167,11 @@ fun CustomDialog(
 @Preview(showBackground = true)
 private fun CustomDialogPreview() {
     ContrastAwareReplyTheme {
-        CustomDialog(value = "", onDismiss = {}) {
+        CustomDialog(
+            titre = "titre",
+            value = "value",
+            onDismiss = {}
+        ) {
         }
     }
 }

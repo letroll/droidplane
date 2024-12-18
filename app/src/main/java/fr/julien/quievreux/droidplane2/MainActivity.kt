@@ -1,7 +1,6 @@
 package fr.julien.quievreux.droidplane2
 
 import android.annotation.SuppressLint
-import android.app.Activity
 import android.app.AlertDialog.Builder
 import android.content.ActivityNotFoundException
 import android.content.ClipData
@@ -17,7 +16,6 @@ import androidx.activity.SystemBarStyle
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -42,6 +40,8 @@ import fr.julien.quievreux.droidplane2.MainUiState.DialogType.Edit
 import fr.julien.quievreux.droidplane2.MainUiState.DialogType.None
 import fr.julien.quievreux.droidplane2.core.PermissionUtils.checkStoragePermissions
 import fr.julien.quievreux.droidplane2.core.PermissionUtils.requestForStoragePermissions
+import fr.julien.quievreux.droidplane2.core.extensions.getOpenFileLauncher
+import fr.julien.quievreux.droidplane2.core.extensions.getSaveFileLauncher
 import fr.julien.quievreux.droidplane2.core.log.Logger
 import fr.julien.quievreux.droidplane2.data.model.Node
 import fr.julien.quievreux.droidplane2.helper.FileRegister
@@ -63,8 +63,8 @@ import fr.julien.quievreux.droidplane2.ui.components.nodeList
 import fr.julien.quievreux.droidplane2.ui.theme.ContrastAwareReplyTheme
 import fr.julien.quievreux.droidplane2.ui.theme.primaryContainerLight
 import fr.julien.quievreux.droidplane2.ui.theme.primaryLight
+import fr.julien.quievreux.droidplane2.ui.view.MindMapViewModel
 import fr.julien.quievreux.droidplane2.ui.view.RichTextViewActivity
-import io.kotest.mpp.file
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import org.koin.android.ext.android.inject
@@ -83,34 +83,23 @@ import java.io.InputStream
 class MainActivity : FragmentActivity(), FileRegister {
 
     private val viewModel: MainViewModel by viewModel()
+    private val mindMapViewModel: MindMapViewModel by viewModel()
     private val logger by inject<Logger>()
     private val useNewView = false
 
     private val clipboardManager by lazy {
         getSystemService(CLIPBOARD_SERVICE) as ClipboardManager
     }
-    private val launcher = registerForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
-        uri?.let {
-            val openFileIntent = Intent(this, MainActivity::class.java)
-            openFileIntent.setData(uri)
-            openFileIntent.setAction(ACTION_OPEN_DOCUMENT)
-            startActivity(openFileIntent)
-        }
-    }
 
-    private val saveFileLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
-        if (result.resultCode == Activity.RESULT_OK) {
-            result.data?.data?.let { uri ->
-                contentResolver.openOutputStream(uri)?.use { outputStream ->
-                    viewModel.getFileToSave()?.let { file ->
-                        logger.e("Saving file ${file.name} content:${file.readText()}")
-                        outputStream.write(file.readText().toByteArray())
-                    }
+    private val openFileLauncher = getOpenFileLauncher()
 
-                }
+    private val saveFileLauncher = getSaveFileLauncher(
+        actionOnResultOk = { uri ->
+            contentResolver.openOutputStream(uri)?.use { outputStream ->
+                viewModel.saveFile(outputStream)
             }
         }
-    }
+    )
 
     @SuppressLint("RememberReturnType")
     public override fun onCreate(savedInstanceState: Bundle?) {
@@ -122,12 +111,11 @@ class MainActivity : FragmentActivity(), FileRegister {
             )
         )
         setContentView(R.layout.activity_main)
-
         viewModel.apply {
             viewModel.setFileRegister(this@MainActivity)
             if (isAnExternalMindMapEdit()) {
                 setMapUri(intent.data)
-            }else{
+            } else {
                 setMapUri(Uri.parse("android.resource://$packageName/raw/example.mm"))
             }
 
@@ -162,6 +150,7 @@ class MainActivity : FragmentActivity(), FileRegister {
                     None -> {}
                     is Edit -> {
                         CustomDialog(
+                            titre = stringResource(R.string.edit),
                             value = dialog.oldValue,
                             onDismiss = {
                                 viewModel.setDialogState(None)
@@ -194,11 +183,11 @@ class MainActivity : FragmentActivity(), FileRegister {
 
                                     Top -> viewModel.top()
 
-                                    Open -> openFile()
+                                    Open -> openFileLauncher.launch("*/*")
 
                                     Help -> showHelp()
 
-                                    Save -> viewModel.saveFile()
+                                    Save -> viewModel.launchSaveFile()
                                 }
                             },
                         )
@@ -219,6 +208,21 @@ class MainActivity : FragmentActivity(), FileRegister {
                                     rootNode = node,
                                     fetchText = viewModel::getNodeText,
                                 )
+//                                MindMap2(
+//                                    node = node,
+//                                    modifier = Modifier
+//                                        .fillMaxSize()
+//                                        .background(MaterialTheme.colorScheme.surfaceContainer)
+//                                        .padding(innerPadding),
+//                                    fetchText = viewModel::getNodeText,
+//                                    logger = logger,
+//                                    viewModel = mindMapViewModel,
+//                                )
+//                                    { nodeClicked,mindMapView ->
+//                                       createNode(nodeClicked)?.let {
+//
+//                            }
+//                                    }
                             } else {
                                 LazyColumn(
                                     modifier = Modifier
@@ -341,8 +345,6 @@ class MainActivity : FragmentActivity(), FileRegister {
         }
     }
 
-    private fun openFile() = launcher.launch("*/*")
-
     private fun getDocumentInputStream(isAnExternalMindMapEdit: Boolean): InputStream? {
         return if (isAnExternalMindMapEdit) {
             val uri = intent.data
@@ -365,7 +367,7 @@ class MainActivity : FragmentActivity(), FileRegister {
     }
 
     // determine whether we are started from the EDIT or VIEW intent, or whether we are started from the
-    // launcher started from ACTION_EDIT/VIEW intent
+// launcher started from ACTION_EDIT/VIEW intent
     private fun isAnExternalMindMapEdit(): Boolean = ACTION_EDIT == intent.action || ACTION_VIEW == intent.action || ACTION_OPEN_DOCUMENT == intent.action
 
     private fun showHelp() {
@@ -423,7 +425,7 @@ class MainActivity : FragmentActivity(), FileRegister {
             CREATE_FILE_REQUEST_CODE -> {
                 if (grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
                     // Permission granted, launch file saving intent
-                    viewModel.getFileToSave()?.name?.let { fileName ->
+                    viewModel.getNameOfFileToSave()?.let { fileName ->
                         launchFileSavingIntent(fileName)
                     }
 
@@ -435,11 +437,6 @@ class MainActivity : FragmentActivity(), FileRegister {
             else -> super.onRequestPermissionsResult(requestCode, permissions, grantResults)
         }
 
-    }
-
-    companion object {
-        const val INTENT_START_HELP: String = "fr.julien.quievreux.droidplane2.INTENT_START_HELP"
-        const val CREATE_FILE_REQUEST_CODE = 1
     }
 
     override fun registerFile(file: File) {
@@ -460,4 +457,8 @@ class MainActivity : FragmentActivity(), FileRegister {
 
     override fun getfilesDir(): String = filesDir.path
 
+    companion object {
+        const val INTENT_START_HELP: String = "fr.julien.quievreux.droidplane2.INTENT_START_HELP"
+        const val CREATE_FILE_REQUEST_CODE = 1
+    }
 }

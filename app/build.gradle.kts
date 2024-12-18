@@ -13,6 +13,7 @@ android {
 
     buildFeatures {
         compose = true
+        dataBinding = true
     }
     packaging {
         // Exclure le fichier en conflit de la dépendance 'kotlinx-coroutines-debug'
@@ -73,6 +74,9 @@ dependencies {
     implementation(libs.koin.compose)
     implementation(libs.koin.compose.viewmodel)
     implementation(libs.koin.compose.viewmodel.navigation)
+
+    implementation(libs.mindmapview)
+
     implementation(libs.turbine)
 
     // UI Tests

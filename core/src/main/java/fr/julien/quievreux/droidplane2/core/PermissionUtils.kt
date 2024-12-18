@@ -82,5 +82,5 @@ object PermissionUtils {
         }
     }
 
-    const val STORAGE_PERMISSION_CODE: Int = 23
+    private const val STORAGE_PERMISSION_CODE: Int = 23
 }

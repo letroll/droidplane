@@ -6,10 +6,10 @@ import fr.julien.quievreux.droidplane2.data.model.RichContentType
 object FakeDataSource {
 
     fun fakeNodeChildren(count: Int = 5): MutableList<Node> = mutableListOf(
-        fakeNode("Opening Files"),
-        fakeNode("Navigating"),
-        fakeNode("Editing"),
-        fakeNode("Test"),
+        fakeNode("Opening Files", childNodes = fakeNodeChildren(1)),
+        fakeNode("Navigating", childNodes = fakeNodeChildren(3)),
+        fakeNode("Editing", childNodes = fakeNodeChildren(2)),
+        fakeNode("Test", childNodes = fakeNodeChildren(4)),
     ).take(count).toMutableList()
 
     fun fakeNode(
