@@ -304,10 +304,6 @@ class NodeManager(
 
     fun getSearchResultCount() = searchManager.getSearchResult().value.size
 
-    companion object {
-        const val UNDEFINED_NODE_ID: Int = 2000000000
-    }
-
 //    fun generateNodeID(): String {
 //        var returnValue: String
 //        do {
@@ -437,10 +433,10 @@ class NodeManager(
             node.position?.let {
                 serializer.nodeAttribute(POSITION, it)
             }
-
-            if (node.richTextContents.isEmpty()) {
-                serializer.nodeAttribute(TEXT, getNodeText(node).orEmpty())
-            }else{
+            getNodeText(node)?.let { text ->
+                serializer.nodeAttribute(TEXT, text)
+            }
+            if (node.richTextContents.isNotEmpty()) {
                 serializer.startNodeTag(RICH_CONTENT)
                 serializer.nodeAttribute(TYPE, node.richContentType?.text.orEmpty())
                 node.richTextContents.forEach { richTextContent ->
@@ -502,5 +498,9 @@ class NodeManager(
         value: String,
     ){
         attribute(null, nodeAttribute.text, value)
+    }
+
+    companion object {
+        const val UNDEFINED_NODE_ID: Int = 2000000000
     }
 }

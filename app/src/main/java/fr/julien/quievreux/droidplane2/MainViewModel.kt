@@ -311,21 +311,21 @@ nodeFindList:${nodeManager.getSearchResult().map { getNodeText(it) }.joinToStrin
         // descent from the root node down to the target node
         for (mindmapNode in nodeHierarchy) {
             mindmapNode.isSelected = true
-            scrollTo(mindmapNode)
+//            scrollTo(mindmapNode)
             if ((mindmapNode != node || openLast) && mindmapNode.childNodes.size > 0) {
                 onNodeClick(mindmapNode)
             }
         }
     }
 
-    private fun scrollTo(node: Node) {
+//    private fun scrollTo(node: Node) {
         //TODO for column with a lot of elements
 //        if (nodeColumns.isEmpty()) {
 //            return
 //        }
 //        val lastCol = nodeColumns[nodeColumns.size - 1]
 //        lastCol.scrollTo(node)
-    }
+//    }
 
     fun top() {
         updateUiState {
@@ -543,7 +543,7 @@ show text from node manager:${nodeManager.getNodeByID(updatedNode.id)?.let { nod
     fun setMapUri(data: Uri?) = nodeManager.setMapUri(data)
 
     fun launchSaveFile() {
-        nodeBeforeFileSave = nodeManager.rootNode
+        nodeBeforeFileSave = _uiState.value.rootNode
         nodeBeforeFileSave?.let {
             top()
             nodeManager.getMindmapFileName()?.let { filename ->
