@@ -2,7 +2,6 @@ package fr.julien.quievreux.droidplane2.model
 
 import android.content.Context
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
@@ -18,8 +17,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.input.key.type
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -30,25 +27,17 @@ import compose.icons.fontawesomeicons.Solid
 import compose.icons.fontawesomeicons.regular.Square
 import compose.icons.fontawesomeicons.solid.ArrowLeft
 import compose.icons.fontawesomeicons.solid.ArrowUp
-import compose.icons.fontawesomeicons.solid.AudioDescription
-import compose.icons.fontawesomeicons.solid.Backward
 import compose.icons.fontawesomeicons.solid.Bookmark
-import compose.icons.fontawesomeicons.solid.Check
 import compose.icons.fontawesomeicons.solid.Edit
-import compose.icons.fontawesomeicons.solid.FileAudio
-import compose.icons.fontawesomeicons.solid.FileVideo
 import compose.icons.fontawesomeicons.solid.HatWizard
 import compose.icons.fontawesomeicons.solid.Image
 import compose.icons.fontawesomeicons.solid.Link
 import compose.icons.fontawesomeicons.solid.List
 import compose.icons.fontawesomeicons.solid.MailBulk
 import compose.icons.fontawesomeicons.solid.Paperclip
-import compose.icons.fontawesomeicons.solid.PhoneVolume
 import compose.icons.fontawesomeicons.solid.Plus
 import compose.icons.fontawesomeicons.solid.Redo
-import compose.icons.fontawesomeicons.solid.Square
 import compose.icons.fontawesomeicons.solid.Video
-import compose.icons.fontawesomeicons.solid.VideoSlash
 import compose.icons.fontawesomeicons.solid.VolumeUp
 import compose.icons.tablericons.Circle0
 import compose.icons.tablericons.Circle1
@@ -61,8 +50,6 @@ import compose.icons.tablericons.Circle7
 import compose.icons.tablericons.Circle8
 import compose.icons.tablericons.Circle9
 import fr.julien.quievreux.droidplane2.R
-import kotlin.io.path.name
-import kotlin.reflect.KProperty1
 
 enum class NodeIcons(
     val text: String,

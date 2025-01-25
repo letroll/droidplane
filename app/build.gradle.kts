@@ -13,7 +13,6 @@ android {
 
     buildFeatures {
         compose = true
-        dataBinding = true
     }
     packaging {
         // Exclure le fichier en conflit de la dépendance 'kotlinx-coroutines-debug'

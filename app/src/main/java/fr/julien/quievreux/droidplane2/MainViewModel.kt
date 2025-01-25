@@ -490,28 +490,9 @@ nodeFindList:${nodeManager.getSearchResult().map { getNodeText(it) }.joinToStrin
                 text = newValue,
             )
 
-            Log.e(
-                "toto", """
-show:${getNodeText(updatedNode)}
-modif: ${updatedNode.modificationDate?.let { DateUtils.formatDate(it) }.orEmpty()}
-        """.trimIndent()
-            )
-
             updateNodeInIndexes(updatedNode)
 
-
-            Log.e(
-                "toto", """
-show text from node manager:${nodeManager.getNodeByID(updatedNode.id)?.let { nodeManager.getNodeText(it) }}
-        """.trimIndent()
-            )
-
             var parentNodeToShow: Node? = null
-            //TODO modif root
-            //TODO preserve icon
-            //TODO preserve link
-            //TODO preserve format
-            //TODO etc, T.U.
 
             //update in parent also, if not the root, because it's what we show which is the list if(updatedNode.isRoot().not()){
             updatedNode.parentNode?.let { parentNode ->
@@ -553,7 +534,7 @@ show text from node manager:${nodeManager.getNodeByID(updatedNode.id)?.let { nod
                             filePath = register.getfilesDir(),
                             filename = filename,
                             onError = {
-                                Log.e("toto", "error saving file:$it")
+                                logger.e("error saving file:$it")
                             },
                             onSaveFinished = { file ->
                                 fileToSave = file

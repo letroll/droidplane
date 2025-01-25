@@ -19,6 +19,8 @@
     <string name="help">Help</string>
     <string name="save">Save</string>
     <string name="add">Add</string>
+    <string name="add_brother">Add brother</string>
+    <string name="add_child">Add child</string>
     <string name="title_activity_rich_text_view">Rich Text View</string>
     <string name="mindmap_loading">Loading</string>
     <string name="search">Search</string>
