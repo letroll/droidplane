@@ -69,7 +69,7 @@ class NodeManager(
      *
      * @param inputStream the inputStream to load
      */
-    fun loadMindMap(
+    suspend fun loadMindMap(
         inputStream: InputStream,
         onError: (Exception) -> Unit,
         onParentNodeUpdate: (Node) -> Unit,
@@ -139,7 +139,7 @@ class NodeManager(
                             }
 
                             else -> {
-                                logger.d("Received unknown node " + xpp.name)
+                                logger.w("Received unknown node " + xpp.name)
                             }
                         }
                     }

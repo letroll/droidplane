@@ -38,12 +38,12 @@ class XmlParseUtilsDefaultImpl(
     }
 
     override fun parseFont(xpp: XmlPullParser, nodeStack: Stack<Node>) {
-        val boldAttribute = xpp.getAttributeValue(null, NodeAttribute.BOLD.name)
 
         // if we have no parent node, something went seriously wrong - we can't have a font node that is not part of a viewModel node
         check(!nodeStack.empty()) { "Received richtext without a parent node" }
         val parentNode = nodeStack.peek()
 
+        val boldAttribute = xpp.getAttributeValue(null, NodeAttribute.BOLD.name)
         if (boldAttribute != null && boldAttribute == "true") {
             parentNode.isBold = true
         }

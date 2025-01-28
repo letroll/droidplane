@@ -11,6 +11,14 @@ class AndLogger : Logger {
         Log.e(tag, message)
     }
 
+    override fun w(message: String) {
+        Log.w("droidplane2", message)
+    }
+
+    override fun w(tag: String, message: String) {
+        Log.w(tag, message)
+    }
+
     override fun d(message: String) {
         Log.d("droidplane2", message)
     }
