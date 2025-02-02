@@ -70,7 +70,6 @@ import kotlinx.coroutines.launch
 import org.koin.android.ext.android.inject
 import org.koin.androidx.viewmodel.ext.android.viewModel
 import java.io.File
-import java.io.FileNotFoundException
 import java.io.InputStream
 
 /**
@@ -347,20 +346,7 @@ class MainActivity : FragmentActivity(), FileRegister {
 
     private fun getDocumentInputStream(isAnExternalMindMapEdit: Boolean): InputStream? {
         return if (isAnExternalMindMapEdit) {
-            val uri = intent.data
-            if (uri != null) {
-                val cr = contentResolver
-                try {
-                    cr.openInputStream(uri)
-                } catch (e: FileNotFoundException) {
-                    abortWithPopup(R.string.filenotfound)
-                    e.printStackTrace()
-                    null
-                }
-            } else {
-                abortWithPopup(R.string.novalidfile)
-                null
-            }
+            intent.data?.let { contentResolver.openInputStream(it) }
         } else {
             resources.openRawResource(R.raw.example)
         }

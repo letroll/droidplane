@@ -3,7 +3,6 @@ package fr.julien.quievreux.droidplane2
 import android.content.Intent
 import android.content.Intent.ACTION_VIEW
 import android.net.Uri
-import android.util.Log
 import android.webkit.MimeTypeMap
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -14,7 +13,6 @@ import fr.julien.quievreux.droidplane2.MainUiState.DialogUiState
 import fr.julien.quievreux.droidplane2.MainUiState.SearchUiState
 import fr.julien.quievreux.droidplane2.core.log.Logger
 import fr.julien.quievreux.droidplane2.data.NodeManager
-import fr.julien.quievreux.droidplane2.helper.DateUtils
 import fr.julien.quievreux.droidplane2.model.ContextMenuAction
 import fr.julien.quievreux.droidplane2.model.ContextMenuAction.CopyText
 import fr.julien.quievreux.droidplane2.model.ContextMenuAction.Edit
@@ -69,10 +67,11 @@ class MainViewModel(
     ) {
         setMindmapIsLoading(true)
         viewModelScope.launch {
-            nodeManager.loadMindMap(
+            nodeManager.loadMindMapFromInputStream(
                 inputStream = inputStream,
                 onLoadFinished = onLoadFinished,
                 onError = { exception ->
+                    logger.e("Error loading mind map:$exception")
                     updateUiState {
                         it.copy(
                             error = exception.message ?: "exception without message"//exception.stackTraceToString()

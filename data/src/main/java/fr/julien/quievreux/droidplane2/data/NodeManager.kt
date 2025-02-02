@@ -69,7 +69,7 @@ class NodeManager(
      *
      * @param inputStream the inputStream to load
      */
-    suspend fun loadMindMap(
+    fun loadMindMapFromInputStream(
         inputStream: InputStream,
         onError: (Exception) -> Unit,
         onParentNodeUpdate: (Node) -> Unit,
@@ -83,7 +83,7 @@ class NodeManager(
             xpp = factory.newPullParser()
             xpp.setInput(inputStream, "UTF-8")
             xpp?.let {
-                loadMindMap(
+                loadMindMapFromXml(
                     xpp = it,
                     onParentNodeUpdate = onParentNodeUpdate,
                     onReadFinish = onLoadFinished,
@@ -95,7 +95,7 @@ class NodeManager(
         }
     }
 
-    fun loadMindMap(
+    fun loadMindMapFromXml(
         xpp: XmlPullParser,
         onError: (Exception) -> Unit,
         onParentNodeUpdate: (Node) -> Unit,
@@ -113,35 +113,7 @@ class NodeManager(
                     }
 
                     XmlPullParser.START_TAG -> {
-                        when {
-                            xpp.name == NODE.text -> {
-                                parseNode(
-                                    nodeStack = nodeStack,
-                                    xpp = xpp,
-                                    onParentNodeUpdate = onParentNodeUpdate,
-                                )
-                            }
-
-                            xpp.isRichContent() -> {
-                                xmlParseUtils.parseRichContent(xpp, nodeStack)
-                            }
-
-                            xpp.name == Font.value -> {
-                                xmlParseUtils.parseFont(xpp, nodeStack)
-                            }
-
-                            xpp.name == Icon.value && xpp.getAttributeValue(null, "BUILTIN") != null -> {
-                                xmlParseUtils.parseIcon(xpp, nodeStack)
-                            }
-
-                            xpp.name == ArrowLink.value -> {
-                                xmlParseUtils.parseArrowLink(xpp, nodeStack)
-                            }
-
-                            else -> {
-                                logger.w("Received unknown node " + xpp.name)
-                            }
-                        }
+                        loadXmlTagNode(xpp, nodeStack, onParentNodeUpdate)
                     }
 
                     XmlPullParser.END_TAG -> {
@@ -177,6 +149,38 @@ class NodeManager(
             processMindMap()
         } catch (exception: Exception) {
             onError(exception)
+        }
+    }
+
+    private fun loadXmlTagNode(xpp: XmlPullParser, nodeStack: Stack<Node>, onParentNodeUpdate: (Node) -> Unit) {
+        when {
+            xpp.name == NODE.text -> {
+                parseNode(
+                    nodeStack = nodeStack,
+                    xpp = xpp,
+                    onParentNodeUpdate = onParentNodeUpdate,
+                )
+            }
+
+            xpp.isRichContent() -> {
+                xmlParseUtils.parseRichContent(xpp, nodeStack)
+            }
+
+            xpp.name == Font.value -> {
+                xmlParseUtils.parseFont(xpp, nodeStack)
+            }
+
+            xpp.name == Icon.value && xpp.getAttributeValue(null, "BUILTIN") != null -> {
+                xmlParseUtils.parseIcon(xpp, nodeStack)
+            }
+
+            xpp.name == ArrowLink.value -> {
+                xmlParseUtils.parseArrowLink(xpp, nodeStack)
+            }
+
+            else -> {
+                logger.w("Received unknown node " + xpp.name)
+            }
         }
     }
 
@@ -337,7 +341,7 @@ class NodeManager(
 
     fun setMapUri(data: Uri?) {
         currentMindMapUri = data
-        logger.e("uri:$currentMindMapUri")
+        logger.e("setMapUri uri:$currentMindMapUri")
     }
 
     suspend fun serializeMindmap(
@@ -346,11 +350,19 @@ class NodeManager(
         onError: (Exception) -> Unit,
         onSaveFinished: ((File) -> Unit)? = null,
     ) {
-        var file = File(filePath,filename)
+        if(isInvalidFilePath(filePath)) onError.invoke(
+            Exception("Invalid file path")
+        )
+
+        if(isInvalidFileName(filename)) onError.invoke(
+            Exception("Invalid file name")
+        )
+
+        var fileSaveDestination = File(filePath,filename)
         rootNode?.let { node ->
             try {
                 withContext(Dispatchers.IO) {
-                    val outputStream = FileOutputStream(file)
+                    val outputStream = FileOutputStream(fileSaveDestination)
                     val factory = XmlPullParserFactory.newInstance()
                     val serializer = factory.newSerializer()
 
@@ -383,14 +395,17 @@ class NodeManager(
                         newText = "",
                         onError = onError,
                     )
-                    file = File(filePath,filename)
                 }
             } catch (e: Exception) {
                 onError(e)
             }
-            onSaveFinished?.invoke(file)
+            onSaveFinished?.invoke(fileSaveDestination)
         }
     }
+
+    fun isInvalidFilePath(filePath: String): Boolean = filePath.isBlank() || !filePath.contains("/") || !filePath.startsWith("/")
+
+    fun isInvalidFileName(fileName: String): Boolean = fileName.isBlank() || !fileName.endsWith(".mm") || fileName == FILE_EXTENSION
 
     private fun replaceTextInLargeFile(
         filePath: String,
@@ -502,5 +517,6 @@ class NodeManager(
 
     companion object {
         const val UNDEFINED_NODE_ID: Int = 2000000000
+        const val FILE_EXTENSION = ".mm"
     }
 }

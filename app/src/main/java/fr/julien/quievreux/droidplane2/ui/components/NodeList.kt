@@ -300,13 +300,7 @@ fun NodeItem(
                     text = {
                         Text(text = item.text)
                     },
-//                    modifier = TODO(),
                     leadingIcon = { item.action?.let { GetLeadingIcon(it) } },
-//                    trailingIcon = TODO(),
-//                    enabled = TODO(),
-//                    colors = TODO(),
-//                    contentPadding = TODO(),
-//                    interactionSource = TODO()
                 )
             }
 

@@ -2,9 +2,11 @@ package fr.julien.quievreux.droidplane2.data
 
 import fr.julien.quievreux.droidplane2.core.log.Logger
 import fr.julien.quievreux.droidplane2.core.testutils.KStringSpec
+import fr.julien.quievreux.droidplane2.data.NodeManager.Companion.FILE_EXTENSION
 import fr.julien.quievreux.droidplane2.data.model.MindmapIndexes
 import fr.julien.quievreux.droidplane2.data.model.Node
 import fr.julien.quievreux.droidplane2.data.model.RichContent
+import io.kotest.matchers.should
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.shouldNotBe
 import io.mockk.coEvery
@@ -31,7 +33,7 @@ class NodeManagerTest : KStringSpec() {
             var possibleException: Exception? = null
             val nodeManager = initNodeManager()
             val job = launch {
-                nodeManager.loadMindMap(
+                nodeManager.loadMindMapFromXml(
                     xpp = fakeXmlPullParser,
                     onParentNodeUpdate = {},
                     onError = { exception ->
@@ -55,7 +57,7 @@ class NodeManagerTest : KStringSpec() {
             var finishWithProcessing = false
             val nodeManager = initNodeManager()
             val job = launch {
-                nodeManager.loadMindMap(
+                nodeManager.loadMindMapFromXml(
                     xpp = fakeXmlPullParser,
                     onParentNodeUpdate = {},
                     onError = { },
@@ -75,12 +77,11 @@ class NodeManagerTest : KStringSpec() {
             val fakeXmlPullParser: XmlPullParser = mockk(relaxed = true)
 //            coEvery { fakeXmlPullParser.eventType }.returns(XmlPullParser.END_TAG)
 //            coEvery { fakeXmlPullParser.next() }.returns(XmlPullParser.END_DOCUMENT)
-            coEvery { fakeXmlPullParser.getAttributeValue(any(),any()) }.returns(null)
-            coEvery { fakeXmlPullParser.getAttributeValue(any(),any()) }.returns(null)
+            coEvery { fakeXmlPullParser.getAttributeValue(any(), any()) }.returns(null)
 //            var finishWithProcessing = false
             val nodeManager = initNodeManager()
             val nodeStack = Stack<Node>()
-            var nodeResult : Node? = null
+            var nodeResult: Node? = null
             val job = launch {
                 nodeManager.parseNode(
                     nodeStack = nodeStack,
@@ -97,6 +98,133 @@ class NodeManagerTest : KStringSpec() {
             nodeResult shouldNotBe null
         }
 
+        "serialize a mindmap with incorrect destination" should {
+            val nodeManager = initNodeManager()
+            var possibleException: Exception? = null
+            val validFilePath = "/storage/"
+            val validFileName = "mindmap.mm"
+
+            "fail on empty filePath"{
+                val job = launch {
+                    nodeManager.serializeMindmap(
+                        filePath = "", filename = validFileName, onError = { exception ->
+                            possibleException = exception
+                        }, onSaveFinished = {}
+                    )
+                }
+
+                job.join()
+                job.cancel()
+
+                possibleException shouldNotBe null
+            }
+
+            "fail on blank filePath"{
+                val job = launch {
+                    nodeManager.serializeMindmap(
+                        filePath = "   ", filename = validFileName, onError = { exception ->
+                            possibleException = exception
+                        }, onSaveFinished = {}
+                    )
+                }
+
+                job.join()
+                job.cancel()
+
+                possibleException shouldNotBe null
+            }
+
+            "fail on filePath without path separator"{
+                val job = launch {
+                    nodeManager.serializeMindmap(
+                        filePath = "lkjqsdf", filename = validFileName, onError = { exception ->
+                            possibleException = exception
+                        }, onSaveFinished = {}
+                    )
+                }
+
+                job.join()
+                job.cancel()
+
+                possibleException shouldNotBe null
+            }
+
+            "fail on filePath not beginning with path separator"{
+                val job = launch {
+                    nodeManager.serializeMindmap(
+                        filePath = "lkjqsdf/", filename = validFileName, onError = { exception ->
+                            possibleException = exception
+                        }, onSaveFinished = {}
+                    )
+                }
+
+                job.join()
+                job.cancel()
+
+                possibleException shouldNotBe null
+            }
+
+            "fail on fileName empty"{
+                val job = launch {
+                    nodeManager.serializeMindmap(
+                        filePath = validFilePath, filename = "", onError = { exception ->
+                            possibleException = exception
+                        }, onSaveFinished = {}
+                    )
+                }
+
+                job.join()
+                job.cancel()
+
+                possibleException shouldNotBe null
+            }
+
+            "fail on fileName blank"{
+                val job = launch {
+                    nodeManager.serializeMindmap(
+                        filePath = validFilePath, filename = "    ", onError = { exception ->
+                            possibleException = exception
+                        }, onSaveFinished = {}
+                    )
+                }
+
+                job.join()
+                job.cancel()
+
+                possibleException shouldNotBe null
+            }
+
+            "fail on fileName without extension"{
+                val job = launch {
+                    nodeManager.serializeMindmap(
+                        filePath = validFilePath, filename = "filename", onError = { exception ->
+                            possibleException = exception
+                        }, onSaveFinished = {}
+                    )
+                }
+
+                job.join()
+                job.cancel()
+
+                possibleException shouldNotBe null
+            }
+
+            "fail on fileName with only an extension"{
+                val job = launch {
+                    nodeManager.serializeMindmap(
+                        filePath = validFilePath, filename = FILE_EXTENSION , onError = { exception ->
+                            possibleException = exception
+                        }, onSaveFinished = {}
+                    )
+                }
+
+                job.join()
+                job.cancel()
+
+                possibleException shouldNotBe null
+            }
+        }
+
         /*
          test idea:
          * "at end of parsing we should obtain a mindmap node"
@@ -107,33 +235,24 @@ class NodeManagerTest : KStringSpec() {
     }
 
     private fun initNodeManager(
-        nodeUtils:NodeUtils= NodeUtilsDefaultImpl(),
+        nodeUtils: NodeUtils = NodeUtilsDefaultImpl(),
         logger: Logger = mockk(relaxed = true),
     ): NodeManager {
         return NodeManager(
             logger = logger,
             nodeUtils = nodeUtils,
-            xmlParseUtils = XmlParseUtilsDefaultImpl(nodeUtils,logger),
+            xmlParseUtils = XmlParseUtilsDefaultImpl(nodeUtils, logger),
             coroutineScope = TestScope(),
         )
     }
 
-    private fun getFakeNodeUtils(): NodeUtils = object :NodeUtils{
-        override fun loadRichContent(xpp: XmlPullParser): Result<RichContent> {
-            TODO("Not yet implemented")
-        }
+    private fun getFakeNodeUtils(): NodeUtils = object : NodeUtils {
+        override fun loadRichContent(xpp: XmlPullParser): Result<RichContent> = Result.failure(Exception())
 
-        override fun fillArrowLinks(nodesById: Map<String, Node>?) {
-            TODO("Not yet implemented")
-        }
+        override fun fillArrowLinks(nodesById: Map<String, Node>?) {}
 
-        override fun loadAndIndexNodesByIds(root: Node?): MindmapIndexes {
-            TODO("Not yet implemented")
-        }
+        override fun loadAndIndexNodesByIds(root: Node?): MindmapIndexes = MindmapIndexes(emptyMap(), emptyMap())
 
-        override fun parseNodeTag(xpp: XmlPullParser, parentNode: Node?): Result<Node> {
-            TODO("Not yet implemented")
-        }
-
+        override fun parseNodeTag(xpp: XmlPullParser, parentNode: Node?): Result<Node> = Result.failure(Exception())
     }
 }
