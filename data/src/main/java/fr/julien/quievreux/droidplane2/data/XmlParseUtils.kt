@@ -11,12 +11,12 @@ interface XmlParseUtils {
     // if this is an empty tag, we won't need to bother trying to read its content
     // we don't even need to read the <richcontent> node's attributes, as we would
     // only be interested in it's children
-    fun parseRichContent(xpp: XmlPullParser, nodeStack: Stack<Node>)
+    fun parseRichContent(xpp: XmlPullParser, nodes: MutableList<Node>)
 
-    fun parseFont(xpp: XmlPullParser, nodeStack: Stack<Node>)
+    fun parseFont(xpp: XmlPullParser, nodes: MutableList<Node>)
 
-    fun parseArrowLink(xpp: XmlPullParser, nodeStack: Stack<Node>)
+    fun parseArrowLink(xpp: XmlPullParser, nodes: MutableList<Node>)
 
-    fun parseIcon(xpp: XmlPullParser, nodeStack: Stack<Node>)
+    fun parseIcon(xpp: XmlPullParser, nodes: MutableList<Node>)
 
 }

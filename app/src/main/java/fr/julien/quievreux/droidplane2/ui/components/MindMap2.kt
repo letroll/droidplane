@@ -280,6 +280,10 @@ private fun MindMap2Preview() {
 
         override fun e(tag: String, message: String) {}
 
+        override fun w(message: String) {}
+
+        override fun w(tag: String, message: String) {}
+
         override fun d(message: String) {}
 
         override fun d(tag: String, message: String) {}

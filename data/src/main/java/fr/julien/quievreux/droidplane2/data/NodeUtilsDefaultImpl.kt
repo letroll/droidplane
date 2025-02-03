@@ -9,7 +9,6 @@ import fr.julien.quievreux.droidplane2.data.model.NodeAttribute.*
 import fr.julien.quievreux.droidplane2.data.model.RichContent
 import fr.julien.quievreux.droidplane2.data.model.RichContentType
 import org.xmlpull.v1.XmlPullParser
-import java.util.Stack
 
 class NodeUtilsDefaultImpl : NodeUtils {
 
@@ -77,13 +76,14 @@ class NodeUtilsDefaultImpl : NodeUtils {
     override fun fillArrowLinks(nodesById: Map<String, Node>?) {
         nodesById?.let {
             for (nodeId in nodesById.keys) {
-                val mindmapNode = nodesById[nodeId]
-                mindmapNode?.arrowLinkDestinationIds?.let {
-                    for (linkDestinationId in it) {
-                        val destinationNode = nodesById[linkDestinationId]
-                        if (destinationNode != null) {
-                            mindmapNode.arrowLinkDestinationNodes.add(destinationNode)
-                            destinationNode.arrowLinkIncomingNodes.add(mindmapNode)
+                nodesById[nodeId]?.let { mindmapNode ->
+                    mindmapNode.arrowLinkDestinationIds?.let { nodeIds ->
+                        for (linkDestinationId in nodeIds) {
+                            val destinationNode = nodesById[linkDestinationId]
+                            if (destinationNode != null) {
+                                mindmapNode.arrowLinkDestinationNodes.add(destinationNode)
+                                destinationNode.arrowLinkIncomingNodes.add(mindmapNode)
+                            }
                         }
                     }
                 }
@@ -101,23 +101,23 @@ class NodeUtilsDefaultImpl : NodeUtils {
 
         // TODO: this causes us to load all viewModel nodes, defeating the lazy loading in.Node.getChildNodes
 
-        val stack = Stack<Node?>()
-        stack.push(root)
+        val nodes = mutableListOf<Node?>()
+        nodes.add(root)
 
         // try first to just extract all IDs and the respective node, and
         // only insert into the hashmap once we know the size of the hashmap
         val idAndNode: MutableList<Pair<String, Node>> = mutableListOf()
         val numericIdAndNode: MutableList<Pair<Int, Node>> = mutableListOf()
 
-        while (!stack.isEmpty()) {
-            val node = stack.pop()
+        while (!nodes.isEmpty()) {
+            val node = nodes.removeAt(nodes.size - 1)
 
             idAndNode.add(Pair(node?.id, node))
             node?.let {
                 numericIdAndNode.add(Pair(node.numericId, node))
 
                 for (mindmapNode in node.childNodes) {
-                    stack.push(mindmapNode)
+                    nodes.add(mindmapNode)
                 }
             }
 

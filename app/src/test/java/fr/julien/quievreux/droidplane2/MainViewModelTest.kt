@@ -19,10 +19,10 @@ class MainViewModelTest : KStringSpec() {
     init {
         coroutineTestScope = true
 
-        lateinit var mindMapStream: InputStream
+//        lateinit var mindMapStream: InputStream
 
         beforeSpec {
-            mindMapStream = FakeDataSource.mindMap.byteInputStream()
+//            mindMapStream = FakeDataSource.mindMap.byteInputStream()
         }
 
         "check default state" {
@@ -61,16 +61,9 @@ class MainViewModelTest : KStringSpec() {
     }
 
     private fun initMainViewModel(): MainViewModel {
-        val nodeUtils = NodeUtilsDefaultImpl()
+//        val nodeUtils = NodeUtilsDefaultImpl()
         val logger = mockk<Logger>(relaxed = true)
         return MainViewModel(
-            nodeManager = NodeManager(
-                logger = logger,
-                nodeUtils = nodeUtils,
-                xmlParseUtils = mockk(relaxed = true),
-                coroutineScope = Dispatchers.default()
-
-            ),
             logger = logger
         )
     }

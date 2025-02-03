@@ -25,7 +25,6 @@ import org.xmlpull.v1.XmlSerializer
 import java.io.File
 import java.io.FileOutputStream
 import java.io.InputStream
-import java.util.Stack
 
 class NodeManager(
     private val logger: Logger,
@@ -69,12 +68,13 @@ class NodeManager(
      *
      * @param inputStream the inputStream to load
      */
-    fun loadMindMapFromInputStream(
+    suspend fun loadMindMapFromInputStream(
         inputStream: InputStream,
         onError: (Exception) -> Unit,
         onParentNodeUpdate: (Node) -> Unit,
         onLoadFinished: (() -> Unit)? = null,
     ) {
+        logger.e("loadMindMapFromInputStream")
         val xpp: XmlPullParser?
         try {
             // set up XML pull parsing
@@ -101,8 +101,9 @@ class NodeManager(
         onParentNodeUpdate: (Node) -> Unit,
         onReadFinish: (() -> Unit)? = null,
     ) {
+        logger.e("loadMindMapFromXml")
         try {
-            val nodeStack = Stack<Node>()
+            val nodes = mutableListOf<Node>()
             var eventType = xpp.eventType
             var hasStartDocument = false
             while (eventType != XmlPullParser.END_DOCUMENT) {
@@ -113,7 +114,7 @@ class NodeManager(
                     }
 
                     XmlPullParser.START_TAG -> {
-                        loadXmlTagNode(xpp, nodeStack, onParentNodeUpdate)
+                        loadXmlTagNode(xpp, nodes, onParentNodeUpdate)
                     }
 
                     XmlPullParser.END_TAG -> {
@@ -121,7 +122,7 @@ class NodeManager(
                             onError(Exception("Received END_DOCUMENT without START_DOCUMENT"))
                         }
                         if (xpp.name == "node") {
-                            nodeStack.pop()
+                            nodes.removeAt(nodes.size - 1)
                         }
                     }
 
@@ -138,7 +139,7 @@ class NodeManager(
             }
 
             // stack should now be empty
-            if (!nodeStack.empty()) {
+            if (!nodes.isEmpty()) {
                 onError(Exception("Stack should be empty"))
                 // TODO: we could try to be lenient here to allow opening partial documents
                 //  (which sometimes happens when dropbox doesn't fully sync).
@@ -152,34 +153,34 @@ class NodeManager(
         }
     }
 
-    private fun loadXmlTagNode(xpp: XmlPullParser, nodeStack: Stack<Node>, onParentNodeUpdate: (Node) -> Unit) {
+    private fun loadXmlTagNode(xpp: XmlPullParser, nodes: MutableList<Node>, onParentNodeUpdate: (Node) -> Unit) {
         when {
             xpp.name == NODE.text -> {
                 parseNode(
-                    nodeStack = nodeStack,
+                    nodes = nodes,
                     xpp = xpp,
                     onParentNodeUpdate = onParentNodeUpdate,
                 )
             }
 
             xpp.isRichContent() -> {
-                xmlParseUtils.parseRichContent(xpp, nodeStack)
+                xmlParseUtils.parseRichContent(xpp, nodes)
             }
 
             xpp.name == Font.value -> {
-                xmlParseUtils.parseFont(xpp, nodeStack)
+                xmlParseUtils.parseFont(xpp, nodes)
             }
 
             xpp.name == Icon.value && xpp.getAttributeValue(null, "BUILTIN") != null -> {
-                xmlParseUtils.parseIcon(xpp, nodeStack)
+                xmlParseUtils.parseIcon(xpp, nodes)
             }
 
             xpp.name == ArrowLink.value -> {
-                xmlParseUtils.parseArrowLink(xpp, nodeStack)
+                xmlParseUtils.parseArrowLink(xpp, nodes)
             }
 
             else -> {
-                logger.w("Received unknown node " + xpp.name)
+//                logger.w("Received unknown node " + xpp.name)
             }
         }
     }
@@ -195,15 +196,15 @@ class NodeManager(
     }
 
     fun parseNode(
-        nodeStack: Stack<Node>,
+        nodes: MutableList<Node>,
         xpp: XmlPullParser,
         onParentNodeUpdate: (Node) -> Unit,
     ) {
-        val parentNode: Node? = getParentFromStack(nodeStack)
+        val parentNode: Node? = getParentFromStack(nodes)
 
         nodeUtils.parseNodeTag(xpp, parentNode)
             .onSuccess { newMindmapNode ->
-                nodeStack.push(newMindmapNode)
+                nodes.add(newMindmapNode)
 
                 // if we don't have a parent node, then this is the root node
                 if (parentNode == null) {
@@ -259,10 +260,10 @@ class NodeManager(
         }
     }
 
-    private fun getParentFromStack(nodeStack: Stack<Node>): Node? {
+    private fun getParentFromStack(nodes: MutableList<Node>): Node? {
         var parentNode: Node? = null
-        if (!nodeStack.empty()) {
-            parentNode = nodeStack.peek()
+        if (!nodes.isEmpty()) {
+            parentNode = nodes.last()
         }
         return parentNode
     }

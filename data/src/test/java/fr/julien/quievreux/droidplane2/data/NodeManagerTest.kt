@@ -14,7 +14,6 @@ import io.mockk.mockk
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.TestScope
 import org.xmlpull.v1.XmlPullParser
-import java.util.Stack
 
 class NodeManagerTest : KStringSpec() {
 
@@ -80,11 +79,11 @@ class NodeManagerTest : KStringSpec() {
             coEvery { fakeXmlPullParser.getAttributeValue(any(), any()) }.returns(null)
 //            var finishWithProcessing = false
             val nodeManager = initNodeManager()
-            val nodeStack = Stack<Node>()
+            val nodes = mutableListOf<Node>()
             var nodeResult: Node? = null
             val job = launch {
                 nodeManager.parseNode(
-                    nodeStack = nodeStack,
+                    nodes = nodes,
                     xpp = fakeXmlPullParser,
                     onParentNodeUpdate = { result ->
                         nodeResult = result

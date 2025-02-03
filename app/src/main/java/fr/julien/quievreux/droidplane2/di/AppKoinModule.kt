@@ -16,7 +16,6 @@ val appKoinModule = module {
 
     viewModel{
         MainViewModel(
-            nodeManager = get(),
             logger = get(),
         )
     }
@@ -36,12 +35,14 @@ val appKoinModule = module {
 //        )
 //    }
 
-    single {
-         NodeManager(
-            coroutineScope = get(),
-            logger = get(),
-            nodeUtils = get(),
-            xmlParseUtils = get(),
-        )
+    scope<MainViewModel> {
+        scoped { parametersHolder ->
+            NodeManager(
+                coroutineScope = get(),
+                logger = get(),
+                nodeUtils = get(),
+                xmlParseUtils = get(),
+            )
+        }
     }
 }

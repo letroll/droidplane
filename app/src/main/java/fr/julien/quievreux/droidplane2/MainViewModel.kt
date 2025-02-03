@@ -3,6 +3,7 @@ package fr.julien.quievreux.droidplane2
 import android.content.Intent
 import android.content.Intent.ACTION_VIEW
 import android.net.Uri
+import android.util.Log
 import android.webkit.MimeTypeMap
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -24,10 +25,16 @@ import fr.julien.quievreux.droidplane2.helper.FileRegister
 import fr.julien.quievreux.droidplane2.model.ContentNodeType
 import fr.julien.quievreux.droidplane2.model.ViewIntentNode
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import org.koin.core.component.KoinScopeComponent
+import org.koin.core.component.createScope
+import org.koin.core.component.inject
+import org.koin.core.parameter.parametersOf
+import org.koin.core.scope.Scope
 import java.io.File
 import java.io.InputStream
 import java.io.OutputStream
@@ -37,16 +44,25 @@ import java.util.Date
  * MainViewModel handles the loading and storing of a mind map document.
  */
 class MainViewModel(
-    val nodeManager: NodeManager,
     val logger: Logger,
-) : ViewModel(viewModelScope = nodeManager.coroutineScope) {
+) : ViewModel(), KoinScopeComponent {
+
+    override val scope: Scope by lazy { createScope(this) }
 
     private val _uiState: MutableStateFlow<MainUiState> = MutableStateFlow(MainUiState())
     val uiState: StateFlow<MainUiState> = _uiState
 
+    private val nodeManager: NodeManager by inject {
+        parametersOf(viewModelScope)
+    }
     private var fileRegister: FileRegister? = null
     private var fileToSave: File? = null
     private var nodeBeforeFileSave:Node? = null
+
+    override fun onCleared() {
+        super.onCleared()
+        scope.close()
+    }
 
     private fun setMindmapIsLoading(mindmapIsLoading: Boolean) {
         updateUiState {
@@ -66,22 +82,27 @@ class MainViewModel(
         onLoadFinished: (() -> Unit)? = null,
     ) {
         setMindmapIsLoading(true)
-        viewModelScope.launch {
-            nodeManager.loadMindMapFromInputStream(
-                inputStream = inputStream,
-                onLoadFinished = onLoadFinished,
-                onError = { exception ->
-                    logger.e("Error loading mind map:$exception")
-                    updateUiState {
-                        it.copy(
-                            error = exception.message ?: "exception without message"//exception.stackTraceToString()
-                        )
+        try {
+            viewModelScope.launch {
+                nodeManager.loadMindMapFromInputStream(
+                    inputStream = inputStream,
+                    onLoadFinished = onLoadFinished,
+                    onError = { exception ->
+                        logger.e("Error loading mind map:$exception")
+                        updateUiState {
+                            it.copy(
+                                error = exception.message ?: "exception without message"//exception.stackTraceToString()
+                            )
+                        }
+                    },
+                    onParentNodeUpdate = { parentNode ->
+                        logger.e("loadMindMap onParentNodeUpdate")
+                        updateParentNode(parentNode)
                     }
-                },
-                onParentNodeUpdate = { parentNode ->
-                    updateParentNode(parentNode)
-                }
-            )
+                )
+            }
+        }catch (exception:Exception){
+            logger.e("loadMindMap exc")
         }
         setMindmapIsLoading(false)
     }

@@ -52,7 +52,7 @@ data class Node(
 
     val arrowLinks: List<Node>
         get() {
-            val combinedArrowLists = ArrayList<Node>()
+            val combinedArrowLists = mutableListOf<Node>()
             combinedArrowLists.addAll(arrowLinkDestinationNodes)
             combinedArrowLists.addAll(arrowLinkIncomingNodes)
             return combinedArrowLists

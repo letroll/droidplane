@@ -1,7 +1,6 @@
 package fr.julien.quievreux.droidplane2
 
 import android.annotation.SuppressLint
-import android.app.AlertDialog.Builder
 import android.content.ActivityNotFoundException
 import android.content.ClipData
 import android.content.ClipboardManager
@@ -36,6 +35,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.res.stringResource
 import androidx.fragment.app.FragmentActivity
+import androidx.lifecycle.lifecycleScope
 import fr.julien.quievreux.droidplane2.MainUiState.DialogType.Edit
 import fr.julien.quievreux.droidplane2.MainUiState.DialogType.None
 import fr.julien.quievreux.droidplane2.core.PermissionUtils.checkStoragePermissions
@@ -63,7 +63,6 @@ import fr.julien.quievreux.droidplane2.ui.components.nodeList
 import fr.julien.quievreux.droidplane2.ui.theme.ContrastAwareReplyTheme
 import fr.julien.quievreux.droidplane2.ui.theme.primaryContainerLight
 import fr.julien.quievreux.droidplane2.ui.theme.primaryLight
-import fr.julien.quievreux.droidplane2.ui.view.MindMapViewModel
 import fr.julien.quievreux.droidplane2.ui.view.RichTextViewActivity
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
@@ -82,7 +81,6 @@ import java.io.InputStream
 class MainActivity : FragmentActivity(), FileRegister {
 
     private val viewModel: MainViewModel by viewModel()
-    private val mindMapViewModel: MindMapViewModel by viewModel()
     private val logger by inject<Logger>()
     private val useNewView = false
 
@@ -110,16 +108,6 @@ class MainActivity : FragmentActivity(), FileRegister {
             )
         )
         setContentView(R.layout.activity_main)
-        viewModel.apply {
-            viewModel.setFileRegister(this@MainActivity)
-            if (isAnExternalMindMapEdit()) {
-                setMapUri(intent.data)
-            } else {
-                setMapUri(Uri.parse("android.resource://$packageName/raw/example.mm"))
-            }
-
-            getDocumentInputStream(isAnExternalMindMapEdit())?.let { loadMindMap(it) }
-        }
         setContent {
             val scope = rememberCoroutineScope()
             val snackbarHostState = remember { SnackbarHostState() }
@@ -250,6 +238,20 @@ class MainActivity : FragmentActivity(), FileRegister {
                 )
             }
         }
+
+        viewModel.apply {
+            setFileRegister(this@MainActivity)
+            if (isAnExternalMindMapEdit()) {
+                setMapUri(intent.data)
+            } else {
+                setMapUri(Uri.parse("android.resource://$packageName/raw/example.mm"))
+            }
+
+            lifecycleScope.launch {
+                logger.e("lifecycleScope")
+                getDocumentInputStream(isAnExternalMindMapEdit())?.let { loadMindMap(it) }
+            }
+        }
     }
 
     private fun onViewIntent(
@@ -365,21 +367,6 @@ class MainActivity : FragmentActivity(), FileRegister {
     private fun updateClipboard(text: String) {
         val clipData = ClipData.newPlainText("node", text)
         clipboardManager.setPrimaryClip(clipData)
-    }
-
-    /**
-     * Shows a popup with an error message and then closes the application
-     *
-     * @param stringResourceId
-     */
-    private fun abortWithPopup(stringResourceId: Int) {
-        val builder = Builder(this)
-        builder.setMessage(stringResourceId)
-        builder.setCancelable(true)
-        builder.setPositiveButton(R.string.ok) { _, _ -> finish() }
-
-        val alert = builder.create()
-        alert.show()
     }
 
     private fun openRichText(
