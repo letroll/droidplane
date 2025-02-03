@@ -2,6 +2,8 @@ plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
     alias(libs.plugins.compose.compiler)
+    alias(libs.plugins.google.services)
+    alias(libs.plugins.firebase.crashlytics)
 }
 
 android {
@@ -55,6 +57,7 @@ dependencies {
     implementation(project(":core"))
     implementation(project(":data"))
 
+    //jetpack compose
     val composeBom = platform("androidx.compose:compose-bom:2024.09.03")
     implementation(composeBom)
     testImplementation(composeBom)
@@ -67,6 +70,7 @@ dependencies {
     implementation(libs.font.awesome)
     implementation(libs.tabler.icons)
 
+    //koin
     implementation(project.dependencies.platform(libs.koin.bom))
     implementation(libs.koin.android)
     implementation(libs.koin.core)
@@ -77,6 +81,12 @@ dependencies {
     implementation(libs.mindmapview)
 
     implementation(libs.turbine)
+
+    //firebase
+    implementation(platform(libs.firebase.bom))
+    implementation(libs.firebase.crashlytics)
+    implementation(libs.firebase.analytics)
+
 
     // UI Tests
     androidTestImplementation(libs.androidx.ui.test.junit4)

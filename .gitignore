@@ -63,3 +63,5 @@ Thumbs.db
 /.idea/.gitignore
 /.idea/droidplane.iml
 /.idea/modules/app/droidplane2.app.iml
+
+/app/google-services.json
