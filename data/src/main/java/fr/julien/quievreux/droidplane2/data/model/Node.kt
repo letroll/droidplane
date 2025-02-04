@@ -40,6 +40,28 @@ data class Node(
     val arrowLinkIncomingNodes: MutableList<Node> = mutableListOf(),
 ) {
 
+    override fun equals(other: Any?): Boolean {
+        if (this === other) return true
+        if (other !is Node) return false
+
+        if (id != other.id) return false
+        if (text != other.text) return false
+        //!\\
+        /*
+            Do not compare childNodes or if needed, with only their id and maybe their modification date!
+            When StateFlow compares the new list of Node objects with the old list, it calls ArrayList.equals()
+            => Comparing lists of nodes recursively => stackOverflow
+         */
+
+        return true
+    }
+
+    override fun hashCode(): Int {
+        var result = id.hashCode()
+        result = 31 * result + text.hashCode()
+        return result
+    }
+
     fun isClone() = treeIdAttribute != null && treeIdAttribute != ""
 
     fun addRichContent(

@@ -19,6 +19,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarDuration.Indefinite
@@ -43,6 +45,7 @@ import fr.julien.quievreux.droidplane2.core.PermissionUtils.requestForStoragePer
 import fr.julien.quievreux.droidplane2.core.extensions.getOpenFileLauncher
 import fr.julien.quievreux.droidplane2.core.extensions.getSaveFileLauncher
 import fr.julien.quievreux.droidplane2.core.log.Logger
+import fr.julien.quievreux.droidplane2.core.ui.component.AppFloatingActionButton
 import fr.julien.quievreux.droidplane2.data.model.Node
 import fr.julien.quievreux.droidplane2.helper.FileRegister
 import fr.julien.quievreux.droidplane2.model.ContentNodeType.Classic
@@ -183,7 +186,15 @@ class MainActivity : FragmentActivity(), FileRegister {
                     snackbarHost = {
                         SnackbarHost(hostState = snackbarHostState)
                     },
-                    //                    floatingActionButton = {},
+                    floatingActionButton = {
+                        AppFloatingActionButton(
+                            onClick = {
+
+                            },
+                            iconContentDsc = "Add",
+                            icon = Icons.Filled.Add
+                        )
+                    },
                     //                    floatingActionButtonPosition =,
                     //                    containerColor =,
                     //                    contentColor =,

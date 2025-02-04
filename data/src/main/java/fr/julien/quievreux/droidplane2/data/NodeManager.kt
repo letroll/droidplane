@@ -384,16 +384,9 @@ class NodeManager(
                     outputStream.flush()
                     outputStream.close()
 
-                    replaceTextInLargeFile(
+                    removeTextInLargeFile(
                         filePath="$filePath/$filename",
-                        oldText = "<![CDATA[",
-                        newText = "",
-                        onError = onError,
-                    )
-                    replaceTextInLargeFile(
-                        filePath="$filePath/$filename",
-                        oldText = "]]>",
-                        newText = "",
+                        textToRemove = arrayOf("<![CDATA[", "]]>"),
                         onError = onError,
                     )
                 }
@@ -408,31 +401,49 @@ class NodeManager(
 
     fun isInvalidFileName(fileName: String): Boolean = fileName.isBlank() || !fileName.endsWith(".mm") || fileName == FILE_EXTENSION
 
+    private fun removeTextInLargeFile(
+        filePath: String,
+        onError: (Exception) -> Unit,
+        vararg textToRemove: String,
+    ) {
+       replaceTextInLargeFile(
+           filePath = filePath,
+           replacements = textToRemove.associate { it to "" },
+           onError = onError,
+       )
+    }
+
     private fun replaceTextInLargeFile(
         filePath: String,
-        oldText: String,
-        newText: String,
+        replacements: Map<String, String>,  // Map of oldText to newText
         onError: (Exception) -> Unit,
     ) {
         val file = File(filePath)
         val tempFile = File("${file.parent}/tempfile.txt")
 
-        file.useLines { lines ->
-            tempFile.bufferedWriter().use { writer ->
-                lines.forEach { line ->
-                    // Remplacer le texte dans chaque ligne
-                    writer.write(line.replace(oldText, newText))
-                    writer.newLine()
+        try {
+            file.useLines { lines ->
+                tempFile.bufferedWriter().use { writer ->
+                    lines.forEach { line ->
+                        var modifiedLine = line
+                        // Appliquer tous les remplacements en une seule fois
+                        replacements.forEach { (oldText, newText) ->
+                            modifiedLine = modifiedLine.replace(oldText, newText)
+                        }
+                        writer.write(modifiedLine)
+                        writer.newLine()
+                    }
                 }
             }
-        }
 
-        // Remplacer l'ancien fichier par le fichier temporaire
-        if (file.delete()) {
-            tempFile.renameTo(file)
-            println("Texte remplacé avec succès !")
-        } else {
-            onError(Exception("Échec du remplacement du fichier !"))
+            // Remplacer l'ancien fichier par le fichier temporaire
+            if (file.delete()) {
+                tempFile.renameTo(file)
+            } else {
+                onError(Exception("Échec du remplacement du fichier !"))
+            }
+        } catch (e: Exception) {
+            onError(e)
         }
     }
 
