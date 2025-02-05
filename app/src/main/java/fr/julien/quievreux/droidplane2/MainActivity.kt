@@ -38,7 +38,8 @@ import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.res.stringResource
 import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.lifecycleScope
-import fr.julien.quievreux.droidplane2.MainUiState.DialogType.Edit
+import fr.julien.quievreux.droidplane2.MainUiState.DialogType.CreateNode
+import fr.julien.quievreux.droidplane2.MainUiState.DialogType.EditNodeDescription
 import fr.julien.quievreux.droidplane2.MainUiState.DialogType.None
 import fr.julien.quievreux.droidplane2.core.PermissionUtils.checkStoragePermissions
 import fr.julien.quievreux.droidplane2.core.PermissionUtils.requestForStoragePermissions
@@ -60,7 +61,7 @@ import fr.julien.quievreux.droidplane2.ui.components.AppTopBarAction.SearchNext
 import fr.julien.quievreux.droidplane2.ui.components.AppTopBarAction.SearchPrevious
 import fr.julien.quievreux.droidplane2.ui.components.AppTopBarAction.Top
 import fr.julien.quievreux.droidplane2.ui.components.AppTopBarAction.Up
-import fr.julien.quievreux.droidplane2.ui.components.CustomDialog
+import fr.julien.quievreux.droidplane2.core.ui.component.CustomDialog
 import fr.julien.quievreux.droidplane2.ui.components.MindMap
 import fr.julien.quievreux.droidplane2.ui.components.nodeList
 import fr.julien.quievreux.droidplane2.ui.theme.ContrastAwareReplyTheme
@@ -138,7 +139,7 @@ class MainActivity : FragmentActivity(), FileRegister {
 
                 when (val dialog = state.value.dialogUiState.dialogType) {
                     None -> {}
-                    is Edit -> {
+                    is EditNodeDescription -> {
                         CustomDialog(
                             titre = stringResource(R.string.edit),
                             value = dialog.oldValue,
@@ -147,6 +148,17 @@ class MainActivity : FragmentActivity(), FileRegister {
                             }
                         ) { newValue ->
                             viewModel.updateNodeText(dialog.node, newValue)
+                        }
+                    }
+                    CreateNode -> {
+                        CustomDialog(
+                            titre = stringResource(R.string.add_child),
+                            value = "",
+                            onDismiss = {
+                                viewModel.setDialogState(None)
+                            }
+                        ) { newValue ->
+                            viewModel.addNode(newValue)
                         }
                     }
                 }
@@ -189,7 +201,7 @@ class MainActivity : FragmentActivity(), FileRegister {
                     floatingActionButton = {
                         AppFloatingActionButton(
                             onClick = {
-
+                                viewModel.setDialogState(CreateNode)
                             },
                             iconContentDsc = "Add",
                             icon = Icons.Filled.Add

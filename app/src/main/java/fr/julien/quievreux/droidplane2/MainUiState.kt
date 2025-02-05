@@ -33,10 +33,12 @@ data class MainUiState(
 
     sealed class DialogType{
         data object None:DialogType()
-        data class Edit(
+        data class EditNodeDescription(
             val node: Node,
             val oldValue: String,
         ):DialogType()
+
+        data object CreateNode:DialogType()
     }
 
 }

@@ -139,7 +139,7 @@ class NodeManager(
             }
 
             // stack should now be empty
-            if (!nodes.isEmpty()) {
+            if (nodes.isNotEmpty()) {
                 onError(Exception("Stack should be empty"))
                 // TODO: we could try to be lenient here to allow opening partial documents
                 //  (which sometimes happens when dropbox doesn't fully sync).
@@ -171,7 +171,7 @@ class NodeManager(
                 xmlParseUtils.parseFont(xpp, nodes)
             }
 
-            xpp.name == Icon.value && xpp.getAttributeValue(null, "BUILTIN") != null -> {
+            xpp.isIcon() -> {
                 xmlParseUtils.parseIcon(xpp, nodes)
             }
 
@@ -211,14 +211,14 @@ class NodeManager(
                     onParentNodeUpdate(newMindmapNode)
                     updateNodeInstances(newMindmapNode)
                 } else {
-                    addChild(parentNode, newMindmapNode)
+                    addChildIntoParent(parentNode, newMindmapNode)
                 }
             }.onFailure {
                 logger.e("Failed to parse node:$it")
             }
     }
 
-    private fun addChild(parentNode: Node, newMindmapNode: Node) {
+    private fun addChildIntoParent(parentNode: Node, newMindmapNode: Node) {
         //TODO change to immutable list
         parentNode.addChildMindmapNode(newMindmapNode)
         //            parentNode = parentNode.copy(
@@ -359,7 +359,7 @@ class NodeManager(
             Exception("Invalid file name")
         )
 
-        var fileSaveDestination = File(filePath,filename)
+        val fileSaveDestination = File(filePath,filename)
         rootNode?.let { node ->
             try {
                 withContext(Dispatchers.IO) {
@@ -525,6 +525,10 @@ class NodeManager(
         value: String,
     ){
         attribute(null, nodeAttribute.text, value)
+    }
+
+    fun addNode(newValue: String) {
+
     }
 
     companion object {

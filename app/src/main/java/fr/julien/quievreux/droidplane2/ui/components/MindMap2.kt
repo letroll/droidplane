@@ -33,6 +33,7 @@ import com.mindsync.library.data.Tree
 import com.mindsync.library.util.Dp
 import fr.julien.quievreux.droidplane2.R
 import fr.julien.quievreux.droidplane2.core.log.Logger
+import fr.julien.quievreux.droidplane2.core.ui.component.CustomDialog
 import fr.julien.quievreux.droidplane2.data.FakeDataSource
 import fr.julien.quievreux.droidplane2.data.model.Node
 import fr.julien.quievreux.droidplane2.ui.model.Circle
@@ -40,7 +41,6 @@ import fr.julien.quievreux.droidplane2.ui.model.CircleNode
 import fr.julien.quievreux.droidplane2.ui.model.Dot
 import fr.julien.quievreux.droidplane2.ui.model.RectangleNode
 import fr.julien.quievreux.droidplane2.ui.theme.ContrastAwareReplyTheme
-import fr.julien.quievreux.droidplane2.ui.view.MindMapUiState.DialogType
 import fr.julien.quievreux.droidplane2.ui.view.MindMapUiState.DialogType.*
 import fr.julien.quievreux.droidplane2.ui.view.MindMapViewModel
 import fr.julien.quievreux.droidplane2.ui.model.Node as NodeView
@@ -179,7 +179,7 @@ fun MindMap2(
                 AppButton(
                     text = stringResource(R.string.edit),
                     onClick = {
-//                        viewModel.setDialogState(Edit())
+//                        viewModel.setDialogState(EditNodeDescription())
                     }
                 )
             }

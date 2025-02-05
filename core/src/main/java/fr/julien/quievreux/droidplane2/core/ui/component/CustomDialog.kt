@@ -1,4 +1,4 @@
-package fr.julien.quievreux.droidplane2.ui.components
+package fr.julien.quievreux.droidplane2.core.ui.component
 
 import android.util.Log
 import androidx.compose.foundation.clickable
@@ -36,8 +36,6 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
-import fr.julien.quievreux.droidplane2.R
-import fr.julien.quievreux.droidplane2.ui.theme.ContrastAwareReplyTheme
 
 /*
 Usage :
@@ -93,7 +91,7 @@ fun CustomDialog(
                         Icon(
                             imageVector = Icons.Filled.Clear,
                             contentDescription = "",
-                            tint = colorResource(R.color.gray4),
+//                            tint = colorResource(R.color.gray4),
                             modifier = Modifier
                                 .width(30.dp)
                                 .height(30.dp)
@@ -133,7 +131,7 @@ fun CustomDialog(
                         value = txtField,
                         onValueChange = { newValue: String ->
                             txtField = newValue
-                            Log.e("toto","newValue:$newValue")
+                            Log.e("toto", "newValue:$newValue")
                         }
                     )
 
@@ -166,12 +164,10 @@ fun CustomDialog(
 @Composable
 @Preview(showBackground = true)
 private fun CustomDialogPreview() {
-    ContrastAwareReplyTheme {
-        CustomDialog(
-            titre = "titre",
-            value = "value",
-            onDismiss = {}
-        ) {
-        }
+    CustomDialog(
+        titre = "titre",
+        value = "value",
+        onDismiss = {}
+    ) {
     }
 }

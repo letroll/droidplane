@@ -3,7 +3,6 @@ package fr.julien.quievreux.droidplane2
 import android.content.Intent
 import android.content.Intent.ACTION_VIEW
 import android.net.Uri
-import android.util.Log
 import android.webkit.MimeTypeMap
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -25,7 +24,6 @@ import fr.julien.quievreux.droidplane2.helper.FileRegister
 import fr.julien.quievreux.droidplane2.model.ContentNodeType
 import fr.julien.quievreux.droidplane2.model.ViewIntentNode
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
@@ -374,7 +372,7 @@ nodeFindList:${nodeManager.getSearchResult().map { getNodeText(it) }.joinToStrin
             is Edit -> {
                 nodeManager.getNodeByID(contextMenuAction.node.id)?.let { node ->
                     setDialogState(
-                        DialogType.Edit(
+                        DialogType.EditNodeDescription(
                             node = node,
                             oldValue = getNodeText(node).orEmpty(),
                         )
@@ -582,5 +580,9 @@ nodeFindList:${nodeManager.getSearchResult().map { getNodeText(it) }.joinToStrin
     }
 
     fun getNameOfFileToSave(): String? = fileToSave?.name
+
+    fun addNode(newValue: String) {
+        nodeManager.addNode(newValue)
+    }
 }
 
