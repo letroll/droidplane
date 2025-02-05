@@ -1,8 +1,8 @@
 package fr.julien.quievreux.droidplane2.data
 
 import fr.julien.quievreux.droidplane2.data.model.Node
+import fr.julien.quievreux.droidplane2.data.model.NodeRelation
 import org.xmlpull.v1.XmlPullParser
-import java.util.Stack
 
 interface XmlParseUtils {
     // extract the richcontent (HTML) of the node. This works both for nodes with a rich text content
@@ -19,4 +19,10 @@ interface XmlParseUtils {
 
     fun parseIcon(xpp: XmlPullParser, nodes: MutableList<Node>)
 
+    fun parseNodeText(
+        nodes: MutableList<Node>,
+        xpp: XmlPullParser,
+        addChildIntoParent: (NodeRelation) -> Unit,
+        onParentNodeUpdate: (Node) -> Unit,
+    )
 }

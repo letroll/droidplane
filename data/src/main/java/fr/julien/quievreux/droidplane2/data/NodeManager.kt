@@ -7,11 +7,11 @@ import fr.julien.quievreux.droidplane2.data.model.MindmapIndexes
 import fr.julien.quievreux.droidplane2.data.model.Node
 import fr.julien.quievreux.droidplane2.data.model.NodeAttribute
 import fr.julien.quievreux.droidplane2.data.model.NodeAttribute.*
+import fr.julien.quievreux.droidplane2.data.model.NodeRelation
 import fr.julien.quievreux.droidplane2.data.model.NodeTag
 import fr.julien.quievreux.droidplane2.data.model.NodeTag.*
 import fr.julien.quievreux.droidplane2.data.model.NodeType.ArrowLink
 import fr.julien.quievreux.droidplane2.data.model.NodeType.Font
-import fr.julien.quievreux.droidplane2.data.model.NodeType.Icon
 import fr.julien.quievreux.droidplane2.data.search.SearchManager
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -154,33 +154,29 @@ class NodeManager(
     }
 
     private fun loadXmlTagNode(xpp: XmlPullParser, nodes: MutableList<Node>, onParentNodeUpdate: (Node) -> Unit) {
-        when {
-            xpp.name == NODE.text -> {
-                parseNode(
+        with(xmlParseUtils) {
+            when {
+                xpp.name == NODE.text -> parseNodeText(
                     nodes = nodes,
                     xpp = xpp,
-                    onParentNodeUpdate = onParentNodeUpdate,
+                    addChildIntoParent = ::addChildIntoParent,
+                    onParentNodeUpdate = { updatedRootNode ->
+                        onParentNodeUpdate(updatedRootNode)
+                        updateNodeInstances(updatedRootNode)
+                    },
                 )
-            }
 
-            xpp.isRichContent() -> {
-                xmlParseUtils.parseRichContent(xpp, nodes)
-            }
+                xpp.isRichContent() -> parseRichContent(xpp, nodes)
 
-            xpp.name == Font.value -> {
-                xmlParseUtils.parseFont(xpp, nodes)
-            }
+                xpp.name == Font.value -> parseFont(xpp, nodes)
 
-            xpp.isIcon() -> {
-                xmlParseUtils.parseIcon(xpp, nodes)
-            }
+                xpp.isIcon() -> parseIcon(xpp, nodes)
 
-            xpp.name == ArrowLink.value -> {
-                xmlParseUtils.parseArrowLink(xpp, nodes)
-            }
+                xpp.name == ArrowLink.value -> parseArrowLink(xpp, nodes)
 
-            else -> {
+                else -> {
 //                logger.w("Received unknown node " + xpp.name)
+                }
             }
         }
     }
@@ -195,38 +191,15 @@ class NodeManager(
         nodeUtils.fillArrowLinks(getNodeByIdIndex())
     }
 
-    fun parseNode(
-        nodes: MutableList<Node>,
-        xpp: XmlPullParser,
-        onParentNodeUpdate: (Node) -> Unit,
-    ) {
-        val parentNode: Node? = getParentFromStack(nodes)
-
-        nodeUtils.parseNodeTag(xpp, parentNode)
-            .onSuccess { newMindmapNode ->
-                nodes.add(newMindmapNode)
-
-                // if we don't have a parent node, then this is the root node
-                if (parentNode == null) {
-                    onParentNodeUpdate(newMindmapNode)
-                    updateNodeInstances(newMindmapNode)
-                } else {
-                    addChildIntoParent(parentNode, newMindmapNode)
-                }
-            }.onFailure {
-                logger.e("Failed to parse node:$it")
-            }
-    }
-
-    private fun addChildIntoParent(parentNode: Node, newMindmapNode: Node) {
+    private fun addChildIntoParent(nodeRelation: NodeRelation) {
         //TODO change to immutable list
-        parentNode.addChildMindmapNode(newMindmapNode)
+        nodeRelation.parent.addChildMindmapNode(nodeRelation.child)
         //            parentNode = parentNode.copy(
         //                childNodes = parentNode.childNodes + newMindmapNode
         //            )
 
         _allNodes.update {
-            it + newMindmapNode
+            it + nodeRelation.child
         }
     }
 
@@ -346,20 +319,20 @@ class NodeManager(
     }
 
     suspend fun serializeMindmap(
-        filePath:String,
-        filename:String,
+        filePath: String,
+        filename: String,
         onError: (Exception) -> Unit,
         onSaveFinished: ((File) -> Unit)? = null,
     ) {
-        if(isInvalidFilePath(filePath)) onError.invoke(
+        if (isInvalidFilePath(filePath)) onError.invoke(
             Exception("Invalid file path")
         )
 
-        if(isInvalidFileName(filename)) onError.invoke(
+        if (isInvalidFileName(filename)) onError.invoke(
             Exception("Invalid file name")
         )
 
-        val fileSaveDestination = File(filePath,filename)
+        val fileSaveDestination = File(filePath, filename)
         rootNode?.let { node ->
             try {
                 withContext(Dispatchers.IO) {
@@ -385,7 +358,7 @@ class NodeManager(
                     outputStream.close()
 
                     removeTextInLargeFile(
-                        filePath="$filePath/$filename",
+                        filePath = "$filePath/$filename",
                         textToRemove = arrayOf("<![CDATA[", "]]>"),
                         onError = onError,
                     )
@@ -406,11 +379,11 @@ class NodeManager(
         onError: (Exception) -> Unit,
         vararg textToRemove: String,
     ) {
-       replaceTextInLargeFile(
-           filePath = filePath,
-           replacements = textToRemove.associate { it to "" },
-           onError = onError,
-       )
+        replaceTextInLargeFile(
+            filePath = filePath,
+            replacements = textToRemove.associate { it to "" },
+            onError = onError,
+        )
     }
 
     private fun replaceTextInLargeFile(
@@ -512,18 +485,18 @@ class NodeManager(
         }
     }
 
-    private fun XmlSerializer.startNodeTag(nodeTag: NodeTag){
+    private fun XmlSerializer.startNodeTag(nodeTag: NodeTag) {
         startTag(null, nodeTag.text)
     }
 
-    private fun XmlSerializer.endNodeTag(nodeTag: NodeTag){
+    private fun XmlSerializer.endNodeTag(nodeTag: NodeTag) {
         endTag(null, nodeTag.text)
     }
 
     private fun XmlSerializer.nodeAttribute(
         nodeAttribute: NodeAttribute,
         value: String,
-    ){
+    ) {
         attribute(null, nodeAttribute.text, value)
     }
 

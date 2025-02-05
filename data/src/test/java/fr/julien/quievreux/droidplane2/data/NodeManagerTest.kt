@@ -72,31 +72,6 @@ class NodeManagerTest : KStringSpec() {
             finishWithProcessing shouldBe true
         }
 
-        "at end of parsing we should obtain a mindmap node" {
-            val fakeXmlPullParser: XmlPullParser = mockk(relaxed = true)
-//            coEvery { fakeXmlPullParser.eventType }.returns(XmlPullParser.END_TAG)
-//            coEvery { fakeXmlPullParser.next() }.returns(XmlPullParser.END_DOCUMENT)
-            coEvery { fakeXmlPullParser.getAttributeValue(any(), any()) }.returns(null)
-//            var finishWithProcessing = false
-            val nodeManager = initNodeManager()
-            val nodes = mutableListOf<Node>()
-            var nodeResult: Node? = null
-            val job = launch {
-                nodeManager.parseNode(
-                    nodes = nodes,
-                    xpp = fakeXmlPullParser,
-                    onParentNodeUpdate = { result ->
-                        nodeResult = result
-                    }
-                )
-            }
-
-            job.join()
-            job.cancel()
-
-            nodeResult shouldNotBe null
-        }
-
         "serialize a mindmap with incorrect destination" should {
             val nodeManager = initNodeManager()
             var possibleException: Exception? = null
