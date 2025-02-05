@@ -4,16 +4,10 @@ import app.cash.turbine.test
 import fr.julien.quievreux.droidplane2.model.ContentNodeType.Classic
 import fr.julien.quievreux.droidplane2.MainUiState.DialogUiState
 import fr.julien.quievreux.droidplane2.MainUiState.SearchUiState
-import fr.julien.quievreux.droidplane2.data.NodeManager
-import fr.julien.quievreux.droidplane2.data.NodeUtilsDefaultImpl
-import fr.julien.quievreux.droidplane2.core.extensions.default
 import fr.julien.quievreux.droidplane2.core.log.Logger
 import fr.julien.quievreux.droidplane2.core.testutils.KStringSpec
-import fr.julien.quievreux.droidplane2.data.FakeDataSource
 import io.kotest.matchers.shouldBe
 import io.mockk.mockk
-import kotlinx.coroutines.Dispatchers
-import java.io.InputStream
 
 class MainViewModelTest : KStringSpec() {
     init {
@@ -34,7 +28,7 @@ class MainViewModelTest : KStringSpec() {
                     canGoBack shouldBe false
                     title shouldBe ""
                     error shouldBe ""
-                    rootNode shouldBe null
+                    nodeCurrentlyDisplayed shouldBe null
                     errorAction shouldBe null
                     viewIntentNode shouldBe null
                     contentNodeType shouldBe Classic

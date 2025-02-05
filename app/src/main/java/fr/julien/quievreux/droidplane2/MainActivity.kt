@@ -212,7 +212,7 @@ class MainActivity : FragmentActivity(), FileRegister {
                     //                    contentColor =,
                     //                    contentWindowInsets =,
                     content = { innerPadding ->
-                        state.value.rootNode?.let { node ->
+                        state.value.nodeCurrentlyDisplayed?.let { node ->
                             if (useNewView) {
                                 MindMap(
                                     rootNode = node,

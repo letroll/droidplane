@@ -292,7 +292,7 @@ private fun MindMap2Preview() {
         MindMap2(
             fetchText = { it.text },
             logger = logger,
-            node = FakeDataSource.fakeRootNode(),
+            node = FakeDataSource.getFakeRootNode(),
             viewModel = MindMapViewModel(
                 logger = logger,
             )

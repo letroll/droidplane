@@ -19,11 +19,11 @@ data class Node(
     /**
      * If the node has a LINK attribute, it will be stored in Uri link
      */
-    val link: Uri?,
+    val link: Uri? = null,
     /**
      * If the node clones another node, it doesn't have text or richtext, but a TREE_ID
      */
-    val treeIdAttribute: String?,
+    val treeIdAttribute: String? = null,
     val childNodes: MutableList<Node> = mutableListOf(),
     val richTextContents: MutableList<String> = mutableListOf(),
     var richContentType: RichContentType?=null,
@@ -32,7 +32,7 @@ data class Node(
     val modificationDate: Long?,
     var isBold: Boolean = false,
     var isItalic: Boolean = false,
-    val position: String?,
+    val position: String? = null,
     // TODO: this has nothing to do with the model
     var isSelected: Boolean = false,
     val arrowLinkDestinationIds: MutableList<String> = mutableListOf(),

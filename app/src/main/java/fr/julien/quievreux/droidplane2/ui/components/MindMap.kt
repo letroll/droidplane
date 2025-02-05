@@ -194,7 +194,7 @@ fun DrawScope.drawConnection(
 @Composable
 fun PreviewMindMap() {
     MindMap(
-        rootNode = FakeDataSource.fakeRootNode(),
+        rootNode = FakeDataSource.getFakeRootNode(),
         fetchText = { node ->
             node.text
         },

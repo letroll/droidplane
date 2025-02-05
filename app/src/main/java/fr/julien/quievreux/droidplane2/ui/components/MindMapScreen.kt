@@ -11,7 +11,7 @@ fun MindMapScreen() {
     val screenHeight = configuration.screenHeightDp.toFloat()
 
 //    MindMap(screenWidth = screenWidth, screenHeight = screenHeight)
-    MindMap(rootNode = FakeDataSource.fakeRootNode(), fetchText = { node ->
+    MindMap(rootNode = FakeDataSource.getFakeRootNode(), fetchText = { node ->
         node.text
     })
 }

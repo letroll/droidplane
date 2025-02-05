@@ -6,24 +6,26 @@ import android.net.Uri
 import android.webkit.MimeTypeMap
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import fr.julien.quievreux.droidplane2.model.ContentNodeType.Classic
-import fr.julien.quievreux.droidplane2.model.ContentNodeType.RelativeFile
 import fr.julien.quievreux.droidplane2.MainUiState.DialogType
 import fr.julien.quievreux.droidplane2.MainUiState.DialogUiState
 import fr.julien.quievreux.droidplane2.MainUiState.SearchUiState
 import fr.julien.quievreux.droidplane2.core.log.Logger
 import fr.julien.quievreux.droidplane2.data.NodeManager
-import fr.julien.quievreux.droidplane2.model.ContextMenuAction
-import fr.julien.quievreux.droidplane2.model.ContextMenuAction.CopyText
-import fr.julien.quievreux.droidplane2.model.ContextMenuAction.Edit
-import fr.julien.quievreux.droidplane2.model.ContextMenuAction.NodeLink
 import fr.julien.quievreux.droidplane2.data.model.MindmapIndexes
 import fr.julien.quievreux.droidplane2.data.model.Node
 import fr.julien.quievreux.droidplane2.data.model.isInternalLink
 import fr.julien.quievreux.droidplane2.helper.FileRegister
 import fr.julien.quievreux.droidplane2.model.ContentNodeType
+import fr.julien.quievreux.droidplane2.model.ContentNodeType.Classic
+import fr.julien.quievreux.droidplane2.model.ContentNodeType.RelativeFile
+import fr.julien.quievreux.droidplane2.model.ContextMenuAction
+import fr.julien.quievreux.droidplane2.model.ContextMenuAction.CopyText
+import fr.julien.quievreux.droidplane2.model.ContextMenuAction.Edit
+import fr.julien.quievreux.droidplane2.model.ContextMenuAction.NodeLink
 import fr.julien.quievreux.droidplane2.model.ViewIntentNode
+import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
@@ -95,7 +97,7 @@ class MainViewModel(
                     },
                     onParentNodeUpdate = { parentNode ->
                         logger.e("loadMindMap onParentNodeUpdate")
-                        updateParentNode(parentNode)
+                        updateNodeDisplayed(parentNode)
                     }
                 )
             }
@@ -105,12 +107,12 @@ class MainViewModel(
         setMindmapIsLoading(false)
     }
 
-    private fun updateParentNode(parentNode: Node) {
+    private fun updateNodeDisplayed(parentNode: Node) {
         val title = getNodeText(parentNode).orEmpty()
         updateUiState {
             it.copy(
                 title = title,
-                rootNode = parentNode,
+                nodeCurrentlyDisplayed = parentNode,
             )
         }
     }
@@ -161,7 +163,7 @@ class MainViewModel(
         node.deselectAllChildNodes()
         updateUiState {
             it.copy(
-                rootNode = node,
+                nodeCurrentlyDisplayed = node,
             )
         }
 
@@ -204,13 +206,13 @@ class MainViewModel(
      * @param force
      */
     fun up(force: Boolean) {
-        _uiState.value.rootNode?.id?.let { nodeId ->
+        _uiState.value.nodeCurrentlyDisplayed?.id?.let { nodeId ->
             nodeManager.findFilledNode(nodeId)?.let { node ->
                 val parent = node.parentNode
                 parent?.isSelected = false
                 updateUiState {
                     it.copy(
-                        rootNode = parent,
+                        nodeCurrentlyDisplayed = parent,
                     )
                 }
 
@@ -348,7 +350,7 @@ nodeFindList:${nodeManager.getSearchResult().map { getNodeText(it) }.joinToStrin
     fun top() {
         updateUiState {
             it.copy(
-                rootNode = nodeManager.rootNode,
+                nodeCurrentlyDisplayed = nodeManager.rootNode,
             )
         }
     }
@@ -501,6 +503,7 @@ nodeFindList:${nodeManager.getSearchResult().map { getNodeText(it) }.joinToStrin
         node: Node,
         newValue: String,
     ) {
+        //TODO jqx check if some logic shouldn't be down in nodeManager
         viewModelScope.launch(Dispatchers.IO) {
             setMindmapIsLoading(true)
             val updatedNode = node.copy(
@@ -532,8 +535,8 @@ nodeFindList:${nodeManager.getSearchResult().map { getNodeText(it) }.joinToStrin
             }
 
             parentNodeToShow?.let { newParentNode ->
-                nodeManager.updateNodeInstances(newParentNode)
-                updateParentNode(newParentNode)
+                nodeManager.updateRootNode(newParentNode)
+                updateNodeDisplayed(newParentNode)
             }
             setMindmapIsLoading(false)
         }
@@ -542,7 +545,7 @@ nodeFindList:${nodeManager.getSearchResult().map { getNodeText(it) }.joinToStrin
     fun setMapUri(data: Uri?) = nodeManager.setMapUri(data)
 
     fun launchSaveFile() {
-        nodeBeforeFileSave = _uiState.value.rootNode
+        nodeBeforeFileSave = _uiState.value.nodeCurrentlyDisplayed
         nodeBeforeFileSave?.let {
             top()
             nodeManager.getMindmapFileName()?.let { filename ->
@@ -582,7 +585,17 @@ nodeFindList:${nodeManager.getSearchResult().map { getNodeText(it) }.joinToStrin
     fun getNameOfFileToSave(): String? = fileToSave?.name
 
     fun addNode(newValue: String) {
-        nodeManager.addNode(newValue)
+        viewModelScope.launch(Dispatchers.IO) {
+            setMindmapIsLoading(true)
+            val deferredNodeId : Deferred<Int?> = async { nodeManager.addNodeToMindmap(newValue) }
+            deferredNodeId.await()?.let { newNodeId ->
+                nodeManager.getNodeParent(newNodeId)?.let { parentNode ->
+                    updateNodeDisplayed(parentNode)
+                }
+            }
+
+            setMindmapIsLoading(false)
+        }
     }
 }
 

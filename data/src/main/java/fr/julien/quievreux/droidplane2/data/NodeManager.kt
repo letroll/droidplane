@@ -17,6 +17,8 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.withContext
 import org.xmlpull.v1.XmlPullParser
@@ -25,6 +27,8 @@ import org.xmlpull.v1.XmlSerializer
 import java.io.File
 import java.io.FileOutputStream
 import java.io.InputStream
+import kotlin.math.abs
+import kotlin.random.Random
 
 class NodeManager(
     private val logger: Logger,
@@ -32,18 +36,14 @@ class NodeManager(
     private val xmlParseUtils: XmlParseUtils,
     val coroutineScope: CoroutineScope,
 ) {
-//    private val random = Random(System.currentTimeMillis())
-
-    private var currentMindMapUri: Uri? = null
 
     private val _allNodes = MutableStateFlow(emptyList<Node>())
 
-    private val searchManager = SearchManager(
-        scope = coroutineScope,
-        logger = logger,
-        nodesSource = _allNodes,
-        fetchText = { node -> getNodeText(node) }
-    )
+    val allNodesId = _allNodes.map { nodes ->
+        nodes.map { node ->
+            node.numericId
+        }
+    }
 
     /**
      * A map that resolves node IDs to Node objects
@@ -53,11 +53,24 @@ class NodeManager(
     var rootNode: Node? = null
         private set
 
+    private var currentMindMapUri: Uri? = null
+
+    private val searchManager = SearchManager(
+        scope = coroutineScope,
+        logger = logger,
+        nodesSource = _allNodes,
+        fetchText = { node -> getNodeText(node) }
+    )
+
     fun getNodeByID(id: String?) = mindmapIndexes?.nodesByIdIndex?.get(id)
 
     fun getNodeByNumericIndex() = mindmapIndexes?.nodesByNumericIndex
 
     fun getNodeByIdIndex() = mindmapIndexes?.nodesByIdIndex
+
+    fun getNodeByNumericId(nodeId : Int):Node? = getNodeByID(getNodeID(nodeId))
+
+    fun getNodeParent(childNodeId : Int):Node? = getNodeByNumericId(childNodeId)?.parentNode
 
     fun updatemMindmapIndexes(mindmapIndexes: MindmapIndexes) {
         this.mindmapIndexes = mindmapIndexes
@@ -162,7 +175,7 @@ class NodeManager(
                     addChildIntoParent = ::addChildIntoParent,
                     onParentNodeUpdate = { updatedRootNode ->
                         onParentNodeUpdate(updatedRootNode)
-                        updateNodeInstances(updatedRootNode)
+                        updateRootNode(updatedRootNode)
                     },
                 )
 
@@ -191,7 +204,7 @@ class NodeManager(
         nodeUtils.fillArrowLinks(getNodeByIdIndex())
     }
 
-    private fun addChildIntoParent(nodeRelation: NodeRelation) {
+    fun addChildIntoParent(nodeRelation: NodeRelation) {
         //TODO change to immutable list
         nodeRelation.parent.addChildMindmapNode(nodeRelation.child)
         //            parentNode = parentNode.copy(
@@ -203,7 +216,7 @@ class NodeManager(
         }
     }
 
-    fun updateNodeInstances(newNode: Node) {
+    fun updateRootNode(newNode: Node) {
         rootNode = newNode
         _allNodes.update {
             listOf(newNode)
@@ -235,7 +248,7 @@ class NodeManager(
 
     private fun getParentFromStack(nodes: MutableList<Node>): Node? {
         var parentNode: Node? = null
-        if (!nodes.isEmpty()) {
+        if (nodes.isNotEmpty()) {
             parentNode = nodes.last()
         }
         return parentNode
@@ -500,12 +513,53 @@ class NodeManager(
         attribute(null, nodeAttribute.text, value)
     }
 
-    fun addNode(newValue: String) {
+    /**
+     * addNode : try to add a node and return it's id on success
+     */
+    suspend fun addNodeToMindmap(newValue: String, parentNode: Node? = null): Int? {
+        return if (newValue.isBlank()) {
+            null
+        } else {
+            generateNodeNumericID().let { nodeNumericId ->
+                val time = System.currentTimeMillis()
+                val newNode = Node(
+                    id = getNodeID(nodeNumericId),
+                    numericId = nodeNumericId,
+                    text = newValue,
+                    parentNode = parentNode,
+                    creationDate = time,
+                    modificationDate = time,
+                )
 
+                _allNodes.update { nodes ->
+                    nodes.map { node ->
+                        if (node.id == parentNode?.id) {
+                            node.copy(childNodes = (node.childNodes + newNode).toMutableList())
+                        } else node
+                    } + newNode
+                }
+                nodeNumericId
+            }
+        }
     }
+
+    suspend fun generateNodeNumericID(): Int {
+        val currentIds = allNodesId.first().toSet()
+        if (currentIds.size >= Int.MAX_VALUE) {
+            throw IllegalStateException("No more available IDs")
+        }
+        var newId = 0
+        while (currentIds.contains(newId)) {
+            newId = abs(Random.nextInt(UNDEFINED_NODE_ID))
+        }
+        return newId
+    }
+
+    fun getNodeID(nodeNumericId: Int): String = NODE_ID_PREFIX + nodeNumericId.toString()
 
     companion object {
         const val UNDEFINED_NODE_ID: Int = 2000000000
         const val FILE_EXTENSION = ".mm"
+        const val NODE_ID_PREFIX = "ID_"
     }
 }

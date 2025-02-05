@@ -5,42 +5,40 @@ import fr.julien.quievreux.droidplane2.data.model.RichContentType
 
 object FakeDataSource {
 
-    fun fakeNodeChildren(count: Int = 5): MutableList<Node> = mutableListOf(
-        fakeNode("Opening Files", childNodes = fakeNodeChildren(1)),
-        fakeNode("Navigating", childNodes = fakeNodeChildren(3)),
-        fakeNode("Editing", childNodes = fakeNodeChildren(2)),
-        fakeNode("Test", childNodes = fakeNodeChildren(4)),
+    fun getDistinctFakeNodeChildren(count: Int = 5): MutableList<Node> = mutableListOf(
+        getFakeNode("Opening Files", childNodes = emptyList()),
+        getFakeNode("Navigating", childNodes = emptyList()),
+        getFakeNode("Editing", childNodes = emptyList()),
+        getFakeNode("Test", childNodes = emptyList()),
     ).take(count).toMutableList()
 
-    fun fakeNode(
+    fun getFakeNode(
         text: String = "DroidPlane",
-        childNodes: MutableList<Node> = mutableListOf(),
-    ): Node {
-        return Node(
-            parentNode = null,
-            id = "taciti",
-            numericId = 7900,
-            text = text,
-            link = null,
-            treeIdAttribute = null,
-            childNodes = childNodes,
-            richTextContents = mutableListOf(),
-            richContentType = RichContentType.NODE,
-            iconNames = mutableListOf(),
-            creationDate = null,
-            modificationDate = null,
-            isBold = false,
-            isItalic = false,
-            isSelected = false,
-            arrowLinkDestinationIds = mutableListOf(),
-            arrowLinkDestinationNodes = mutableListOf(),
-            arrowLinkIncomingNodes = mutableListOf(),
-            position = null,
-        )
-    }
+        childNodes: List<Node> = listOf(),
+    ) = Node(
+        parentNode = null,
+        id = "taciti",
+        numericId = 7900,
+        text = text,
+        link = null,
+        treeIdAttribute = null,
+        childNodes = childNodes.toMutableList(),
+        richTextContents = mutableListOf(),
+        richContentType = RichContentType.NODE,
+        iconNames = mutableListOf(),
+        creationDate = null,
+        modificationDate = null,
+        isBold = false,
+        isItalic = false,
+        isSelected = false,
+        arrowLinkDestinationIds = mutableListOf(),
+        arrowLinkDestinationNodes = mutableListOf(),
+        arrowLinkIncomingNodes = mutableListOf(),
+        position = null,
+    )
 
-    fun fakeRootNode(): Node = fakeNode(
-        childNodes = fakeNodeChildren()
+    fun getFakeRootNode(): Node = getFakeNode(
+        childNodes = getDistinctFakeNodeChildren()
     )
 
     val mindMap = """

@@ -6,12 +6,19 @@ import fr.julien.quievreux.droidplane2.data.NodeManager.Companion.FILE_EXTENSION
 import fr.julien.quievreux.droidplane2.data.model.MindmapIndexes
 import fr.julien.quievreux.droidplane2.data.model.Node
 import fr.julien.quievreux.droidplane2.data.model.RichContent
+import io.kotest.matchers.collections.shouldNotBeIn
+import io.kotest.matchers.ints.shouldBeGreaterThan
+import io.kotest.matchers.ints.shouldBeGreaterThanOrEqual
 import io.kotest.matchers.should
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.shouldNotBe
 import io.mockk.coEvery
 import io.mockk.mockk
+import kotlinx.coroutines.Deferred
+import kotlinx.coroutines.async
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.TestScope
 import org.xmlpull.v1.XmlPullParser
 
@@ -20,11 +27,6 @@ class NodeManagerTest : KStringSpec() {
     init {
         coroutineTestScope = true
 
-        //todo Tests
-        /*
-        *  parsing document without node should throw an error?
-        *  parsing document should finish with mindmap processing
-         */
         "parsing document without start should throw an error" {
             val fakeXmlPullParser: XmlPullParser = mockk(relaxed = true)
             coEvery { fakeXmlPullParser.eventType }.returns(XmlPullParser.END_TAG)
@@ -46,7 +48,6 @@ class NodeManagerTest : KStringSpec() {
             job.cancel()
 
             possibleException shouldNotBe null
-
         }
 
         "parsing document should finish with mindmap processing" {
@@ -78,7 +79,7 @@ class NodeManagerTest : KStringSpec() {
             val validFilePath = "/storage/"
             val validFileName = "mindmap.mm"
 
-            "fail on empty filePath"{
+            "fail on empty filePath" {
                 val job = launch {
                     nodeManager.serializeMindmap(
                         filePath = "", filename = validFileName, onError = { exception ->
@@ -93,7 +94,7 @@ class NodeManagerTest : KStringSpec() {
                 possibleException shouldNotBe null
             }
 
-            "fail on blank filePath"{
+            "fail on blank filePath" {
                 val job = launch {
                     nodeManager.serializeMindmap(
                         filePath = "   ", filename = validFileName, onError = { exception ->
@@ -108,7 +109,7 @@ class NodeManagerTest : KStringSpec() {
                 possibleException shouldNotBe null
             }
 
-            "fail on filePath without path separator"{
+            "fail on filePath without path separator" {
                 val job = launch {
                     nodeManager.serializeMindmap(
                         filePath = "lkjqsdf", filename = validFileName, onError = { exception ->
@@ -123,7 +124,7 @@ class NodeManagerTest : KStringSpec() {
                 possibleException shouldNotBe null
             }
 
-            "fail on filePath not beginning with path separator"{
+            "fail on filePath not beginning with path separator" {
                 val job = launch {
                     nodeManager.serializeMindmap(
                         filePath = "lkjqsdf/", filename = validFileName, onError = { exception ->
@@ -138,7 +139,7 @@ class NodeManagerTest : KStringSpec() {
                 possibleException shouldNotBe null
             }
 
-            "fail on fileName empty"{
+            "fail on fileName empty" {
                 val job = launch {
                     nodeManager.serializeMindmap(
                         filePath = validFilePath, filename = "", onError = { exception ->
@@ -153,7 +154,7 @@ class NodeManagerTest : KStringSpec() {
                 possibleException shouldNotBe null
             }
 
-            "fail on fileName blank"{
+            "fail on fileName blank" {
                 val job = launch {
                     nodeManager.serializeMindmap(
                         filePath = validFilePath, filename = "    ", onError = { exception ->
@@ -168,7 +169,7 @@ class NodeManagerTest : KStringSpec() {
                 possibleException shouldNotBe null
             }
 
-            "fail on fileName without extension"{
+            "fail on fileName without extension" {
                 val job = launch {
                     nodeManager.serializeMindmap(
                         filePath = validFilePath, filename = "filename", onError = { exception ->
@@ -183,10 +184,10 @@ class NodeManagerTest : KStringSpec() {
                 possibleException shouldNotBe null
             }
 
-            "fail on fileName with only an extension"{
+            "fail on fileName with only an extension" {
                 val job = launch {
                     nodeManager.serializeMindmap(
-                        filePath = validFilePath, filename = FILE_EXTENSION , onError = { exception ->
+                        filePath = validFilePath, filename = FILE_EXTENSION, onError = { exception ->
                             possibleException = exception
                         }, onSaveFinished = {}
                     )
@@ -199,12 +200,77 @@ class NodeManagerTest : KStringSpec() {
             }
         }
 
-        /*
-         test idea:
-         * "at end of parsing we should obtain a mindmap node"
-         * "parse a node should end up add it to the mindmap"
+        "generateNodeNumericID should be positive" {
+            var resultId = -1
+            val job = launch {
+                val nodeManager = initNodeManager()
+                resultId = nodeManager.generateNodeNumericID()
+            }
 
-         */
+            job.join()
+            job.cancel()
+
+            resultId shouldBeGreaterThanOrEqual 0
+        }
+
+        "generateNodeNumericID should generate id not contained in mindmap nodes" {
+            val nodeManager = initNodeManager()
+            val fakeNode = FakeDataSource.getFakeRootNode()
+            nodeManager.updateRootNode(fakeNode)
+            val existingNodeIds = nodeManager.allNodesId.first().toSet()
+
+            // Act
+            val generatedId: Int = runBlocking {
+                nodeManager.generateNodeNumericID()
+            }
+
+            // Assert
+            generatedId shouldNotBeIn existingNodeIds
+        }
+
+        "Add node with blank text should do nothing and so return an null node id" {
+            val nodeManager = initNodeManager()
+            nodeManager.addNodeToMindmap("") shouldBe (null)
+            nodeManager.addNodeToMindmap(" ") shouldBe (null)
+        }
+
+        "Add node should give Id not blank" {
+            val nodeManager = initNodeManager()
+            nodeManager.addNodeToMindmap("fakeValue") shouldNotBe (null)
+        }
+
+        "Add node increase allNodeIds size" {
+            val nodeManager = initNodeManager()
+            val sizeBefore = nodeManager.allNodesId.first().size
+            nodeManager.addNodeToMindmap("fakeValue")
+            val sizeAfter = nodeManager.allNodesId.first().size
+            sizeAfter shouldBeGreaterThan sizeBefore
+        }
+
+        "Add node with parent should also change it's parent child list" {
+            val nodeManager = initNodeManager()
+            val deferredDadNodeId: Deferred<Int?> = async { nodeManager.addNodeToMindmap("fakeDad") }
+            val dadNodeId = deferredDadNodeId.await()
+
+            dadNodeId shouldNotBe (null)
+
+            dadNodeId?.let {
+                var dadNode = nodeManager.getNodeByNumericId(dadNodeId)
+                val deferredChildNodeId : Deferred<Int?> = async { nodeManager.addNodeToMindmap("fakeChild", parentNode = dadNode) }
+                val childNodeId = deferredChildNodeId.await()
+
+                childNodeId shouldNotBe null
+
+                childNodeId?.let {
+                    val childNode = nodeManager.getNodeByNumericId(childNodeId)
+                    childNode?.parentNode shouldBe dadNode
+                    dadNode = nodeManager.getNodeByNumericId(dadNodeId)
+                    dadNode?.childNodes?.first()?.id shouldBe childNode?.id
+                }
+            }
+        }
+
+        //TODO jqx look if with freeplane, when we modify a child if parent modification date change also and if it's recursif
 
     }
 

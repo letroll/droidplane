@@ -10,7 +10,7 @@ data class MainUiState(
     val loading: Boolean = false,
     val leaving: Boolean = false,
     val canGoBack: Boolean = false,
-    val rootNode: Node? = null,
+    val nodeCurrentlyDisplayed: Node? = null,
     val error: String = "",
     val errorAction: ErrorAction? = null,
     val viewIntentNode: ViewIntentNode? = null,
