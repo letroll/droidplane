@@ -11,9 +11,9 @@ import fr.julien.quievreux.droidplane2.MainUiState.DialogUiState
 import fr.julien.quievreux.droidplane2.MainUiState.SearchUiState
 import fr.julien.quievreux.droidplane2.core.log.Logger
 import fr.julien.quievreux.droidplane2.data.NodeManager
-import fr.julien.quievreux.droidplane2.data.model.MindmapIndexes
 import fr.julien.quievreux.droidplane2.data.model.Node
 import fr.julien.quievreux.droidplane2.data.model.isInternalLink
+import fr.julien.quievreux.droidplane2.data.model.shortFamily
 import fr.julien.quievreux.droidplane2.helper.FileRegister
 import fr.julien.quievreux.droidplane2.model.ContentNodeType
 import fr.julien.quievreux.droidplane2.model.ContentNodeType.Classic
@@ -57,7 +57,7 @@ class MainViewModel(
     }
     private var fileRegister: FileRegister? = null
     private var fileToSave: File? = null
-    private var nodeBeforeFileSave:Node? = null
+    private var nodeBeforeFileSave: Node? = null
 
     override fun onCleared() {
         super.onCleared()
@@ -101,7 +101,7 @@ class MainViewModel(
                     }
                 )
             }
-        }catch (exception:Exception){
+        } catch (exception: Exception) {
             logger.e("loadMindMap exc")
         }
         setMindmapIsLoading(false)
@@ -122,33 +122,35 @@ class MainViewModel(
     fun onNodeClick(
         node: Node,
     ) {
-        when {
-            node.childNodes.size > 0 -> {
-                showNode(node)
-            }
-
-            node.link != null -> {
-                if (node.isInternalLink()) {
-                    openInternalFragmentLink(node = node)
-                } else {
-                    openIntentLink(node = node)
+        viewModelScope.launch {
+            when {
+                node.childNodes.size > 0 -> {
+                    showNode(node)
                 }
-            }
 
-            node.richTextContents.isNotEmpty() -> {
-                updateUiState {
-                    it.copy(
-                        viewIntentNode = ViewIntentNode(
-                            intent = Intent(),
-                            node = node,
-                        ),
-                        contentNodeType = ContentNodeType.RichText
-                    )
+                node.link != null -> {
+                    if (node.isInternalLink()) {
+                        openInternalFragmentLink(node = node)
+                    } else {
+                        openIntentLink(node = node)
+                    }
                 }
-            }
 
-            else -> {
-                setTitle(getNodeText(node))
+                node.richTextContents.isNotEmpty() -> {
+                    updateUiState {
+                        it.copy(
+                            viewIntentNode = ViewIntentNode(
+                                intent = Intent(),
+                                node = node,
+                            ),
+                            contentNodeType = ContentNodeType.RichText
+                        )
+                    }
+                }
+
+                else -> {
+                    setTitle(getNodeText(node))
+                }
             }
         }
     }
@@ -159,7 +161,7 @@ class MainViewModel(
      *
      * @param node
      */
-    private fun showNode(node: Node) {
+    private suspend fun showNode(node: Node) {
         node.deselectAllChildNodes()
         updateUiState {
             it.copy(
@@ -206,31 +208,36 @@ class MainViewModel(
      * @param force
      */
     fun up(force: Boolean) {
-        _uiState.value.nodeCurrentlyDisplayed?.id?.let { nodeId ->
-            nodeManager.findFilledNode(nodeId)?.let { node ->
-                val parent = node.parentNode
-                parent?.isSelected = false
-                updateUiState {
-                    it.copy(
-                        nodeCurrentlyDisplayed = parent,
-                    )
-                }
+        viewModelScope.launch {
+            _uiState.value.nodeCurrentlyDisplayed?.id?.let { nodeId ->
+                nodeManager.findFilledNode(nodeId)?.let { node ->
+                    // Find the parent using findFilledNode to get the updated version
+                    node.parentNode?.id?.let { parentId ->
+                        val parent = nodeManager.findFilledNode(parentId)
+                        parent?.isSelected = false
+                        updateUiState {
+                            it.copy(
+                                nodeCurrentlyDisplayed = parent,
+                            )
+                        }
 
-                // enable the up navigation with the Home (app) button (top left corner)
-                enableHomeButtonIfNeeded(parent)
+                        // enable the up navigation with the Home (app) button (top left corner)
+                        enableHomeButtonIfNeeded(parent)
 
-                // get the title of the parent of the rightmost column (i.e. the selected node in the 2nd-rightmost column)
-                parent?.let {
-                    setTitle(getNodeText(it))
+                        // get the title of the parent of the rightmost column (i.e. the selected node in the 2nd-rightmost column)
+                        parent?.let {
+                            setTitle(getNodeText(it))
+                        }
+                    }
+                } ?: run {
+                    if (force) {
+                        leaveApp()
+                    }
                 }
             } ?: run {
                 if (force) {
                     leaveApp()
                 }
-            }
-        } ?: run {
-            if (force) {
-                leaveApp()
             }
         }
     }
@@ -292,17 +299,19 @@ class MainViewModel(
     }
 
     private fun showCurrentSearchResult() {
-        logger.e(
-            "toto", """
+        viewModelScope.launch {
+            logger.e(
+                "toto", """
 showCurrentSearchResult:${_uiState.value.searchUiState.currentSearchResultIndex}
 nodeFindList:${nodeManager.getSearchResult().map { getNodeText(it) }.joinToString(separator = "|")}
-        """.trimIndent()
-        )
-        if (isSearchResultIndexValid()) {
-            downTo(getCurrentSearchResultItem(), false)
+            """.trimIndent()
+            )
+            if (isSearchResultIndexValid()) {
+                downTo(getCurrentSearchResultItem(), false)
+            }
+            //TODO Shows/hides the next/prev buttons
+            //TODO highlight result in column
         }
-        //TODO Shows/hides the next/prev buttons
-        //TODO highlight result in column
     }
 
     private fun getCurrentSearchResultItem() = nodeManager.getSearchResult()[_uiState.value.searchUiState.currentSearchResultIndex]
@@ -313,7 +322,7 @@ nodeFindList:${nodeManager.getSearchResult().map { getNodeText(it) }.joinToStrin
      * Navigate down the MainViewModel to the specified node, opening each of it's parent nodes along the way.
      * @param node
      */
-    private fun downTo(node: Node?, openLast: Boolean) {
+    private suspend fun downTo(node: Node?, openLast: Boolean) {
         // first navigate back to the top (essentially closing all other nodes)
         top()
 
@@ -333,13 +342,13 @@ nodeFindList:${nodeManager.getSearchResult().map { getNodeText(it) }.joinToStrin
             mindmapNode.isSelected = true
 //            scrollTo(mindmapNode)
             if ((mindmapNode != node || openLast) && mindmapNode.childNodes.size > 0) {
-                onNodeClick(mindmapNode)
+                showNode(mindmapNode)
             }
         }
     }
 
 //    private fun scrollTo(node: Node) {
-        //TODO for column with a lot of elements
+    //TODO for column with a lot of elements
 //        if (nodeColumns.isEmpty()) {
 //            return
 //        }
@@ -384,7 +393,9 @@ nodeFindList:${nodeManager.getSearchResult().map { getNodeText(it) }.joinToStrin
 
             is NodeLink -> {
                 val node = nodeManager.getNodeByID(contextMenuAction.node.id)
-                downTo(node, true)
+                viewModelScope.launch {
+                    downTo(node, true)
+                }
             }
 
             is CopyText -> {/* already handled by activity */
@@ -396,23 +407,25 @@ nodeFindList:${nodeManager.getSearchResult().map { getNodeText(it) }.joinToStrin
      * Open this node's link as internal fragment
      */
     private fun openInternalFragmentLink(node: Node?) {
-        // internal link, so this.link is of the form "#ID_123234534" this.link.getFragment() should give everything
-        // after the "#" it is null if there is no "#", which should be the case for all other links
-        val fragment = node?.link?.fragment
-        val linkedInternal = nodeManager.getNodeByID(fragment)
+        viewModelScope.launch {
+            // internal link, so this.link is of the form "#ID_123234534" this.link.getFragment() should give everything
+            // after the "#" it is null if there is no "#", which should be the case for all other links
+            val fragment = node?.link?.fragment
+            val linkedInternal = nodeManager.getNodeByID(fragment)
 
-        if (linkedInternal != null) {
-            logger.e("Opening internal node, $linkedInternal, with ID: $fragment")
+            if (linkedInternal != null) {
+                logger.e("Opening internal node, $linkedInternal, with ID: $fragment")
 
-            // the internal linked node might be anywhere in the viewModel, i.e. on a completely separate branch than
-            // we are on currently. We need to go to the Top, and then descend into the viewModel to reach the right
-            // point
-            downTo(linkedInternal, true)
-        } else {
-            updateUiState {
-                it.copy(
-                    error = "This internal link to ID $fragment seems to be broken.",
-                )
+                // the internal linked node might be anywhere in the viewModel, i.e. on a completely separate branch than
+                // we are on currently. We need to go to the Top, and then descend into the viewModel to reach the right
+                // point
+                downTo(linkedInternal, true)
+            } else {
+                updateUiState {
+                    it.copy(
+                        error = "This internal link to ID $fragment seems to be broken.",
+                    )
+                }
             }
         }
     }
@@ -484,19 +497,8 @@ nodeFindList:${nodeManager.getSearchResult().map { getNodeText(it) }.joinToStrin
         updateDialogState { it.copy(dialogType = dialogType) }
     }
 
-    private fun updateNodeInIndexes(node: Node) {
-        val nodesByIdIndex = (nodeManager.getNodeByIdIndex()?.toMutableMap() ?: mutableMapOf())
-        val nodesByNumericIndex = (nodeManager.getNodeByNumericIndex()?.toMutableMap() ?: mutableMapOf())
-        nodesByIdIndex[node.id] = node
-        nodesByNumericIndex[node.numericId] = node
-
-        nodeManager.updatemMindmapIndexes(
-            MindmapIndexes(
-                nodesByIdIndex = nodesByIdIndex,
-                nodesByNumericIndex = nodesByNumericIndex
-            )
-        )
-
+    private fun updateNodeInMindMapIndexes(node: Node) {
+        nodeManager.updateNodeInMindMapIndexes(node)
     }
 
     fun updateNodeText(
@@ -511,7 +513,7 @@ nodeFindList:${nodeManager.getSearchResult().map { getNodeText(it) }.joinToStrin
                 text = newValue,
             )
 
-            updateNodeInIndexes(updatedNode)
+            updateNodeInMindMapIndexes(updatedNode)
 
             var parentNodeToShow: Node? = null
 
@@ -528,7 +530,7 @@ nodeFindList:${nodeManager.getSearchResult().map { getNodeText(it) }.joinToStrin
 
                     parentNodeToShow = updatedParent
 
-                    updateNodeInIndexes(updatedParent)
+                    updateNodeInMindMapIndexes(updatedParent)
                 }
             } ?: run {
                 parentNodeToShow = updatedNode
@@ -574,7 +576,7 @@ nodeFindList:${nodeManager.getSearchResult().map { getNodeText(it) }.joinToStrin
 
     fun saveFile(outputStream: OutputStream) {
         fileToSave?.let { file ->
-            logger.e("Saving file ${file.name} content:${file.readText()}")
+            logger.e("Saving file ${file.name} ")//content:${file.readText()}")
             outputStream.write(file.readText().toByteArray())
         }
         nodeBeforeFileSave?.let {
@@ -587,10 +589,26 @@ nodeFindList:${nodeManager.getSearchResult().map { getNodeText(it) }.joinToStrin
     fun addNode(newValue: String) {
         viewModelScope.launch(Dispatchers.IO) {
             setMindmapIsLoading(true)
-            val deferredNodeId : Deferred<Int?> = async { nodeManager.addNodeToMindmap(newValue) }
+            val deferredNodeId: Deferred<Int?> = async { nodeManager.addNodeToMindmap(newValue, _uiState.value.nodeCurrentlyDisplayed) }
             deferredNodeId.await()?.let { newNodeId ->
-                nodeManager.getNodeParent(newNodeId)?.let { parentNode ->
-                    updateNodeDisplayed(parentNode)
+                // Get the node ID from the numeric ID
+                val nodeId = nodeManager.getNodeID(newNodeId)
+                // Get the updated node with all its children
+                val updatedNode = nodeManager.findFilledNode(nodeId)
+                if (updatedNode != null) {
+                    // If this is a child node, show its parent
+                    val parentNode = updatedNode.parentNode
+                    if (parentNode != null) {
+                        logger.e("addNode done updating UI with parent: ${parentNode.shortFamily()}")
+                        val updatedParent = nodeManager.findFilledNode(parentNode.id)
+                        if (updatedParent != null) {
+                            showNode(updatedParent)
+                        }
+                    } else {
+                        // This is a root node
+                        logger.e("addNode done updating UI with new node")
+                        showNode(updatedNode)
+                    }
                 }
             }
 

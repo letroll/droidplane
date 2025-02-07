@@ -46,12 +46,16 @@ data class Node(
 
         if (id != other.id) return false
         if (text != other.text) return false
-        //!\\
-        /*
-            Do not compare childNodes or if needed, with only their id and maybe their modification date!
-            When StateFlow compares the new list of Node objects with the old list, it calls ArrayList.equals()
-            => Comparing lists of nodes recursively => stackOverflow
-         */
+        if (modificationDate != other.modificationDate) return false
+
+        // Compare child nodes by size and modification dates to avoid recursion
+        if (childNodes.size != other.childNodes.size) return false
+        for (i in childNodes.indices) {
+            if (childNodes[i].id != other.childNodes[i].id ||
+                childNodes[i].modificationDate != other.childNodes[i].modificationDate) {
+                return false
+            }
+        }
 
         return true
     }
@@ -103,3 +107,5 @@ data class Node(
 // if the link has a "#ID123", it's an internal link within the document
 fun Node.isInternalLink(): Boolean = link?.fragment != null && link.fragment?.startsWith("ID") == true
 fun Node.isRoot(): Boolean = parentNode == null
+
+fun Node.shortFamily(): String = "$text = ${childNodes.joinToString(separator = "|"){it.text.orEmpty()}}"

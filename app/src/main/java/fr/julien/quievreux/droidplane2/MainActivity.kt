@@ -240,7 +240,7 @@ class MainActivity : FragmentActivity(), FileRegister {
                                         .background(MaterialTheme.colorScheme.surfaceContainer)
                                         .padding(innerPadding),
                                 ) {
-                                    logger.e("list updated")
+                                    logger.e("list updated :${node.childNodes.joinToString(separator = "|"){it -> it.text.orEmpty()}}")
                                     val searchResultToShow = if (nodeFindList.value.isEmpty() || (state.value.searchUiState.currentSearchResultIndex in 0 until nodeFindList.value.size - 1)) {
                                         null
                                     } else {

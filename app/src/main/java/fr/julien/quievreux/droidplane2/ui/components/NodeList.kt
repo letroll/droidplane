@@ -78,7 +78,8 @@ fun LazyListScope.nodeList(
     items(
         items = node.childNodes,
         key = { child ->
-            child.id
+            // Use both parent and child id as key to force recomposition when parent changes
+            "${node.id}_${child.id}"
         }
     ) { child ->
         if (child.id == searchResultToShow?.id) {

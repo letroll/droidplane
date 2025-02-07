@@ -230,13 +230,13 @@ class NodeManagerTest : KStringSpec() {
 
         "Add node with blank text should do nothing and so return an null node id" {
             val nodeManager = initNodeManager()
-            nodeManager.addNodeToMindmap("") shouldBe (null)
-            nodeManager.addNodeToMindmap(" ") shouldBe (null)
+            nodeManager.addNodeToMindmap("") shouldBe null
+            nodeManager.addNodeToMindmap(" ") shouldBe null
         }
 
         "Add node should give Id not blank" {
             val nodeManager = initNodeManager()
-            nodeManager.addNodeToMindmap("fakeValue") shouldNotBe (null)
+            nodeManager.addNodeToMindmap("fakeValue") shouldNotBe null
         }
 
         "Add node increase allNodeIds size" {
@@ -247,15 +247,26 @@ class NodeManagerTest : KStringSpec() {
             sizeAfter shouldBeGreaterThan sizeBefore
         }
 
+        "Add node increase mindmapIndexes size" {
+            val nodeManager = initNodeManager()
+            val sizeBefore = nodeManager.allNodesId.first().size
+            nodeManager.addNodeToMindmap("fakeValue")
+            val sizeAfter = nodeManager.allNodesId.first().size
+            sizeAfter shouldBeGreaterThan sizeBefore
+        }
+
         "Add node with parent should also change it's parent child list" {
             val nodeManager = initNodeManager()
             val deferredDadNodeId: Deferred<Int?> = async { nodeManager.addNodeToMindmap("fakeDad") }
-            val dadNodeId = deferredDadNodeId.await()
+            val dadNodeId : Int? = deferredDadNodeId.await()
 
-            dadNodeId shouldNotBe (null)
+            dadNodeId shouldNotBe null
+            dadNodeId?.shouldBeGreaterThanOrEqual(0)
 
             dadNodeId?.let {
                 var dadNode = nodeManager.getNodeByNumericId(dadNodeId)
+                dadNode shouldNotBe null
+
                 val deferredChildNodeId : Deferred<Int?> = async { nodeManager.addNodeToMindmap("fakeChild", parentNode = dadNode) }
                 val childNodeId = deferredChildNodeId.await()
 
