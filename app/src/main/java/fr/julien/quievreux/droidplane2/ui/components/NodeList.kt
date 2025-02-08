@@ -1,7 +1,6 @@
 package fr.julien.quievreux.droidplane2.ui.components
 
 import android.annotation.SuppressLint
-import android.content.Context
 import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.indication
@@ -64,6 +63,7 @@ import fr.julien.quievreux.droidplane2.model.NodeIcons.RicheText
 import fr.julien.quievreux.droidplane2.model.getNodeFontIconsFromName
 import fr.julien.quievreux.droidplane2.model.getNodeIconsResIdFromName
 import fr.julien.quievreux.droidplane2.ui.theme.ContrastAwareReplyTheme
+import java.util.Locale
 
 fun LazyListScope.nodeList(
     node: Node,
@@ -217,7 +217,7 @@ fun NodeItem(
                 getNodeIconsResIdFromName(iconName)?.let {
                     iconResourceIds.add(it)
                 } ?: run {
-                    val drawableName = getDrawableNameFromMindmapIcon(iconName, context)
+                    val drawableName = getDrawableNameFromMindmapIcon(iconName)
                     iconResourceIds.add(context.resources.getIdentifier("@drawable/$drawableName", "id", context.packageName))
                 }
             }
@@ -333,8 +333,8 @@ fun applyTextStyle(node: Node) = TextStyle(
  * @param iconName the icon name as it is specified in the XML
  * @return the name of the corresponding android resource icon
  */
-private fun getDrawableNameFromMindmapIcon(iconName: String, context: Context): String {
-    var name = "icon_" + iconName.lowercase(context.resources.configuration.locale).replace("[^a-z0-9_.]".toRegex(), "_")
+private fun getDrawableNameFromMindmapIcon(iconName: String): String {
+    var name = "icon_" + iconName.lowercase(Locale.getDefault()).replace("[^a-z0-9_.]".toRegex(), "_")
     name = name.replace("_$".toRegex(), "")
     return name
 }
@@ -381,9 +381,6 @@ private fun NodeListPreview() {
 
 
     node2.addChildMindmapNode(node1)
-//    node2 = node2.copy(
-//        childNodes = node2.childNodes +  node1
-//    )
 
     val node3 = Node(
         parentNode = nodeParent,

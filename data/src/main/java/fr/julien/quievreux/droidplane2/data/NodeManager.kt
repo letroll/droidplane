@@ -62,17 +62,17 @@ class NodeManager(
         fetchText = { node -> getNodeText(node) }
     )
 
-    fun getNodeByID(id: String?) : Node? = mindmapIndexes?.nodesByIdIndex?.get(id)
+    fun getNodeByID(id: String?): Node? = mindmapIndexes?.nodesByIdIndex?.get(id)
 
-    fun getNodeByNumericIndex() : Map<Int,Node>? = mindmapIndexes?.nodesByNumericIndex
+    fun getNodeByNumericIndex(): Map<Int, Node>? = mindmapIndexes?.nodesByNumericIndex
 
     fun getNodeByIdIndex() = mindmapIndexes?.nodesByIdIndex
 
-    inline fun <reified K,reified V> Map<K,V>?.orMutableMap():MutableMap<K,V> = if (this == null) mutableMapOf() else toMutableMap()
+    inline fun <reified K, reified V> Map<K, V>?.orMutableMap(): MutableMap<K, V> = if (this == null) mutableMapOf() else toMutableMap()
 
-    fun getNodeByNumericId(nodeId : Int):Node? = getNodeByID(getNodeID(nodeId))
+    fun getNodeByNumericId(nodeId: Int): Node? = getNodeByID(getNodeID(nodeId))
 
-    fun getNodeParent(childNodeId : Int):Node? = getNodeByNumericId(childNodeId)?.parentNode
+    fun getNodeParent(childNodeId: Int): Node? = getNodeByNumericId(childNodeId)?.parentNode
 
     fun updatemMindmapIndexes(mindmapIndexes: MindmapIndexes) {
         this.mindmapIndexes = mindmapIndexes
@@ -278,13 +278,13 @@ class NodeManager(
     ): Node? {
         // Get all nodes
         val nodes = _allNodes.first()
-        
+
         // Find the target node
         val targetNode = nodes.find { it.id == parentNodeId } ?: return null
-        
+
         // Create a map of parent ID to children
         val childrenByParentId = nodes.groupBy { it.parentNode?.id }
-        
+
         // Function to recursively rebuild a node with its children
         fun rebuildNode(node: Node): Node {
             val children = childrenByParentId[node.id] ?: emptyList()
@@ -293,7 +293,7 @@ class NodeManager(
                 parentNode = nodes.find { it.id == node.parentNode?.id }
             )
         }
-        
+
         // Rebuild the target node with its children
         return rebuildNode(targetNode)
     }
@@ -399,8 +399,7 @@ class NodeManager(
 
                         serializer.setOutput(outputStream, "UTF-8")
                         serializer.startDocument("UTF-8", true)
-                        serializer.text("\n")
-
+                        serializer.text(CHARIOT_RETURN)
                         serializer.startNodeTag(MAP)
 
                         // Get all nodes and create a map of parent ID to children
@@ -470,67 +469,19 @@ class NodeManager(
 
     fun isInvalidFileName(fileName: String): Boolean = fileName.isBlank() || !fileName.endsWith(".mm") || fileName == FILE_EXTENSION
 
-    private fun removeTextInLargeFile(
-        filePath: String,
-        onError: (Exception) -> Unit,
-        vararg textToRemove: String,
-    ) {
-        replaceTextInLargeFile(
-            filePath = filePath,
-            replacements = textToRemove.associate { it to "" },
-            onError = onError,
-        )
-    }
-
-    private fun replaceTextInLargeFile(
-        filePath: String,
-        replacements: Map<String, String>,  // Map of oldText to newText
-        onError: (Exception) -> Unit,
-    ) {
-        val file = File(filePath)
-        val tempFile = File(file.parent, "temp_clean_${file.name}")
-
-        try {
-            file.useLines { lines ->
-                tempFile.bufferedWriter().use { writer ->
-                    lines.forEach { line ->
-                        var modifiedLine = line
-                        // Appliquer tous les remplacements en une seule fois
-                        replacements.forEach { (oldText, newText) ->
-                            modifiedLine = modifiedLine.replace(oldText, newText)
-                        }
-                        writer.write(modifiedLine)
-                        writer.newLine()
-                    }
-                }
-            }
-
-            // Remplacer l'ancien fichier par le fichier temporaire
-            if (!file.delete()) {
-                throw Exception("Impossible de supprimer le fichier original")
-            }
-            if (!tempFile.renameTo(file)) {
-                throw Exception("Impossible de renommer le fichier temporaire")
-            }
-        } catch (e: Exception) {
-            // Nettoyage en cas d'erreur
-            if (tempFile.exists()) {
-                tempFile.delete()
-            }
-            onError(e)
-        }
-    }
+    private fun getTabsForDepth(depth: Int) = TAB.repeat(depth)
 
     private fun serializeNode(
         serializer: XmlSerializer,
         node: Node,
         childrenByParentId: Map<String?, List<Node>>,
+        depth: Int = 1,
         onError: (Exception) -> Unit,
     ) {
         try {
-            serializer.text("\n")
+            serializer.text("$CHARIOT_RETURN${getTabsForDepth(depth)}")
             serializer.startNodeTag(NODE)
-            
+
             // Write attributes in the correct order for Freeplane compatibility
             serializer.nodeAttribute(ID, node.id)
             node.creationDate?.let { date ->
@@ -546,35 +497,25 @@ class NodeManager(
                 serializer.nodeAttribute(POSITION, it)
             }
             if (node.richTextContents.isNotEmpty()) {
-                serializer.text("\n")
+                serializer.text("$CHARIOT_RETURN${getTabsForDepth(depth + 1)}")
                 serializer.startNodeTag(RICH_CONTENT)
                 serializer.nodeAttribute(TYPE, node.richContentType?.text.orEmpty())
                 node.richTextContents.forEach { richTextContent ->
-                    serializer.text("\n\n")
                     val cleanedText = richTextContent.replace('\u00A0', ' ').replace("&#160;", " ")
-                    serializer.text(cleanedText)
+                    serializer.cdsect(cleanedText)
                 }
-                serializer.text("\n")
+                serializer.text(CHARIOT_RETURN)
                 serializer.endNodeTag(RICH_CONTENT)
+                serializer.text(CHARIOT_RETURN)
             }
 
             //TODO Add other attributes as needed (icon, link, format, etc.)
             node.link?.let { link -> serializer.nodeAttribute(LINK, link.toString()) }
 
-            // Serialize child nodes recursively using the childrenByParentId map
-            val children = childrenByParentId[node.id] ?: emptyList()
-            children.forEach { childNode ->
-                serializeNode(
-                    serializer = serializer,
-                    node = childNode,
-                    childrenByParentId = childrenByParentId,
-                    onError = onError
-                )
-            }
-
             // Serialize arrow links
             if (node.arrowLinkDestinationIds.isNotEmpty()) {
                 node.arrowLinkDestinationIds.forEach { arrowLinkId ->
+                    serializer.text("$CHARIOT_RETURN${getTabsForDepth(depth + 1)}")
                     serializer.startNodeTag(ARROWLINK)
                     serializer.nodeAttribute(DESTINATION, arrowLinkId)
                     // Add other arrowLink attributes as needed
@@ -585,6 +526,7 @@ class NodeManager(
             // Serialize icons
             if (node.iconNames.isNotEmpty()) {
                 node.iconNames.forEach { iconName ->
+                    serializer.text("$CHARIOT_RETURN${getTabsForDepth(depth + 1)}")
                     serializer.startNodeTag(ICON)
                     serializer.nodeAttribute(BUILTIN, iconName)
                     serializer.endNodeTag(ICON)
@@ -593,11 +535,25 @@ class NodeManager(
 
             // Serialize font styles
             if (node.isItalic || node.isBold) {
+                serializer.text("$CHARIOT_RETURN${getTabsForDepth(depth + 1)}")
                 serializer.startNodeTag(FONT)
                 if (node.isItalic) serializer.nodeAttribute(ITALIC, "true")
                 if (node.isBold) serializer.nodeAttribute(BOLD, "true")
                 serializer.endNodeTag(FONT)
             }
+
+            // Serialize child nodes recursively using the childrenByParentId map
+            val children = childrenByParentId[node.id] ?: emptyList()
+            children.forEach { childNode ->
+                serializeNode(
+                    serializer = serializer,
+                    node = childNode,
+                    childrenByParentId = childrenByParentId,
+                    onError = onError,
+                    depth = depth + 1,
+                )
+            }
+
             serializer.endNodeTag(NODE)
         } catch (exception: Exception) {
             onError(exception)
@@ -628,7 +584,7 @@ class NodeManager(
         } else {
             generateNodeNumericID().let { nodeNumericId ->
                 val time = System.currentTimeMillis()
-                
+
                 // First create the new node
                 var newNode = Node(
                     id = getNodeID(nodeNumericId),
@@ -668,7 +624,7 @@ class NodeManager(
                         // If no parent, this is a root node
                         nodes.toMutableList()
                     }
-                    
+
                     // Add the new node
                     updatedNodes.add(newNode)
                     updatedNodes
@@ -729,5 +685,7 @@ class NodeManager(
         const val UNDEFINED_NODE_ID: Int = 2000000000
         const val FILE_EXTENSION = ".mm"
         const val NODE_ID_PREFIX = "ID_"
+        const val CHARIOT_RETURN = "\n"
+        const val TAB = "\t"
     }
 }
