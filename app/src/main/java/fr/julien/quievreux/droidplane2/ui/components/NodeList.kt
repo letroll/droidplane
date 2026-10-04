@@ -28,6 +28,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -54,6 +56,7 @@ import compose.icons.fontawesomeicons.Solid
 import compose.icons.fontawesomeicons.regular.Clipboard
 import compose.icons.fontawesomeicons.regular.Edit
 import compose.icons.fontawesomeicons.solid.Link
+import compose.icons.fontawesomeicons.solid.Minus
 import compose.icons.fontawesomeicons.solid.Plus
 import fr.julien.quievreux.droidplane2.R
 import fr.julien.quievreux.droidplane2.helper.DateUtils
@@ -62,6 +65,7 @@ import fr.julien.quievreux.droidplane2.model.ContextMenuAction.CopyText
 import fr.julien.quievreux.droidplane2.model.ContextMenuAction.Edit
 import fr.julien.quievreux.droidplane2.model.ContextMenuAction.NodeLink
 import fr.julien.quievreux.droidplane2.model.ContextMenuAction.AddChildNode
+import fr.julien.quievreux.droidplane2.model.ContextMenuAction.DeleteNode
 import fr.julien.quievreux.droidplane2.model.ContextMenuDropDownItem
 import fr.julien.quievreux.droidplane2.data.model.Node
 import fr.julien.quievreux.droidplane2.model.NodeIcons.Link
@@ -181,6 +185,11 @@ fun NodeItem(
             text = stringResource(id = R.string.add_child_node),
             action = AddChildNode(parentNode = node)
         ),
+        ContextMenuDropDownItem(
+            text = stringResource(id = R.string.delete),
+            action = DeleteNode(node = node)
+        ),
+
     )
 
     // Add "Open link" action if node has a link
@@ -350,7 +359,7 @@ fun NodeItem(
                         item.action?.let { action ->
                             when (action) {
                                 is CopyText -> updateClipBoard(action.text)
-                                is Edit, is NodeLink, is AddChildNode, is ContextMenuAction.OpenLink -> onNodeContextMenuClick(action)
+                                is Edit, is NodeLink, is AddChildNode, is ContextMenuAction.OpenLink, is DeleteNode -> onNodeContextMenuClick(action)
                             }
                         }
                         isContextMenuVisble = false
@@ -359,6 +368,8 @@ fun NodeItem(
                         Text(text = item.text)
                     },
                     leadingIcon = { item.action?.let { GetLeadingIcon(it) } },
+                    modifier = Modifier
+                        .fillMaxWidth()
                 )
             }
 
@@ -373,10 +384,14 @@ fun NodeItem(
             is Edit -> FontAwesomeIcons.Regular.Edit
             is NodeLink -> FontAwesomeIcons.Solid.Link
             is AddChildNode -> FontAwesomeIcons.Solid.Plus
+            is DeleteNode -> FontAwesomeIcons.Solid.Minus
             is ContextMenuAction.OpenLink -> FontAwesomeIcons.Solid.Link
         },
         tint = MaterialTheme.colorScheme.primary,
-        contentDescription = null,
+        contentDescription = when (action) {
+            is DeleteNode -> "Delete node ${(action as DeleteNode).node.text.orEmpty()}"
+            else -> null
+        },
         modifier = Modifier.size(24.dp),
     )
 

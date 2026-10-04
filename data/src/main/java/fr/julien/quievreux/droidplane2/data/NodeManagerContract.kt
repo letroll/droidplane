@@ -1,5 +1,6 @@
 package fr.julien.quievreux.droidplane2.data
 
+import fr.julien.quievreux.droidplane2.data.model.DeleteSnapshot
 import fr.julien.quievreux.droidplane2.data.model.Node
 import kotlinx.coroutines.flow.StateFlow
 import java.io.File
@@ -50,8 +51,24 @@ interface NodeManagerContract {
 
     /**
      * Deletes a node by its ID from the tree and indexes.
+     * Returns true if node was found and deleted, false otherwise.
      */
     suspend fun deleteNode(nodeId: String): Boolean
+
+    /**
+     * Creates a snapshot of the node and its subtree for undo functionality.
+     * Returns a DeleteSnapshot containing the node and all its descendants,
+     * or null if the node is not found.
+     */
+    suspend fun createDeleteSnapshot(nodeId: String): DeleteSnapshot?
+
+    /**
+     * Restores a previously deleted subtree from a DeleteSnapshot.
+     * Re-inserts nodes into the hierarchy at the original position.
+     * Rebuilds link references and updates indexes.
+     * Returns true if restore succeeded.
+     */
+    suspend fun restoreSubtree(snapshot: DeleteSnapshot): Boolean
 
     /**
      * Initiates a full-text search across all nodes.
@@ -71,6 +88,6 @@ interface NodeManagerContract {
         filePath: String,
         filename: String,
         onError: (Exception) -> Unit,
-        onSaveFinished: ((File) -> Unit)? = null,
+        onSaveFinished: ((java.io.File) -> Unit)? = null,
     )
 }

@@ -31,6 +31,7 @@ import androidx.compose.material3.SnackbarResult.Dismissed
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.State
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
@@ -38,9 +39,12 @@ import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.res.stringResource
 import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.lifecycleScope
+import fr.julien.quievreux.droidplane2.MainUiState.DialogType
 import fr.julien.quievreux.droidplane2.MainUiState.DialogType.AddChildNode
 import fr.julien.quievreux.droidplane2.MainUiState.DialogType.EditNodeDescription
 import fr.julien.quievreux.droidplane2.MainUiState.DialogType.None
+import fr.julien.quievreux.droidplane2.ui.view.DeleteConfirmationDialog
+import fr.julien.quievreux.droidplane2.ui.view.ExitConfirmationDialog
 import fr.julien.quievreux.droidplane2.core.PermissionUtils.checkStoragePermissions
 import fr.julien.quievreux.droidplane2.core.PermissionUtils.requestForStoragePermissions
 import fr.julien.quievreux.droidplane2.core.extensions.getOpenFileLauncher
@@ -61,6 +65,7 @@ import fr.julien.quievreux.droidplane2.ui.components.AppTopBarAction.Save
 import fr.julien.quievreux.droidplane2.ui.components.AppTopBarAction.SearchNext
 import fr.julien.quievreux.droidplane2.ui.components.AppTopBarAction.SearchPrevious
 import fr.julien.quievreux.droidplane2.ui.components.AppTopBarAction.Top
+import fr.julien.quievreux.droidplane2.ui.components.AppTopBarAction.Undo
 import fr.julien.quievreux.droidplane2.ui.components.AppTopBarAction.Up
 import fr.julien.quievreux.droidplane2.core.ui.component.CustomDialog
 import fr.julien.quievreux.droidplane2.ui.components.MindMap
@@ -119,7 +124,16 @@ class MainActivity : FragmentActivity(), FileRegister {
 
             ContrastAwareReplyTheme {
                 val state = viewModel.uiState.collectAsState()
-                if (state.value.leaving) finish() //TODO confirm dialog
+                // Handle exit confirmation for unsaved changes
+                val exitConfirmation = remember { mutableStateOf(false) }
+                val hasUnsavedChanges = state.value.dialogUiState.dialogType is DialogType.DeleteConfirmation || viewModel.hasUnsavedChangesState
+                if (state.value.leaving) {
+                    if (hasUnsavedChanges && !exitConfirmation.value) {
+                        exitConfirmation.value = true
+                    } else {
+                        finish()
+                    }
+                }
                 val nodeFindList = viewModel.getSearchResultFlow().collectAsState()
 
                 BackHandler(true) {
@@ -162,6 +176,14 @@ class MainActivity : FragmentActivity(), FileRegister {
                             viewModel.addNode(newValue)
                         }
                     }
+                    is DialogType.DeleteConfirmation -> {
+                        DeleteConfirmationDialog(confirmation = dialog)
+                    }
+                    is DialogType.ExitConfirmation -> {
+                        ExitConfirmationDialog(
+                            confirmation = dialog,
+                        )
+                    }
                 }
 
                 Scaffold(
@@ -193,6 +215,8 @@ class MainActivity : FragmentActivity(), FileRegister {
                                     Help -> showHelp()
 
                                     Save -> viewModel.launchSaveFile()
+
+                                    Undo -> viewModel.onUndoDelete()
 
                                     ExitSearch -> viewModel.onExitSearchMode()
                                 }
@@ -422,6 +446,16 @@ class MainActivity : FragmentActivity(), FileRegister {
             putExtra(Intent.EXTRA_TITLE, filename)
         }
         saveFileLauncher.launch(intent)
+    }
+
+    override fun onKeyDown(keyCode: Int, event: android.view.KeyEvent): Boolean {
+        if (keyCode == android.view.KeyEvent.KEYCODE_Z && event.isCtrlPressed) {
+            if (viewModel.canUndoDelete) {
+                viewModel.onUndoDelete()
+                return true
+            }
+        }
+        return super.onKeyDown(keyCode, event)
     }
 
     // Handle permission request result

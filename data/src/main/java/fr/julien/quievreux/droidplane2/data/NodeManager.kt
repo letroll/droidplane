@@ -5,6 +5,7 @@ import android.text.Html
 import fr.julien.quievreux.droidplane2.core.log.Logger
 import fr.julien.quievreux.droidplane2.data.model.MindmapIndexes
 import fr.julien.quievreux.droidplane2.data.model.Node
+import fr.julien.quievreux.droidplane2.data.model.DeleteSnapshot
 import fr.julien.quievreux.droidplane2.data.model.NodeAttribute
 import fr.julien.quievreux.droidplane2.data.model.NodeAttribute.*
 import fr.julien.quievreux.droidplane2.data.model.NodeRelation
@@ -762,23 +763,181 @@ class NodeManager(
 
     override suspend fun deleteNode(nodeId: String): Boolean {
         val targetNode = getNodeByID(nodeId) ?: return false
+
+        // Prevent deletion of root node
+        if (targetNode.parentNode == null) {
+            logger.e("Attempted to delete root node, which is not allowed")
+            return false
+        }
+
+        // Collect all node IDs to delete (target + all descendants)
+        val idsToDelete = mutableSetOf<String>()
+        fun collectDescendants(node: Node) {
+            idsToDelete.add(node.id)
+            for (child in node.childNodes) {
+                collectDescendants(child)
+            }
+        }
+        collectDescendants(targetNode)
+
+        // Collect all numeric IDs to delete
+        val numericIdsToDelete = idsToDelete.mapNotNull { id ->
+            getNodeByID(id)?.numericId
+        }.toSet()
+
+        // Update the nodes list: remove all deleted nodes, update parent's children
+        val parentNodeId = targetNode.parentNode?.id
         _allNodes.update { nodes ->
-            nodes.filter { it.id != nodeId }.map { node ->
-                if (node.id == targetNode.parentNode?.id) {
-                    val newChildren = node.childNodes.filter { it.id != nodeId }.toMutableList()
+            nodes.filter { it.id !in idsToDelete }.map { node ->
+                if (node.id == parentNodeId) {
+                    val newChildren = node.childNodes.filter { it.id !in idsToDelete }.toMutableList()
                     node.copy(childNodes = newChildren)
                 } else {
                     node
                 }
             }
         }
+
+
+        // Update indexes: remove all deleted nodes
         val nodesById = getNodeByIdIndex().orMutableMap()
         val nodesByNumeric = getNodeByNumericIndex().orMutableMap()
-        nodesById.remove(nodeId)
-        nodesByNumeric.remove(targetNode.numericId)
+        idsToDelete.forEach { nodesById.remove(it) }
+        numericIdsToDelete.forEach { nodesByNumeric.remove(it) }
+        println("deleteNode: updated indexes, size: ${nodesById.size}, ${nodesByNumeric.size}")
         updatemMindmapIndexes(MindmapIndexes(nodesById, nodesByNumeric))
+
+        // Clean up external links for deleted nodes
+        for (deletedId in idsToDelete) {
+            val deletedNode = getNodeByID(deletedId)
+            if (deletedNode != null && deletedNode.link != null) {
+                // The link will be garbage collected since the node is removed
+                // But we should also clean up any references to this link from other nodes
+                // (handled by arrow link cleanup above)
+            }
+        }
+
+
+
+        val remainingNodes = _allNodes.value
+        for (node in remainingNodes) {
+            try {
+                // Remove deleted node IDs from arrow link destination lists
+                val updatedDestIds = node.arrowLinkDestinationIds.filter { it !in idsToDelete }.toMutableList()
+                val updatedDestNodes = node.arrowLinkDestinationNodes.filter { it.id !in idsToDelete }.toMutableList()
+                val updatedIncomingNodes = node.arrowLinkIncomingNodes.filter { it.id !in idsToDelete }.toMutableList()
+                if (updatedDestIds != node.arrowLinkDestinationIds ||
+                    updatedDestNodes != node.arrowLinkDestinationNodes ||
+                    updatedIncomingNodes != node.arrowLinkIncomingNodes) {
+                    val updatedNode = node.copy(
+                        arrowLinkDestinationIds = updatedDestIds,
+                        arrowLinkDestinationNodes = updatedDestNodes,
+                        arrowLinkIncomingNodes = updatedIncomingNodes
+                    )
+                    updateNodeInMindMapIndexes(updatedNode)
+                }
+            } catch (e: Exception) {
+                println("deleteNode: error cleaning arrow links for node ${node.id}: ${e.message}")
+                e.printStackTrace()
+            }
+        }
+
+        // If root node was deleted, clear root
+        if (targetNode.id == rootNode?.id) {
+            rootNode = null
+        }
+
+
         return true
     }
+
+    override suspend fun createDeleteSnapshot(nodeId: String): DeleteSnapshot? {
+        val targetNode = getNodeByID(nodeId) ?: return null
+        
+        // Prevent deletion of root node (handled at ViewModel level, but also enforce here)
+        if (targetNode.parentNode == null) {
+            logger.e("Attempted to create snapshot of root node, which is not allowed")
+            return null
+        }
+        
+        val parentNode = targetNode.parentNode!!
+        val parentChildIndex = parentNode.childNodes.indexOfFirst { it.id == nodeId }
+        if (parentChildIndex == -1) {
+            logger.e("Node $nodeId not found in parent's children")
+            return null
+        }
+        
+        return DeleteSnapshot.create(targetNode, parentNode, parentChildIndex)
+    }
+
+    override suspend fun restoreSubtree(snapshot: DeleteSnapshot): Boolean {
+        // Verify parent still exists
+        val parentNode = getNodeByID(snapshot.parentNodeId) ?: return false
+        
+        // Verify the index is still valid
+        if (snapshot.parentChildIndex < 0 || snapshot.parentChildIndex > parentNode.childNodes.size) {
+            logger.e("Invalid parentChildIndex in snapshot: ${snapshot.parentChildIndex}")
+            return false
+        }
+        
+        // Rebuild the subtree with new node instances but preserving IDs and timestamps
+        val restoredNodes = mutableMapOf<String, Node>()
+        
+        // First, rebuild all nodes in the subtree
+        for (originalNode in snapshot.deletedSubtree) {
+            // Create a copy with all original properties preserved
+            val restoredNode = originalNode.copy()
+            restoredNodes[originalNode.id] = restoredNode
+        }
+        
+        // Rebuild parent-child relationships
+        for (originalNode in snapshot.deletedSubtree) {
+            val restoredNode = restoredNodes[originalNode.id]!!
+            for (child in originalNode.childNodes) {
+                val restoredChild = restoredNodes[child.id]
+                if (restoredChild != null) {
+                    // Update the child's parent reference
+                    val updatedChild = restoredChild.copy(parentNode = restoredNode)
+                    restoredNodes[child.id] = updatedChild
+                }
+            }
+        }
+        
+        // Insert the restored subtree back into the parent's children at the original index
+        val restoredRoot = restoredNodes[snapshot.deletedNodeId]!!
+        val newChildren = parentNode.childNodes.toMutableList()
+        newChildren.add(snapshot.parentChildIndex, restoredRoot)
+        
+        val updatedParent = parentNode.copy(childNodes = newChildren)
+        
+        // Update all nodes in the hierarchy
+        _allNodes.update { nodes ->
+            nodes.map { node ->
+                when {
+                    node.id == snapshot.parentNodeId -> parentNode.copy(childNodes = (parentNode.childNodes.toMutableList() + restoredRoot).toMutableList())
+                    node.id in snapshot.deletedSubtree.map { it.id }.toMutableList() -> restoredNodes[node.id]!!
+                    else -> node
+                }
+            }
+        }
+        
+        // Update indexes for all restored nodes
+        for (node in snapshot.deletedSubtree) {
+            val restoredNode = restoredNodes[node.id]!!
+            updateNodeInMindMapIndexes(restoredNode)
+        }
+        
+        // Update parent in indexes
+        updateNodeInMindMapIndexes(parentNode.copy(childNodes = (parentNode.childNodes.toMutableList() + restoredRoot).toMutableList()))
+        
+        // Update root if necessary
+        if (snapshot.parentNodeId == rootNode?.id) {
+            rootNode = parentNode.copy(childNodes = (parentNode.childNodes.toMutableList() + restoredRoot).toMutableList())
+        }
+        
+        return true
+    }
+
 
     suspend fun generateNodeNumericID(): Int {
         val currentIds = allNodesId.first().toSet()

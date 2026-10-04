@@ -12,12 +12,21 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import fr.julien.quievreux.droidplane2.MainViewModel
 import fr.julien.quievreux.droidplane2.data.model.Node
 import fr.julien.quievreux.droidplane2.model.ContextMenuAction
+import fr.julien.quievreux.droidplane2.MainUiState.DialogType.DeleteConfirmation
+import fr.julien.quievreux.droidplane2.ui.view.DeleteConfirmationDialog
 
 @Composable
 fun MindMapScreen(viewModel: MainViewModel = viewModel()) {
     val uiState by viewModel.uiState.collectAsState()
 
     val nodeCurrentlyDisplayed = uiState.nodeCurrentlyDisplayed
+
+    // Show DeleteConfirmationDialog when dialog state is DeleteConfirmation
+    uiState.dialogUiState.dialogType.let {
+        if (it is DeleteConfirmation) {
+            DeleteConfirmationDialog(confirmation = it)
+        }
+    }
 
     nodeCurrentlyDisplayed?.let { node ->
         NodeListScreen(

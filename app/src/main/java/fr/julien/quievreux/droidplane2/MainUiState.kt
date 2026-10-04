@@ -44,5 +44,17 @@ data class MainUiState(
         data class AddChildNode(
             val parentNode: Node,
         ):DialogType()
+
+        data class DeleteConfirmation(
+            val node: Node,
+            val descendantCount: Int,
+            val onConfirm: () -> Unit,
+            val onCancel: () -> Unit,
+        ):DialogType()
+
+    data class ExitConfirmation(
+        val onConfirm: () -> Unit,
+        val onCancel: () -> Unit,
+    ):DialogType()
 }
 }

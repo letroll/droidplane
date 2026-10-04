@@ -11,6 +11,7 @@ import fr.julien.quievreux.droidplane2.MainUiState.DialogUiState
 import fr.julien.quievreux.droidplane2.MainUiState.SearchUiState
 import fr.julien.quievreux.droidplane2.core.log.Logger
 import fr.julien.quievreux.droidplane2.data.NodeManager
+import fr.julien.quievreux.droidplane2.data.model.DeleteSnapshot
 import fr.julien.quievreux.droidplane2.data.model.Node
 import fr.julien.quievreux.droidplane2.data.model.isInternalLink
 import fr.julien.quievreux.droidplane2.data.model.shortFamily
@@ -72,6 +73,14 @@ class MainViewModel(
     private var fileRegister: FileRegister? = null
     private var fileToSave: File? = null
     private var nodeBeforeFileSave: Node? = null
+    // Undo stack for node deletion
+    private val undoStack: MutableList<DeleteSnapshot> = mutableListOf()
+    // Unsaved changes tracking
+    private var hasUnsavedChanges: Boolean = false
+    val hasUnsavedChangesState: Boolean
+        get() = hasUnsavedChanges
+    val canUndoDelete: Boolean
+        get() = undoStack.isNotEmpty()
 
     override fun onCleared() {
         super.onCleared()
@@ -547,6 +556,10 @@ nodeFindList:${nodeManager.getSearchResult().map { getNodeText(it) }.joinToStrin
                     openIntentLink(node)
                 }
             }
+
+            is ContextMenuAction.DeleteNode -> {
+                onDeleteNode(contextMenuAction.node)
+            }
         }
     }
 
@@ -657,6 +670,7 @@ nodeFindList:${nodeManager.getSearchResult().map { getNodeText(it) }.joinToStrin
         viewModelScope.launch(Dispatchers.IO) {
             setMindmapIsLoading(true)
             val updatedNode = nodeManager.updateNodeText(node.id, newValue)
+            hasUnsavedChanges = true
             setMindmapIsLoading(false)
             updatedNode?.let { node ->
                 // Reload the displayed node from NodeManager to ensure synchronization
@@ -686,6 +700,7 @@ nodeFindList:${nodeManager.getSearchResult().map { getNodeText(it) }.joinToStrin
                             onSaveFinished = { file ->
                                 fileToSave = file
                                 fileRegister?.registerFile(file)
+                                hasUnsavedChanges = false
                             }
                         )
                     }
@@ -709,6 +724,84 @@ nodeFindList:${nodeManager.getSearchResult().map { getNodeText(it) }.joinToStrin
     }
 
     fun getNameOfFileToSave(): String? = fileToSave?.name
+
+
+    fun onDeleteNode(node: Node) {
+        if (node.parentNode == null) {
+            return
+        }
+        // Calculate descendant count
+        val descendantCount = countDescendants(node)
+        
+        // Show confirmation dialog
+        setDialogState(
+            DialogType.DeleteConfirmation(
+                node = node,
+                descendantCount = descendantCount,
+                onConfirm = { confirmDelete(node) },
+                onCancel = { setDialogState(DialogType.None) }
+            )
+        )
+    }
+
+    private fun countDescendants(node: Node): Int {
+        var count = 0
+        fun countChildren(n: Node) {
+            count += n.childNodes.size
+            n.childNodes.forEach { countChildren(it) }
+        }
+        countChildren(node)
+        return count
+    }
+
+    fun onConfirmDelete() {
+        val dialogType = _uiState.value.dialogUiState.dialogType
+        if (dialogType is DialogType.DeleteConfirmation) {
+            confirmDelete(dialogType.node)
+        }
+    }
+
+    private fun confirmDelete(node: Node) {
+        viewModelScope.launch(Dispatchers.IO) {
+            setMindmapIsLoading(true)
+            // Create snapshot for undo before deleting
+            val snapshot = nodeManager.createDeleteSnapshot(node.id)
+            snapshot?.let { undoStack.add(0, it) }
+            nodeManager.deleteNode(node.id)
+            hasUnsavedChanges = true
+            val parent = node.parentNode
+            if (parent != null) {
+                val updatedParent = nodeManager.getNodeByID(parent.id)
+                if (updatedParent != null) {
+                    showNode(updatedParent)
+                } else {
+                    showNode(parent)
+                }
+            }
+            setMindmapIsLoading(false)
+            setDialogState(DialogType.None)
+        }
+    }
+
+    fun onUndoDelete() {
+        viewModelScope.launch(Dispatchers.IO) {
+            setMindmapIsLoading(true)
+            undoStack.firstOrNull()?.let { snapshot ->
+                val success = nodeManager.restoreSubtree(snapshot)
+                if (success) {
+                    undoStack.removeAt(0)
+                    // Navigate to restored node
+                    val restoredNode = snapshot.rootDeletedNode
+                    restoredNode?.let { showNode(it) }
+                }
+            }
+            setMindmapIsLoading(false)
+        }
+    }
+
+    fun onCancelDelete() {
+        setDialogState(DialogType.None)
+    }
 
     fun addNode(newValue: String) {
         viewModelScope.launch(Dispatchers.IO) {
@@ -735,7 +828,7 @@ nodeFindList:${nodeManager.getSearchResult().map { getNodeText(it) }.joinToStrin
                     }
                 }
             }
-
+            hasUnsavedChanges = true
             setMindmapIsLoading(false)
         }
     }

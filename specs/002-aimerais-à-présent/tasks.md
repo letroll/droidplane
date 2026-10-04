@@ -215,30 +215,30 @@ With multiple developers:
 
 ### CRITICAL - Undo Functionality (FR-006)
 
-- [ ] T034 [US1] Add DeleteSnapshot data class in data/src/main/java/fr/julien/quievreux/droidplane2/data/model/DeleteSnapshot.kt per data-model.md
-- [ ] T035 [US1] Implement NodeManager.createDeleteSnapshot(nodeId) to capture deleted subtree for undo (data/src/main/java/fr/julien/quievreux/droidplane2/data/NodeManager.kt)
-- [ ] T036 [US1] Implement NodeManager.restoreSubtree(snapshot) for undo support (data/src/main/java/fr/julien/quievreux/droidplane2/data/NodeManager.kt)
-- [ ] T037 [US1] Add undo stack (MutableList<DeleteSnapshot>) and canUndoDelete property to MainViewModel (app/src/main/java/fr/julien/quievreux/droidplane2/MainViewModel.kt)
-- [ ] T038 [US1] Implement onUndoDelete() in MainViewModel to restore last deleted subtree (app/src/main/java/fr/julien/quievreux/droidplane2/MainViewModel.kt)
-- [ ] T039 [US1] Add Ctrl+Z handler in MainActivity for undo (app/src/main/java/fr/julien/quievreux/droidplane2/MainActivity.kt)
-- [ ] T040 [US1] Add undo menu action in AppTopBar when canUndoDelete is true (app/src/main/java/fr/julien/quievreux/droidplane2/ui/components/AppTopBar.kt)
+- [X] T034 [US1] Add DeleteSnapshot data class in data/src/main/java/fr/julien/quievreux/droidplane2/data/model/DeleteSnapshot.kt per data-model.md
+- [X] T035 [US1] Implement NodeManager.createDeleteSnapshot(nodeId) to capture deleted subtree for undo (data/src/main/java/fr/julien/quievreux/droidplane2/data/NodeManager.kt)
+- [X] T036 [US1] Implement NodeManager.restoreSubtree(snapshot) for undo support (data/src/main/java/fr/julien/quievreux/droidplane2/data/NodeManager.kt)
+- [X] T037 [US1] Add undo stack (MutableList<DeleteSnapshot>) and canUndoDelete property to MainViewModel (app/src/main/java/fr/julien/quievreux/droidplane2/MainViewModel.kt)
+- [X] T038 [US1] Implement onUndoDelete() in MainViewModel to restore last deleted subtree (app/src/main/java/fr/julien/quievreux/droidplane2/MainViewModel.kt)
+- [X] T039 [US1] Add Ctrl+Z handler in MainActivity for undo (app/src/main/java/fr/julien/quievreux/droidplane2/MainActivity.kt)
+- [X] T040 [US1] Add undo menu action in AppTopBar when canUndoDelete is true (app/src/main/java/fr/julien/quievreux/droidplane2/ui/components/AppTopBar.kt)
 
 ### HIGH - Root Node Protection & Unsaved Changes (FR-003, FR-004)
 
-- [ ] T041 [US1] Add root node protection in NodeManager.deleteNode() - return false for root node (data/src/main/java/fr/julien/quievreux/droidplane2/data/NodeManager.kt)
-- [ ] T042 [US1] Add unsaved changes tracking (dirty flag) in MainViewModel (app/src/main/java/fr/julien/quievreux/droidplane2/MainViewModel.kt)
-- [ ] T043 [US1] Add exit confirmation dialog for unsaved changes in MainActivity (app/src/main/java/fr/julien/quievreux/droidplane2/MainActivity.kt)
+- [X] T041 [US1] Add root node protection in NodeManager.deleteNode() - return false for root node (data/src/main/java/fr/julien/quievreux/droidplane2/data/NodeManager.kt)
+- [X] T042 [US1] Add unsaved changes tracking (dirty flag) in MainViewModel (app/src/main/java/fr/julien/quievreux/droidplane2/MainViewModel.kt)
+- [X] T043 [US1] Add exit confirmation dialog for unsaved changes in MainActivity (app/src/main/java/fr/julien/quievreux/droidplane2/MainActivity.kt)
 
 ### HIGH - Link Cleanup (FR-008)
 
-- [ ] T044 [US1] Clean up Node.link (external link) on deletion in NodeManager.deleteNode() (data/src/main/java/fr/julien/quievreux/droidplane2/data/NodeManager.kt)
+- [X] T044 [US1] Clean up Node.link (external link) on deletion in NodeManager.deleteNode() (data/src/main/java/fr/julien/quievreux/droidplane2/data/NodeManager.kt)
 
 ### MEDIUM - Accessibility & Icon (US3)
 
-- [ ] T045 [US3] Add trash/delete icon for Delete action in NodeList.GetLeadingIcon() (app/src/main/java/fr/julien/quievreux/droidplane2/ui/components/NodeList.kt)
-- [ ] T046 [US3] Add accessibility contentDescription for Delete menu item in NodeList (app/src/main/java/fr/julien/quievreux/droidplane2/ui/components/NodeList.kt)
+- [X] T045 [US3] Add trash/delete icon for Delete action in NodeList.GetLeadingIcon() (app/src/main/java/fr/julien/quievreux/droidplane2/ui/components/NodeList.kt)
+- [X] T046 [US3] Add accessibility contentDescription for Delete menu item in NodeList (app/src/main/java/fr/julien/quievreux/droidplane2/ui/components/NodeList.kt)
 
 ### MEDIUM - DeleteConfirmationDialog Accessibility
 
-- [ ] T047 [US2] Add accessibility semantics to DeleteConfirmationDialog for TalkBack/VoiceOver (app/src/main/java/fr/julien/quievreux/droidplane2/ui/view/DeleteConfirmationDialog.kt)
+- [X] T047 [US2] Add accessibility semantics to DeleteConfirmationDialog for TalkBack/VoiceOver (app/src/main/java/fr/julien/quievreux/droidplane2/ui/view/DeleteConfirmationDialog.kt)
 

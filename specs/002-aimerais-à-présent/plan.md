@@ -1,14 +1,14 @@
-# Implementation Plan: [FEATURE]
+# Implementation Plan: Delete Mindmap Nodes
 
-**Branch**: `[###-feature-name]` | **Date**: [DATE] | **Spec**: [link]
+**Branch**: `002-delete-nodes` | **Date**: 2026-10-04 | **Spec**: spec.md
 
-**Input**: Feature specification from `/specs/[###-feature-name]/spec.md`
+**Input**: Feature specification from `/specs/002-delete-nodes/spec.md`
 
 **Note**: This template is filled in by the `/speckit.plan` command; its definition describes the execution workflow.
 
 ## Summary
 
-[Extract from feature spec: primary requirement + technical approach from research]
+This feature adds the ability to delete mindmap nodes (and their descendants) from within the Droidplane application. The implementation leverages the existing `NodeManager.deleteNode()` method in the `:data` module and wires it through `MainViewModel` to the node context menu in the UI. Key design decisions include: confirmation dialog showing descendant count, full session undo support via Ctrl+Z/menu, automatic link/arrow-link cleanup, and post-deletion navigation to parent's children list.
 
 ## Technical Context
 
@@ -18,71 +18,102 @@
   the iteration process.
 -->
 
-**Language/Version**: [e.g., Python 3.11, Swift 5.9, Rust 1.75 or NEEDS CLARIFICATION]
+**Language/Version**: Kotlin 2.1.0, Java 21 (JVM Target 21)
 
-**Primary Dependencies**: [e.g., FastAPI, UIKit, LLVM or NEEDS CLARIFICATION]
+**Primary Dependencies**:
+- Jetpack Compose (BOM `2024.09.03`, Material 3, Activity Compose `1.10.0`)
+- Koin Dependency Injection (BOM `4.0.0`, `koin-android`, `koin-compose`, `koin-compose-viewmodel`)
+- Kotlinx Coroutines & Flow (`1.9.0+`)
 
-**Storage**: [if applicable, e.g., PostgreSQL, CoreData, files or N/A]
+**Storage**: Local file system (Freeplane XML `.mm` documents) via standard Android content resolvers and file streams; temporary-file atomic staging for safe writes.
 
-**Testing**: [e.g., pytest, XCTest, cargo test or NEEDS CLARIFICATION]
+**Testing**:
+- JVM Unit Tests: Kotest (`5.9.0`), MockK (`1.13.13`), Turbine (`1.2.0`), JUnit 5 (JUnit Platform runner)
+- Android UI Tests: Compose UI Test (`androidx.compose.ui:ui-test-junit4`)
 
-**Target Platform**: [e.g., Linux server, iOS 15+, WASM or NEEDS CLARIFICATION]
+**Target Platform**: Android 8.0+ (API level 26 minimum SDK, API level 35 target SDK)
 
-**Project Type**: [e.g., library/cli/web-service/mobile-app/compiler/desktop-app or NEEDS CLARIFICATION]
+**Project Type**: Multi-module Android mobile application (`:app`, `:data`, `:core`)
 
-**Performance Goals**: [domain-specific, e.g., 1000 req/s, 10k lines/sec, 60 fps or NEEDS CLARIFICATION]
+**Performance Goals**:
+- Sub-100ms deletion time for subtrees with 100+ nodes
+- 100% of deleted nodes and descendants removed from hierarchy and indexes
 
-**Constraints**: [domain-specific, e.g., <200ms p95, <100MB memory, offline-capable or NEEDS CLARIFICATION]
+**Constraints**:
+- Strictly offline-first operation
+- Full backward and forward compatibility with desktop Freeplane `.mm` schemas
+- Non-blocking main thread: All file I/O, XML parsing, and tree traversal execute on coroutine dispatchers (`Dispatchers.IO` / `Dispatchers.Default`)
+- Follow existing architecture: `:core` (utilities), `:data` (domain/parsing), `:app` (UI)
 
-**Scale/Scope**: [domain-specific, e.g., 10k users, 1M LOC, 50 screens or NEEDS CLARIFICATION]
+**Scale/Scope**: Single mindmap documents containing up to 2,000+ nodes; 3 user stories (Deletion, Confirmation, UI Integration).
 
 ## Constitution Check
 
 *GATE: Must pass before Phase 0 research. Re-check after Phase 1 design.*
 
-[Gates determined based on constitution file]
+| Principle | Gate Status | Compliance Details |
+|---|---|---|
+| **I. Modular Separation of Concerns** | **PASSED** | Deletion logic remains in `NodeManager` (`:data`); UI in `:app`; no new cross-module dependencies. |
+| **II. Unidirectional Data Flow & State Consistency** | **PASSED** | `MainViewModel` delegates to `NodeManager`; state updates flow through `StateFlow`; undo uses state snapshots. |
+| **III. Test-Driven Verification (NON-NEGOTIABLE)** | **PASSED** | Deletion, undo, and link cleanup covered by JVM unit tests (`NodeManagerTest`); ViewModel tests with Turbine/MockK. |
+| **IV. Freeplane Format Compatibility & Data Integrity** | **PASSED** | Deletion preserves document structure; atomic writes; link cleanup prevents dangling references. |
+| **V. Performance, Responsiveness & Simplicity (YAGNI)** | **PASSED** | Deletion operates on in-memory indexes; no new dependencies; virtualized UI unaffected.
 
 ## Project Structure
 
 ### Documentation (this feature)
 
 ```text
-specs/[###-feature]/
-├── plan.md              # This file (/speckit.plan command output)
-├── research.md          # Phase 0 output (/speckit.plan command)
-├── data-model.md        # Phase 1 output (/speckit.plan command)
-├── quickstart.md        # Phase 1 output (/speckit.plan command)
-├── contracts/           # Phase 1 output (/speckit.plan command)
-└── tasks.md             # Phase 2 output (/speckit.tasks command - NOT created by /speckit.plan)
+specs/002-delete-nodes/
+├── plan.md              # This file
+├── research.md          # Phase 0 output
+├── data-model.md        # Phase 1 output
+├── quickstart.md        # Phase 1 output
+├── contracts/           # Phase 1 output
+└── tasks.md             # Phase 2 output (created by /speckit.tasks)
 ```
 
 ### Source Code (repository root)
-<!--
-  ACTION REQUIRED: Replace the placeholder tree below with the concrete layout
-  for this feature. Delete unused options and expand the chosen structure with
-  real paths (e.g., apps/admin, packages/something). The delivered plan must
-  not include Option labels.
--->
 
 ```text
-# [REMOVE IF UNUSED] Option 1: Single project (DEFAULT)
-src/
-├── models/
-├── services/
-├── cli/
-└── lib/
+core/
+├── src/main/java/fr/julien/quievreux/droidplane2/core/
+│   ├── log/Logger.kt
+│   ├── di/CoreKoinModule.kt
+│   └── ui/component/              # Atomic Compose primitives
+└── src/test/java/
 
-tests/
-├── contract/
-├── integration/
-└── unit/
+data/
+├── src/main/java/fr/julien/quievreux/droidplane2/data/
+│   ├── model/
+│   │   ├── Node.kt
+│   │   ├── MindmapIndexes.kt
+│   │   └── RichContent.kt
+│   ├── search/SearchManager.kt
+│   ├── NodeManager.kt
+│   ├── XmlParseUtils.kt
+│   └── di/DataKoinModule.kt
+└── src/test/java/                 # NodeManagerTest, etc.
 
-# [REMOVE IF UNUSED] Option 2: Web application (when "frontend" + "backend" detected)
-backend/
-├── src/
-│   ├── models/
-│   ├── services/
-│   └── api/
+app/
+├── src/main/java/fr/julien/quievreux/droidplane2/
+│   ├── MainViewModel.kt
+│   ├── MainUiState.kt
+│   ├── ui/
+│   │   ├── components/
+│   │   │   ├── AppTopBar.kt
+│   │   │   ├── MindMapScreen.kt
+│   │   │   ├── NodeList.kt
+│   │   │   ├── Cell.kt
+│   │   │   └── BarIcon.kt
+│   │   └── view/                  # Dialogs
+│   ├── model/ContextMenuDropDownItem.kt
+│   └── di/AppKoinModule.kt
+└── src/test/java/                 # MainViewModelTest
+```
+
+**Structure Decision**: Multi-module Android architecture (`:app` depends on `:data` and `:core`; `:data` depends on `:core`). No new modules needed - deletion feature extends existing components.
+
 └── tests/
 
 frontend/
@@ -100,14 +131,12 @@ ios/ or android/
 └── [platform-specific structure: feature modules, UI flows, platform tests]
 ```
 
-**Structure Decision**: [Document the selected structure and reference the real
-directories captured above]
+**Structure Decision**: 
 
-## Complexity Tracking
+## Additional Notes
 
-> **Fill ONLY if Constitution Check has violations that must be justified**
-
-| Violation | Why Needed | Simpler Alternative Rejected Because |
-|-----------|------------|-------------------------------------|
+No constitutional violations for this feature. Architecture follows existing patterns.------------|-------------------------------------|
 | [e.g., 4th project] | [current need] | [why 3 projects insufficient] |
 | [e.g., Repository pattern] | [specific problem] | [why direct DB access insufficient] |
+
+No constitutional violations for this feature. Architecture follows existing patterns.

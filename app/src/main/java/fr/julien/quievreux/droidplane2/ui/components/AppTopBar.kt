@@ -57,6 +57,7 @@ enum class AppTopBarAction {
     Open,
     Help,
     Save,
+    Undo,
     Backpress,
     ExitSearch,
 }
@@ -71,6 +72,7 @@ fun AppTopBar(
     onQuery: (String) -> Unit,
     searchUiState: SearchUiState = SearchUiState(),
     onExitSearch: () -> Unit = {},
+    canUndoDelete: Boolean = false,
     modifier: Modifier = Modifier,
 ) {
     var showMenu by remember { mutableStateOf(false) }
@@ -265,6 +267,18 @@ fun AppTopBar(
                         Text(stringResource(R.string.save))
                     },
                 )
+                // Undo action - only visible when undo is available
+                if (canUndoDelete) {
+                    DropdownMenuItem(
+                        onClick = {
+                            showMenu = false
+                            onBarAction(AppTopBarAction.Undo)
+                        },
+                        text = {
+                            Text(stringResource(R.string.undo))
+                        },
+                    )
+                }
             }
         }
     )

@@ -16,6 +16,9 @@ sealed class ContextMenuAction {
     data class OpenLink(
         val node: Node,
     ) : ContextMenuAction()
+    data class DeleteNode(
+        val node: Node,
+    ) : ContextMenuAction()
 }
 
 data class ContextMenuDropDownItem(
