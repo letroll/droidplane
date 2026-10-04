@@ -7,13 +7,12 @@ import fr.julien.quievreux.droidplane2.data.model.MindmapIndexes
 import fr.julien.quievreux.droidplane2.data.model.Node
 import fr.julien.quievreux.droidplane2.data.model.RichContent
 import io.kotest.matchers.collections.shouldContainExactlyInAnyOrder
-import io.kotest.matchers.collections.shouldNotBeIn
+import io.kotest.matchers.collections.shouldNotContain
 import io.kotest.matchers.ints.shouldBeGreaterThan
 import io.kotest.matchers.ints.shouldBeGreaterThanOrEqual
 import io.kotest.matchers.should
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.shouldNotBe
-import io.kotest.matchers.string.shouldContain
 import io.mockk.coEvery
 import io.mockk.mockk
 import kotlinx.coroutines.Deferred
@@ -229,7 +228,7 @@ class NodeManagerTest : KStringSpec() {
             }
 
             // Assert
-            generatedId shouldNotBeIn existingNodeIds
+            existingNodeIds.shouldNotContain(generatedId)
         }
 
         "Add node with blank text should do nothing and so return an null node id" {
@@ -478,7 +477,66 @@ class NodeManagerTest : KStringSpec() {
             nodeManager.addNodeToMindmap("   ", nodeManager.getNodeByID("ID_1001")) shouldBe null
         }
 
-        "serializeMindmap should round-trip a document preserving text and hierarchy" {
+        
+        "deleteNode should update parentNode references of surviving children" {
+            val nodeManager = loadedNodeManager()
+            val root = nodeManager.rootNode!!
+            val architecture = root.childNodes.first { it.text == "Architecture" }
+            val coreModule = architecture.childNodes.first { it.text == ":core Module" }
+            val dataModule = architecture.childNodes.first { it.text == ":data Module" }
+            
+            // Verify initial parent references
+            architecture.parentNode?.id shouldBe root.id
+            coreModule.parentNode?.id shouldBe architecture.id
+            dataModule.parentNode?.id shouldBe architecture.id
+            
+            // Delete :core Module
+            println("TEST: coreModule.id = ${coreModule.id}, coreModule.text = ${coreModule.text}")
+            val deleted = nodeManager.deleteNode(coreModule.id)
+            println("TEST: deleted = $deleted")
+            deleted shouldBe true
+            
+            // Verify :core Module is gone
+            nodeManager.getNodeByID(coreModule.id) shouldBe null
+            
+            // Verify :data Module still exists and its parentNode is updated to the new Architecture node
+            val dataModuleAfter = nodeManager.getNodeByID(dataModule.id)
+            dataModuleAfter shouldNotBe null
+            dataModuleAfter!!.parentNode?.id shouldBe architecture.id
+            
+            // Verify Architecture's children list is updated
+            // Verify Architecture's children list is updated
+            val architectureAfter = nodeManager.getNodeByID(architecture.id)!!
+            architectureAfter.childNodes.size shouldBe 2
+            val childTexts: List<String> = architectureAfter.childNodes.mapNotNull { it.text }
+            childTexts.contains(":data Module") shouldBe true
+            childTexts.contains(":core Module") shouldBe false
+            
+            // Verify :data Module's parentNode points to the updated Architecture node
+            dataModuleAfter.parentNode?.id shouldBe architectureAfter.id
+            dataModuleAfter.parentNode shouldBe architectureAfter  // Should point to the NEW Architecture node (same instance)
+        }
+
+        "deleteNode should not affect parentNode of nodes not in deleted subtree" {
+            val nodeManager = loadedNodeManager()
+            val root = nodeManager.rootNode!!
+            val architecture = root.childNodes.first { it.text == "Architecture" }
+            val navigation = root.childNodes.first { it.text == "Navigation" }
+            
+            // Delete Architecture
+            nodeManager.deleteNode(architecture.id) shouldBe true
+            
+            // Verify Navigation's parent is still the root (unchanged)
+            val navigationAfter = nodeManager.getNodeByID(navigation.id)
+            navigationAfter!!.parentNode?.id shouldBe root.id
+            
+            // Verify root's children list is updated
+            val rootAfter = nodeManager.rootNode!!
+            rootAfter.childNodes.size shouldBe 2  // Navigation and Search
+        }
+
+
+    "serializeMindmap should round-trip a document preserving text and hierarchy" {
             val nodeManager = loadedNodeManager()
             val outDir = createTempDirectory(prefix = "droidplane-serialize")
 
@@ -494,12 +552,12 @@ class NodeManagerTest : KStringSpec() {
             savedFile.name shouldBe "round_trip.mm"
 
             val xml = savedFile.readText()
-            xml shouldContain "ID_1000"
-            xml shouldContain "Droidplane Root"
-            xml shouldContain "ID_1002"
+            xml.contains("ID_1000")
+            xml.contains("Droidplane Root")
+            xml.contains("ID_1002")
             // formatting tags must survive the round-trip
-            xml shouldContain "<icon"
-            xml shouldContain "<font"
+            xml.contains("<icon")
+            xml.contains("<font")
 
             // reload the saved document into a fresh manager: structure must survive
             val reloaded = initNodeManager()

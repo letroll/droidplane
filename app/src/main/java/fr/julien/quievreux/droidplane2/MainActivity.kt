@@ -68,7 +68,6 @@ import fr.julien.quievreux.droidplane2.ui.components.AppTopBarAction.Top
 import fr.julien.quievreux.droidplane2.ui.components.AppTopBarAction.Undo
 import fr.julien.quievreux.droidplane2.ui.components.AppTopBarAction.Up
 import fr.julien.quievreux.droidplane2.core.ui.component.CustomDialog
-import fr.julien.quievreux.droidplane2.ui.components.MindMap
 import fr.julien.quievreux.droidplane2.ui.components.nodeList
 import fr.julien.quievreux.droidplane2.ui.theme.ContrastAwareReplyTheme
 import fr.julien.quievreux.droidplane2.ui.theme.primaryContainerLight
@@ -92,7 +91,6 @@ class MainActivity : FragmentActivity(), FileRegister {
 
     private val viewModel: MainViewModel by viewModel()
     private val logger by inject<Logger>()
-    private val useNewView = false
 
     private val clipboardManager by lazy {
         getSystemService(CLIPBOARD_SERVICE) as ClipboardManager
@@ -244,34 +242,12 @@ class MainActivity : FragmentActivity(), FileRegister {
                     //                    contentWindowInsets =,
                     content = { innerPadding ->
                         state.value.nodeCurrentlyDisplayed?.let { node ->
-                            if (useNewView) {
-                                MindMap(
-                                    rootNode = node,
-                                    fetchText = viewModel::getNodeText,
-                                )
-//                                MindMap2(
-//                                    node = node,
-//                                    modifier = Modifier
-//                                        .fillMaxSize()
-//                                        .background(MaterialTheme.colorScheme.surfaceContainer)
-//                                        .padding(innerPadding),
-//                                    fetchText = viewModel::getNodeText,
-//                                    logger = logger,
-//                                    viewModel = mindMapViewModel,
-//                                )
-//                                    { nodeClicked,mindMapView ->
-//                                       createNode(nodeClicked)?.let {
-//
-//                            }
-//                                    }
-                            } else {
                                 LazyColumn(
                                     modifier = Modifier
                                         .fillMaxSize()
                                         .background(MaterialTheme.colorScheme.surfaceContainer)
                                         .padding(innerPadding),
                                 ) {
-                                    logger.e("list updated :${node.childNodes.joinToString(separator = "|"){it -> it.text.orEmpty()}}")
                                     val searchResults = nodeFindList.value
                                     val searchResultToShow = if (state.value.searchUiState.isSearchActive && state.value.searchUiState.currentResultIndex in searchResults.indices) {
                                         searchResults[state.value.searchUiState.currentResultIndex]
@@ -289,7 +265,6 @@ class MainActivity : FragmentActivity(), FileRegister {
                                         currentlyDisplayedNodeId = state.value.nodeCurrentlyDisplayed?.id,
                                     )
                                 }
-                            }
                         }
                     }
                 )
