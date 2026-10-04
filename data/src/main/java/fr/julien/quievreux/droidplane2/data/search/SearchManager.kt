@@ -65,7 +65,7 @@ find:${nodeFindList.value.joinToString(separator = "|", transform = { fetchText(
         """.trimIndent()
         )
 
-        if (nodeFindList.value.size == 1) {
+        if (nodeFindList.value.size > 0) {
             onResultFound()
         }
     }

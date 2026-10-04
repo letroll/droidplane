@@ -28,6 +28,9 @@ proguard/
 
 # Eclipse Metadata
 .metadata/
+.classpath
+.project
+.settings/
 
 # Mac OS X clutter
 *.DS_Store
@@ -36,32 +39,19 @@ proguard/
 Thumbs.db
 
 # Intellij IDEA (see https://intellij-support.jetbrains.com/entries/23393067)
-.idea/workspace.xml
-.idea/tasks.xml
-.idea/datasources.xml
-.idea/dataSources.ids
-.idea/libraries/
-.idea/appInsightsSettings.xml
-.idea/compiler.xml
-.idea/deploymentTargetSelector.xml
-.idea/caches/deviceStreaming.xml
-.idea/gradle.xml
-.idea/kotlinc.xml
-.idea/migrations.xml
-.idea/misc.xml
-.idea/runConfigurations.xml
-.idea/vcs.xml
+.idea/
 
 *.swp
 
 # Mindmap backup files
 .backup
 
-/.idea/inspectionProfiles/Project_Default.xml
-/.idea/studiobot.xml
-/.idea/.name
-/.idea/.gitignore
-/.idea/droidplane.iml
-/.idea/modules/app/droidplane2.app.iml
-
 /app/google-services.json
+
+.agents/
+.env
+
+# Local AI & Editor tool configurations
+.codex/
+.opencode/
+opencode.json

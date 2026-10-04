@@ -129,7 +129,14 @@ fun CustomDialog(
                         value = txtField,
                         onValueChange = { newValue: String ->
                             txtField = newValue
-                        }
+                            if (txtFieldError.value.isNotEmpty()) txtFieldError.value = ""
+                        },
+                        isError = txtFieldError.value.isNotEmpty(),
+                        supportingText = {
+                            if (txtFieldError.value.isNotEmpty()) {
+                                Text(text = txtFieldError.value)
+                            }
+                        },
                     )
 
                     Spacer(modifier = Modifier.height(20.dp))
@@ -137,7 +144,7 @@ fun CustomDialog(
                     Box(modifier = Modifier.padding(40.dp, 0.dp, 40.dp, 0.dp)) {
                         Button(
                             onClick = {
-                                if (txtField.isEmpty() && !canBeEmpty) {
+                                if (txtField.isBlank() && !canBeEmpty) {
                                     txtFieldError.value = "Field can not be empty"
                                     return@Button
                                 }

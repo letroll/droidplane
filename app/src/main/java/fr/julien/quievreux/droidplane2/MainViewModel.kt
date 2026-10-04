@@ -22,6 +22,8 @@ import fr.julien.quievreux.droidplane2.model.ContextMenuAction
 import fr.julien.quievreux.droidplane2.model.ContextMenuAction.CopyText
 import fr.julien.quievreux.droidplane2.model.ContextMenuAction.Edit
 import fr.julien.quievreux.droidplane2.model.ContextMenuAction.NodeLink
+import fr.julien.quievreux.droidplane2.model.ContextMenuAction.AddChildNode
+import fr.julien.quievreux.droidplane2.model.ContextMenuAction.OpenLink
 import fr.julien.quievreux.droidplane2.model.ViewIntentNode
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
@@ -45,6 +47,7 @@ import java.util.Date
  */
 class MainViewModel(
     val logger: Logger,
+    private val injectedNodeManager: NodeManager? = null,
 ) : ViewModel(), KoinScopeComponent {
 
     override val scope: Scope by lazy { createScope(this) }
@@ -52,9 +55,20 @@ class MainViewModel(
     private val _uiState: MutableStateFlow<MainUiState> = MutableStateFlow(MainUiState())
     val uiState: StateFlow<MainUiState> = _uiState
 
-    private val nodeManager: NodeManager by inject {
-        parametersOf(viewModelScope)
+    /**
+     * Test helper to set initial UI state for testing
+     */
+    fun setInitialStateForTest(rootNode: Node) {
+        _uiState.value = _uiState.value.copy(
+            title = rootNode.text.orEmpty(),
+            nodeCurrentlyDisplayed = rootNode,
+            canGoBack = false,
+            navigationStack = listOf(rootNode.id),
+        )
     }
+
+    private val nodeManager: NodeManager
+        get() = injectedNodeManager ?: scope.get<NodeManager> { parametersOf(viewModelScope) }
     private var fileRegister: FileRegister? = null
     private var fileToSave: File? = null
     private var nodeBeforeFileSave: Node? = null
@@ -102,19 +116,98 @@ class MainViewModel(
                 )
             }
         } catch (exception: Exception) {
-            logger.e("loadMindMap exc")
+            logger.e("loadMindMap exc:$exception")
         }
         setMindmapIsLoading(false)
     }
 
     private fun updateNodeDisplayed(parentNode: Node) {
         val title = getNodeText(parentNode).orEmpty()
+        val isRoot = parentNode.parentNode == null
+        val initialStack = if (isRoot) listOf(parentNode.id) else emptyList<String>()
         updateUiState {
             it.copy(
                 title = title,
                 nodeCurrentlyDisplayed = parentNode,
+                canGoBack = !isRoot,
+                navigationStack = initialStack,
             )
         }
+    }
+
+    /**
+     * Navigate to a child node, pushing it onto the navigation stack
+     */
+    suspend fun onChildNodeClicked(childNode: Node) {
+        updateUiState { currentState ->
+            val newStack = currentState.navigationStack + childNode.id
+            currentState.copy(
+                nodeCurrentlyDisplayed = childNode,
+                title = getNodeText(childNode).orEmpty(),
+                canGoBack = true,
+                navigationStack = newStack,
+            )
+        }
+    }
+
+    /**
+     * Navigate up to parent node, popping from navigation stack
+     */
+    suspend fun onNavigateUp() {
+        updateUiState { currentState ->
+            val currentNode = currentState.nodeCurrentlyDisplayed
+            val parentNode = currentNode?.parentNode
+            
+            if (parentNode != null) {
+                val isParentRoot = parentNode.parentNode == null
+                val newStack = if (isParentRoot) {
+                    listOf(parentNode.id)
+                } else {
+                    currentState.navigationStack.dropLast(1)
+                }
+                currentState.copy(
+                    nodeCurrentlyDisplayed = parentNode,
+                    title = getNodeText(parentNode).orEmpty(),
+                    canGoBack = !isParentRoot,
+                    navigationStack = newStack,
+                )
+            } else {
+                currentState
+            }
+        }
+    }
+
+    /**
+     * Navigate to root node, clearing navigation stack
+     */
+    suspend fun onNavigateToTop() {
+        updateUiState { currentState ->
+            val rootNode = nodeManager.rootNode
+            if (rootNode != null) {
+                currentState.copy(
+                    nodeCurrentlyDisplayed = rootNode,
+                    title = getNodeText(rootNode).orEmpty(),
+                    canGoBack = false,
+                    navigationStack = listOf(rootNode.id),
+                )
+            } else {
+                currentState
+            }
+        }
+    }
+
+    /**
+     * Non-suspend wrapper for onNavigateUp for use from UI components
+     */
+    fun navigateUp() {
+        viewModelScope.launch { onNavigateUp() }
+    }
+
+    /**
+     * Non-suspend wrapper for onNavigateToTop for use from UI components
+     */
+    fun navigateToTop() {
+        viewModelScope.launch { onNavigateToTop() }
     }
 
     fun getSearchResultFlow() = nodeManager.getSearchResultFlow()
@@ -124,7 +217,7 @@ class MainViewModel(
     ) {
         viewModelScope.launch {
             when {
-                node.childNodes.size > 0 -> {
+                node.childNodes.isNotEmpty() -> {
                     showNode(node)
                 }
 
@@ -162,7 +255,6 @@ class MainViewModel(
      * @param node
      */
     private suspend fun showNode(node: Node) {
-        node.deselectAllChildNodes()
         updateUiState {
             it.copy(
                 nodeCurrentlyDisplayed = node,
@@ -173,9 +265,6 @@ class MainViewModel(
 
         // get the title of the parent of the rightmost column (i.e. the selected node in the 2nd-rightmost column)
         setTitle(getNodeText(node))
-
-        // mark node as selected
-        node.isSelected = true //TODO needed?
     }
 
     private fun enableHomeButtonIfNeeded(node: Node?) {
@@ -210,11 +299,9 @@ class MainViewModel(
     fun up(force: Boolean) {
         viewModelScope.launch {
             _uiState.value.nodeCurrentlyDisplayed?.id?.let { nodeId ->
-                nodeManager.findFilledNode(nodeId)?.let { node ->
-                    // Find the parent using findFilledNode to get the updated version
-                    node.parentNode?.id?.let { parentId ->
-                        val parent = nodeManager.findFilledNode(parentId)
-                        parent?.isSelected = false
+                nodeManager.getNodeByID(nodeId)?.let { node ->
+                    // Use NodeManager's index to get parent directly
+                    nodeManager.getNodeParent(node.numericId)?.let { parent ->
                         updateUiState {
                             it.copy(
                                 nodeCurrentlyDisplayed = parent,
@@ -274,10 +361,10 @@ class MainViewModel(
 
     /** Selects the next search result node.  */
     fun searchNext() {
-        if (_uiState.value.searchUiState.currentSearchResultIndex < nodeManager.getResultCount() - 1) {
+        if (_uiState.value.searchUiState.currentResultIndex < nodeManager.getResultCount() - 1) {
             updateSearchUiState {
                 it.copy(
-                    currentSearchResultIndex = it.currentSearchResultIndex + 1
+                    currentResultIndex = it.currentResultIndex + 1
                 )
             }
 
@@ -287,10 +374,10 @@ class MainViewModel(
 
     /** Selects the previous search result node.  */
     fun searchPrevious() {
-        if (_uiState.value.searchUiState.currentSearchResultIndex > 0) {
+        if (_uiState.value.searchUiState.currentResultIndex > 0) {
             updateSearchUiState {
                 it.copy(
-                    currentSearchResultIndex = it.currentSearchResultIndex - 1,
+                    currentResultIndex = it.currentResultIndex - 1,
                 )
             }
 
@@ -298,25 +385,42 @@ class MainViewModel(
         }
     }
 
+    /** Exits search mode and clears match highlighting. */
+    fun onExitSearchMode() {
+        updateSearchUiState {
+            it.copy(
+                isSearchActive = false,
+                searchQuery = "",
+                currentResultIndex = 0,
+                totalResults = 0,
+            )
+        }
+    }
+
     private fun showCurrentSearchResult() {
         viewModelScope.launch {
+            val resultCount = nodeManager.getSearchResultCount()
             logger.e(
                 "toto", """
-showCurrentSearchResult:${_uiState.value.searchUiState.currentSearchResultIndex}
+showCurrentSearchResult:${_uiState.value.searchUiState.currentResultIndex}
 nodeFindList:${nodeManager.getSearchResult().map { getNodeText(it) }.joinToString(separator = "|")}
             """.trimIndent()
             )
             if (isSearchResultIndexValid()) {
                 downTo(getCurrentSearchResultItem(), false)
             }
+            // Update total results count
+            updateSearchUiState {
+                it.copy(totalResults = resultCount)
+            }
             //TODO Shows/hides the next/prev buttons
             //TODO highlight result in column
         }
     }
 
-    private fun getCurrentSearchResultItem() = nodeManager.getSearchResult()[_uiState.value.searchUiState.currentSearchResultIndex]
+    private fun getCurrentSearchResultItem() = nodeManager.getSearchResult()[_uiState.value.searchUiState.currentResultIndex]
 
-    private fun isSearchResultIndexValid() = _uiState.value.searchUiState.currentSearchResultIndex >= 0 && _uiState.value.searchUiState.currentSearchResultIndex < nodeManager.getSearchResultCount()
+    private fun isSearchResultIndexValid() = _uiState.value.searchUiState.currentResultIndex >= 0 && _uiState.value.searchUiState.currentResultIndex < nodeManager.getSearchResultCount()
 
     /**
      * Navigate down the MainViewModel to the specified node, opening each of it's parent nodes along the way.
@@ -326,10 +430,12 @@ nodeFindList:${nodeManager.getSearchResult().map { getNodeText(it) }.joinToStrin
         // first navigate back to the top (essentially closing all other nodes)
         top()
 
+        if (node == null) return
+
         // go upwards from the target node, and keep track of each node leading down to the target node
-        val nodeHierarchy: MutableList<Node> = mutableListOf()
-        var tmpNode = node
-        while (tmpNode?.parentNode != null) {   // TODO: this gives a NPE when rotating the device
+        val nodeHierarchy: MutableList<Node> = mutableListOf(node)
+        var tmpNode = node.parentNode
+        while (tmpNode != null) {
             nodeHierarchy.add(tmpNode)
             tmpNode = tmpNode.parentNode
         }
@@ -339,7 +445,6 @@ nodeFindList:${nodeManager.getSearchResult().map { getNodeText(it) }.joinToStrin
 
         // descent from the root node down to the target node
         for (mindmapNode in nodeHierarchy) {
-            mindmapNode.isSelected = true
 //            scrollTo(mindmapNode)
             if ((mindmapNode != node || openLast) && mindmapNode.childNodes.size > 0) {
                 showNode(mindmapNode)
@@ -365,17 +470,42 @@ nodeFindList:${nodeManager.getSearchResult().map { getNodeText(it) }.joinToStrin
     }
 
     fun search(query: String) {
-//        updateUiState {
-//            it.copy(
-//                currentSearchResultIndex = 0
-//            )
-//        }
+        updateSearchUiState {
+            it.copy(
+                isSearchActive = true,
+                searchQuery = query,
+                currentResultIndex = 0,
+                totalResults = 0,
+            )
+        }
         nodeManager.search(
             query = query,
             onResultFound = {
                 showCurrentSearchResult()
             }
         )
+    }
+
+
+
+    fun onSearchQueryChanged(query: String) {
+        search(query)
+    }
+
+    fun onNextSearchMatch() {
+        searchNext()
+    }
+
+    fun onPreviousSearchMatch() {
+        searchPrevious()
+    }
+
+    fun onAddChildNode(text: String) {
+        addNode(text)
+    }
+
+    fun onUpdateNodeText(node: Node, newText: String) {
+        updateNodeText(node, newText)
     }
 
     fun onNodeContextMenuClick(contextMenuAction: ContextMenuAction) {
@@ -399,6 +529,23 @@ nodeFindList:${nodeManager.getSearchResult().map { getNodeText(it) }.joinToStrin
             }
 
             is CopyText -> {/* already handled by activity */
+            }
+
+            is AddChildNode -> {
+                nodeManager.getNodeByID(contextMenuAction.parentNode.id)?.let { node ->
+                    setDialogState(
+                        DialogType.AddChildNode(parentNode = node)
+                    )
+                }
+            }
+
+            is OpenLink -> {
+                val node = contextMenuAction.node
+                if (node.isInternalLink()) {
+                    openInternalFragmentLink(node)
+                } else {
+                    openIntentLink(node)
+                }
             }
         }
     }
@@ -450,6 +597,8 @@ nodeFindList:${nodeManager.getSearchResult().map { getNodeText(it) }.joinToStrin
     }
 
     fun getNodeText(node: Node) = nodeManager.getNodeText(node)
+
+    fun getNodeTextForCopy(node: Node) = nodeManager.getNodeTextForCopy(node)
 
     fun openRelativeFile(node: Node) {
         val fileName: String? = if (node.link?.path?.startsWith("/") == true) {
@@ -505,42 +654,17 @@ nodeFindList:${nodeManager.getSearchResult().map { getNodeText(it) }.joinToStrin
         node: Node,
         newValue: String,
     ) {
-        //TODO jqx check if some logic shouldn't be down in nodeManager
         viewModelScope.launch(Dispatchers.IO) {
             setMindmapIsLoading(true)
-            val updatedNode = node.copy(
-                modificationDate = Date().time,
-                text = newValue,
-            )
-
-            updateNodeInMindMapIndexes(updatedNode)
-
-            var parentNodeToShow: Node? = null
-
-            //update in parent also, if not the root, because it's what we show which is the list if(updatedNode.isRoot().not()){
-            updatedNode.parentNode?.let { parentNode ->
-                val childIndex = parentNode.childNodes.indexOfFirst { it.id == updatedNode.id }
-                if (childIndex != -1) {
-                    val updatedChildren = parentNode.childNodes.toMutableList()
-                    updatedChildren[childIndex] = updatedNode
-
-                    val updatedParent = parentNode.copy(
-                        childNodes = updatedChildren
-                    )
-
-                    parentNodeToShow = updatedParent
-
-                    updateNodeInMindMapIndexes(updatedParent)
-                }
-            } ?: run {
-                parentNodeToShow = updatedNode
-            }
-
-            parentNodeToShow?.let { newParentNode ->
-                nodeManager.updateRootNode(newParentNode)
-                updateNodeDisplayed(newParentNode)
-            }
+            val updatedNode = nodeManager.updateNodeText(node.id, newValue)
             setMindmapIsLoading(false)
+            updatedNode?.let { node ->
+                // Reload the displayed node from NodeManager to ensure synchronization
+                val reloadedNode = nodeManager.getNodeByID(node.id)
+                reloadedNode?.let { updated ->
+                    updateNodeDisplayed(updated)
+                }
+            }
         }
     }
 
@@ -589,25 +713,25 @@ nodeFindList:${nodeManager.getSearchResult().map { getNodeText(it) }.joinToStrin
     fun addNode(newValue: String) {
         viewModelScope.launch(Dispatchers.IO) {
             setMindmapIsLoading(true)
-            val deferredNodeId: Deferred<Int?> = async { nodeManager.addNodeToMindmap(newValue, _uiState.value.nodeCurrentlyDisplayed) }
-            deferredNodeId.await()?.let { newNodeId ->
+            val newNodeId = nodeManager.addNodeToMindmap(newValue, _uiState.value.nodeCurrentlyDisplayed)
+            newNodeId?.let { newNodeId ->
                 // Get the node ID from the numeric ID
                 val nodeId = nodeManager.getNodeID(newNodeId)
                 // Get the updated node with all its children
-                val updatedNode = nodeManager.findFilledNode(nodeId)
-                if (updatedNode != null) {
+                val updatedNode = nodeManager.getNodeByID(nodeId)
+                updatedNode?.let { node ->
                     // If this is a child node, show its parent
-                    val parentNode = updatedNode.parentNode
+                    val parentNode = node.parentNode
                     if (parentNode != null) {
                         logger.e("addNode done updating UI with parent: ${parentNode.shortFamily()}")
-                        val updatedParent = nodeManager.findFilledNode(parentNode.id)
+                        val updatedParent = nodeManager.getNodeByID(parentNode.id)
                         if (updatedParent != null) {
                             showNode(updatedParent)
                         }
                     } else {
                         // This is a root node
                         logger.e("addNode done updating UI with new node")
-                        showNode(updatedNode)
+                        showNode(node)
                     }
                 }
             }
@@ -616,4 +740,3 @@ nodeFindList:${nodeManager.getSearchResult().map { getNodeText(it) }.joinToStrin
         }
     }
 }
-

@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.items
@@ -28,10 +29,13 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.vector.ImageVector
+
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
@@ -50,12 +54,14 @@ import compose.icons.fontawesomeicons.Solid
 import compose.icons.fontawesomeicons.regular.Clipboard
 import compose.icons.fontawesomeicons.regular.Edit
 import compose.icons.fontawesomeicons.solid.Link
+import compose.icons.fontawesomeicons.solid.Plus
 import fr.julien.quievreux.droidplane2.R
 import fr.julien.quievreux.droidplane2.helper.DateUtils
 import fr.julien.quievreux.droidplane2.model.ContextMenuAction
 import fr.julien.quievreux.droidplane2.model.ContextMenuAction.CopyText
 import fr.julien.quievreux.droidplane2.model.ContextMenuAction.Edit
 import fr.julien.quievreux.droidplane2.model.ContextMenuAction.NodeLink
+import fr.julien.quievreux.droidplane2.model.ContextMenuAction.AddChildNode
 import fr.julien.quievreux.droidplane2.model.ContextMenuDropDownItem
 import fr.julien.quievreux.droidplane2.data.model.Node
 import fr.julien.quievreux.droidplane2.model.NodeIcons.Link
@@ -68,31 +74,42 @@ import java.util.Locale
 fun LazyListScope.nodeList(
     node: Node,
     fetchText: (Node) -> String?,
+    fetchTextForCopy: (Node) -> String?,
     updateClipBoard: (String) -> Unit,
     onNodeClick: (Node) -> Unit,
     onNodeContextMenuClick: (ContextMenuAction) -> Unit,
     searchResultToShow: Node?,
+    currentlyDisplayedNodeId: String? = null,
 ) {
     var isFoundInList = searchResultToShow == null
 
-    items(
-        items = node.childNodes,
-        key = { child ->
-            // Use both parent and child id as key to force recomposition when parent changes
-            "${node.id}_${child.id}"
+    val childNodes = node.childNodes
+    if (childNodes.isEmpty()) {
+        item {
+            EmptyNodeItem()
         }
-    ) { child ->
-        if (child.id == searchResultToShow?.id) {
-            isFoundInList = true
+    } else {
+        items(
+            items = childNodes,
+            key = { child ->
+                // Use both parent and child id as key to force recomposition when parent changes
+                "${node.id}_${child.id}"
+            }
+        ) { child ->
+            if (child.id == searchResultToShow?.id) {
+                isFoundInList = true
+            }
+            NodeItem(
+                fetchText = fetchText,
+                fetchTextForCopy = fetchTextForCopy,
+                updateClipBoard = updateClipBoard,
+                isFoundInList = isFoundInList,
+                onNodeClick = onNodeClick,
+                onNodeContextMenuClick = onNodeContextMenuClick,
+                node = child,
+                currentlyDisplayedNodeId = currentlyDisplayedNodeId,
+            )
         }
-        NodeItem(
-            fetchText = fetchText,
-            updateClipBoard = updateClipBoard,
-            isFoundInList = isFoundInList,
-            onNodeClick = onNodeClick,
-            onNodeContextMenuClick = onNodeContextMenuClick,
-            node = child,
-        )
     }
     //TODO create bug fix it
 //    if (!isFoundInList && searchResultToShow != null) {
@@ -100,21 +117,47 @@ fun LazyListScope.nodeList(
 //    }
 }
 
+@Composable
+fun EmptyNodeItem() {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(16.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
+    ) {
+        Text(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(24.dp),
+            text = "This node has no children. Tap the + button to add one.",
+            style = androidx.compose.ui.text.TextStyle(
+                fontSize = 16.sp,
+                fontStyle = androidx.compose.ui.text.font.FontStyle.Italic
+            ),
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = androidx.compose.ui.text.style.TextAlign.Center
+        )
+    }
+}
+
 @SuppressLint("DiscouragedApi")
 @Composable
 fun NodeItem(
     fetchText: (Node) -> String?,
+    fetchTextForCopy: (Node) -> String?,
     updateClipBoard: (String) -> Unit,
     isFoundInList: Boolean,
     onNodeClick: (Node) -> Unit,
     onNodeContextMenuClick: (ContextMenuAction) -> Unit,
     node: Node,
+    currentlyDisplayedNodeId: String? = null,
 ) {
     val text = fetchText(node) ?: ""
+    val copyText = fetchTextForCopy(node) ?: text
     val contextMenuDropDownItems = mutableListOf(
         ContextMenuDropDownItem(
             text = "copy $text",
-            action = CopyText(text)
+            action = CopyText(copyText)
         ),
         ContextMenuDropDownItem(
             text = stringResource(
@@ -134,7 +177,21 @@ fun NodeItem(
             text = stringResource(id = R.string.edit),
             action = Edit(node)
         ),
+        ContextMenuDropDownItem(
+            text = stringResource(id = R.string.add_child_node),
+            action = AddChildNode(parentNode = node)
+        ),
     )
+
+    // Add "Open link" action if node has a link
+    node.link?.let { link ->
+        contextMenuDropDownItems.add(
+            ContextMenuDropDownItem(
+                text = stringResource(id = R.string.open_link),
+                action = ContextMenuAction.OpenLink(node = node)
+            )
+        )
+    }
 
     node.arrowLinks.forEach { link ->
         fetchText(link)?.let { text ->
@@ -274,7 +331,7 @@ fun NodeItem(
             )
             if (node.childNodes.size > 0) {
                 ToggleIcon(
-                    isOpen = node.isSelected,
+                    isOpen = node.id == currentlyDisplayedNodeId,
                     modifier = Modifier.padding(end = 8.dp)
 
                 )
@@ -293,7 +350,7 @@ fun NodeItem(
                         item.action?.let { action ->
                             when (action) {
                                 is CopyText -> updateClipBoard(action.text)
-                                is Edit, is NodeLink -> onNodeContextMenuClick(action)
+                                is Edit, is NodeLink, is AddChildNode, is ContextMenuAction.OpenLink -> onNodeContextMenuClick(action)
                             }
                         }
                         isContextMenuVisble = false
@@ -315,6 +372,8 @@ fun NodeItem(
             is CopyText -> FontAwesomeIcons.Regular.Clipboard
             is Edit -> FontAwesomeIcons.Regular.Edit
             is NodeLink -> FontAwesomeIcons.Solid.Link
+            is AddChildNode -> FontAwesomeIcons.Solid.Plus
+            is ContextMenuAction.OpenLink -> FontAwesomeIcons.Solid.Link
         },
         tint = MaterialTheme.colorScheme.primary,
         contentDescription = null,
@@ -403,6 +462,9 @@ private fun NodeListPreview() {
             nodeList(
                 node = nodeParent,
                 fetchText = { node ->
+                    node.text
+                },
+                fetchTextForCopy = { node ->
                     node.text
                 },
                 updateClipBoard = {},

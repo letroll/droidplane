@@ -82,6 +82,10 @@ dependencies {
 
     implementation(libs.turbine)
 
+    //real XmlPullParser for JVM unit tests: android.jar only ships throwing stubs
+    testImplementation("xmlpull:xmlpull:1.1.3.1")
+    testImplementation("xpp3:xpp3:1.1.4c")
+
     //firebase
     implementation(platform(libs.firebase.bom))
     implementation(libs.firebase.crashlytics)

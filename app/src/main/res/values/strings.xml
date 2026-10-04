@@ -29,4 +29,6 @@
     <string name="open">Open</string>
     <string name="edit">Edit</string>
     <string name="node_information">Created : %1$s Modified : %2$s</string>
+    <string name="add_child_node">Add Child Node</string>
+    <string name="open_link">Open Link</string>
 </resources>

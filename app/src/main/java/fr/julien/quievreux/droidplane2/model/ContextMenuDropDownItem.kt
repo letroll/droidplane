@@ -10,6 +10,12 @@ sealed class ContextMenuAction {
     data class NodeLink(
         val node: Node,
     ) : ContextMenuAction()
+    data class AddChildNode(
+        val parentNode: Node,
+    ) : ContextMenuAction()
+    data class OpenLink(
+        val node: Node,
+    ) : ContextMenuAction()
 }
 
 data class ContextMenuDropDownItem(

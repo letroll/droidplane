@@ -17,14 +17,17 @@ data class MainUiState(
     val contentNodeType: ContentNodeType = Classic,
     val searchUiState: SearchUiState = SearchUiState(),
     val dialogUiState: DialogUiState = DialogUiState(),
+    val navigationStack: List<String> = emptyList(),
 ) {
     data class ErrorAction(
         val actionLabel: Int,
         val action: () -> Unit,
     )
     data class SearchUiState(
-        val lastSearchString: String = "",
-        val currentSearchResultIndex: Int = 0,
+        val isSearchActive: Boolean = false,
+        val searchQuery: String = "",
+        val currentResultIndex: Int = 0,
+        val totalResults: Int = 0,
     )
 
     data class DialogUiState(
@@ -38,7 +41,8 @@ data class MainUiState(
             val oldValue: String,
         ):DialogType()
 
-        data object CreateNode:DialogType()
-    }
-
+        data class AddChildNode(
+            val parentNode: Node,
+        ):DialogType()
+}
 }

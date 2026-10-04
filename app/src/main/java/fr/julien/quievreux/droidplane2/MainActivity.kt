@@ -38,7 +38,7 @@ import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.res.stringResource
 import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.lifecycleScope
-import fr.julien.quievreux.droidplane2.MainUiState.DialogType.CreateNode
+import fr.julien.quievreux.droidplane2.MainUiState.DialogType.AddChildNode
 import fr.julien.quievreux.droidplane2.MainUiState.DialogType.EditNodeDescription
 import fr.julien.quievreux.droidplane2.MainUiState.DialogType.None
 import fr.julien.quievreux.droidplane2.core.PermissionUtils.checkStoragePermissions
@@ -54,6 +54,7 @@ import fr.julien.quievreux.droidplane2.model.ContentNodeType.RelativeFile
 import fr.julien.quievreux.droidplane2.model.ContentNodeType.RichText
 import fr.julien.quievreux.droidplane2.ui.components.AppTopBar
 import fr.julien.quievreux.droidplane2.ui.components.AppTopBarAction.Backpress
+import fr.julien.quievreux.droidplane2.ui.components.AppTopBarAction.ExitSearch
 import fr.julien.quievreux.droidplane2.ui.components.AppTopBarAction.Help
 import fr.julien.quievreux.droidplane2.ui.components.AppTopBarAction.Open
 import fr.julien.quievreux.droidplane2.ui.components.AppTopBarAction.Save
@@ -102,7 +103,7 @@ class MainActivity : FragmentActivity(), FileRegister {
         }
     )
 
-    @SuppressLint("RememberReturnType")
+    @SuppressLint("RemeddmberReturnType")
     public override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge(
@@ -150,7 +151,7 @@ class MainActivity : FragmentActivity(), FileRegister {
                             viewModel.updateNodeText(dialog.node, newValue)
                         }
                     }
-                    CreateNode -> {
+                    is AddChildNode -> {
                         CustomDialog(
                             titre = stringResource(R.string.add_child),
                             value = "",
@@ -172,7 +173,9 @@ class MainActivity : FragmentActivity(), FileRegister {
                             onQuery = { query ->
                                 viewModel.search(query)
                             },
-                            hasSearchNavigateButton = Pair(state.value.searchUiState.currentSearchResultIndex > 0, state.value.searchUiState.currentSearchResultIndex < nodeFindList.value.size - 1),
+                            hasSearchNavigateButton = Pair(state.value.searchUiState.currentResultIndex > 0, state.value.searchUiState.currentResultIndex < nodeFindList.value.size - 1),
+                            searchUiState = state.value.searchUiState,
+                            onExitSearch = { viewModel.onExitSearchMode() },
                             onBarAction = { action ->
                                 when (action) {
                                     Backpress -> viewModel.upOrClose()
@@ -181,15 +184,17 @@ class MainActivity : FragmentActivity(), FileRegister {
 
                                     SearchPrevious -> viewModel.searchPrevious()
 
-                                    Up -> viewModel.up(false)
+                                    Up -> viewModel.navigateUp()
 
-                                    Top -> viewModel.top()
+                                    Top -> viewModel.navigateToTop()
 
                                     Open -> openFileLauncher.launch("*/*")
 
                                     Help -> showHelp()
 
                                     Save -> viewModel.launchSaveFile()
+
+                                    ExitSearch -> viewModel.onExitSearchMode()
                                 }
                             },
                         )
@@ -201,7 +206,9 @@ class MainActivity : FragmentActivity(), FileRegister {
                     floatingActionButton = {
                         AppFloatingActionButton(
                             onClick = {
-                                viewModel.setDialogState(CreateNode)
+                                state.value.nodeCurrentlyDisplayed?.let { node ->
+                                    viewModel.setDialogState(AddChildNode(parentNode = node))
+                                }
                             },
                             iconContentDsc = "Add",
                             icon = Icons.Filled.Add
@@ -241,18 +248,21 @@ class MainActivity : FragmentActivity(), FileRegister {
                                         .padding(innerPadding),
                                 ) {
                                     logger.e("list updated :${node.childNodes.joinToString(separator = "|"){it -> it.text.orEmpty()}}")
-                                    val searchResultToShow = if (nodeFindList.value.isEmpty() || (state.value.searchUiState.currentSearchResultIndex in 0 until nodeFindList.value.size - 1)) {
-                                        null
+                                    val searchResults = nodeFindList.value
+                                    val searchResultToShow = if (state.value.searchUiState.isSearchActive && state.value.searchUiState.currentResultIndex in searchResults.indices) {
+                                        searchResults[state.value.searchUiState.currentResultIndex]
                                     } else {
-                                        nodeFindList.value[state.value.searchUiState.currentSearchResultIndex]
+                                        null
                                     }
                                     nodeList(
                                         node = node,
                                         searchResultToShow = searchResultToShow,
                                         fetchText = viewModel::getNodeText,
+                                        fetchTextForCopy = viewModel::getNodeTextForCopy,
                                         updateClipBoard = ::updateClipboard,
                                         onNodeClick = viewModel::onNodeClick,
                                         onNodeContextMenuClick = viewModel::onNodeContextMenuClick,
+                                        currentlyDisplayedNodeId = state.value.nodeCurrentlyDisplayed?.id,
                                     )
                                 }
                             }

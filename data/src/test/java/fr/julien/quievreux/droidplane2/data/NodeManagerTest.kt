@@ -6,12 +6,14 @@ import fr.julien.quievreux.droidplane2.data.NodeManager.Companion.FILE_EXTENSION
 import fr.julien.quievreux.droidplane2.data.model.MindmapIndexes
 import fr.julien.quievreux.droidplane2.data.model.Node
 import fr.julien.quievreux.droidplane2.data.model.RichContent
+import io.kotest.matchers.collections.shouldContainExactlyInAnyOrder
 import io.kotest.matchers.collections.shouldNotBeIn
 import io.kotest.matchers.ints.shouldBeGreaterThan
 import io.kotest.matchers.ints.shouldBeGreaterThanOrEqual
 import io.kotest.matchers.should
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.shouldNotBe
+import io.kotest.matchers.string.shouldContain
 import io.mockk.coEvery
 import io.mockk.mockk
 import kotlinx.coroutines.Deferred
@@ -21,6 +23,8 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.TestScope
 import org.xmlpull.v1.XmlPullParser
+import java.io.InputStream
+import kotlin.io.path.createTempDirectory
 
 class NodeManagerTest : KStringSpec() {
 
@@ -274,8 +278,8 @@ class NodeManagerTest : KStringSpec() {
 
                 childNodeId?.let {
                     val childNode = nodeManager.getNodeByNumericId(childNodeId)
-                    childNode?.parentNode shouldBe dadNode
                     dadNode = nodeManager.getNodeByNumericId(dadNodeId)
+                    childNode?.parentNode?.id shouldBe dadNode?.id
                     dadNode?.childNodes?.first()?.id shouldBe childNode?.id
                 }
             }
@@ -283,6 +287,247 @@ class NodeManagerTest : KStringSpec() {
 
         //TODO jqx look if with freeplane, when we modify a child if parent modification date change also and if it's recursif
 
+        "loadMindMapFromInputStream should parse test_map.mm and build correct hierarchy" {
+            val nodeManager = initNodeManager()
+            val inputStream: InputStream = java.lang.ClassLoader.getSystemResourceAsStream("test_map.mm")
+            inputStream shouldNotBe null
+            
+            var loadFinished = false
+            var capturedRootNode: Node? = null
+            var capturedError: Exception? = null
+            
+            val job = launch {
+                nodeManager.loadMindMapFromInputStream(
+                    inputStream = inputStream!!,
+                    onError = { capturedError = it },
+                    onParentNodeUpdate = { capturedRootNode = it },
+                    onLoadFinished = { loadFinished = true }
+                )
+            }
+            
+            job.join()
+            job.cancel()
+            
+            capturedError shouldBe null
+            loadFinished shouldBe true
+            capturedRootNode shouldNotBe null
+            capturedRootNode?.text shouldBe "Droidplane Root"
+            capturedRootNode?.id shouldBe "ID_1000"
+            
+            // Verify all nodes are indexed
+            val indexes = nodeManager.getNodeByIdIndex()
+            indexes shouldNotBe null
+            indexes!!.size shouldBe 11  // Root + 10 children from test_map.mm
+            
+            // Verify root node is in index
+            indexes["ID_1000"] shouldNotBe null
+            indexes["ID_1000"]?.text shouldBe "Droidplane Root"
+            indexes["ID_1000"]?.parentNode shouldBe null
+            
+            // Verify child nodes are in index with correct parent references
+            val architectureNode = indexes["ID_1001"]
+            architectureNode shouldNotBe null
+            architectureNode?.text shouldBe "Architecture"
+            architectureNode?.parentNode?.id shouldBe "ID_1000"
+            
+            val navigationNode = indexes["ID_1005"]
+            navigationNode shouldNotBe null
+            navigationNode?.text shouldBe "Navigation"
+            navigationNode?.parentNode?.id shouldBe "ID_1000"
+            
+            val searchNode = indexes["ID_1008"]
+            searchNode shouldNotBe null
+            searchNode?.text shouldBe "Search"
+            searchNode?.parentNode?.id shouldBe "ID_1000"
+            
+            // Verify grand-children
+            val coreModuleNode = indexes["ID_1002"]
+            coreModuleNode shouldNotBe null
+            coreModuleNode?.text shouldBe ":core Module"
+            coreModuleNode?.parentNode?.id shouldBe "ID_1001"
+            
+            val upActionNode = indexes["ID_1006"]
+            upActionNode shouldNotBe null
+            upActionNode?.text shouldBe "Up Action"
+            upActionNode?.parentNode?.id shouldBe "ID_1005"
+            
+            // Verify rootNode property is set
+            nodeManager.rootNode shouldNotBe null
+            nodeManager.rootNode?.id shouldBe "ID_1000"
+            nodeManager.rootNode?.text shouldBe "Droidplane Root"
+        }
+
+        "loadMindMapFromInputStream should populate _allNodes StateFlow with all nodes" {
+            val nodeManager = initNodeManager()
+            val inputStream: InputStream = java.lang.ClassLoader.getSystemResourceAsStream("test_map.mm")
+            inputStream shouldNotBe null
+            
+            var loadFinished = false
+            var capturedError: Exception? = null
+            
+            val job = launch {
+                nodeManager.loadMindMapFromInputStream(
+                    inputStream = inputStream!!,
+                    onError = { capturedError = it },
+                    onParentNodeUpdate = { },
+                    onLoadFinished = { loadFinished = true }
+                )
+            }
+            
+            job.join()
+            job.cancel()
+            
+            capturedError shouldBe null
+            loadFinished shouldBe true
+            
+            // Verify _allNodes StateFlow has all nodes
+            val allNodes = nodeManager.allNodes.first()
+            allNodes.size shouldBe 11
+            allNodes.map { it.id } shouldContainExactlyInAnyOrder listOf(
+                "ID_1000", "ID_1001", "ID_1002", "ID_1003", "ID_1004",
+                "ID_1005", "ID_1006", "ID_1007", "ID_1008", "ID_1009", "ID_1010"
+            )
+        }
+
+        "getNodeParent should return correct parent for a given node ID" {
+            val nodeManager = initNodeManager()
+            val inputStream: InputStream = java.lang.ClassLoader.getSystemResourceAsStream("test_map.mm")
+            inputStream shouldNotBe null
+            
+            var loadFinished = false
+            var capturedError: Exception? = null
+            val job = launch {
+                nodeManager.loadMindMapFromInputStream(
+                    inputStream = inputStream!!,
+                    onError = { capturedError = it },
+                    onParentNodeUpdate = { },
+                    onLoadFinished = { loadFinished = true }
+                )
+            }
+            job.join()
+            job.cancel()
+            capturedError shouldBe null
+            loadFinished shouldBe true
+            
+            // Test getNodeParent with numeric IDs
+            val parentOfCoreModule = nodeManager.getNodeParent(1002)
+            parentOfCoreModule shouldNotBe null
+            parentOfCoreModule?.id shouldBe "ID_1001"
+            
+            val parentOfArchitecture = nodeManager.getNodeParent(1001)
+            parentOfArchitecture shouldNotBe null
+            parentOfArchitecture?.id shouldBe "ID_1000"
+            
+            val parentOfRoot = nodeManager.getNodeParent(1000)
+            parentOfRoot shouldBe null
+        }
+
+        "updateNodeText should update node, its parent childNodes entry and indexes" {
+            val nodeManager = loadedNodeManager()
+            val before = nodeManager.getNodeByID("ID_1002")!!.modificationDate!!
+
+            val updated = nodeManager.updateNodeText("ID_1002", "edited text")
+            updated shouldNotBe null
+            updated!!.text shouldBe "edited text"
+            val newModificationDate = updated!!.modificationDate!!
+            (newModificationDate >= before) shouldBe true
+
+
+            // index lookup returns the updated node
+            nodeManager.getNodeByID("ID_1002")?.text shouldBe "edited text"
+
+            // parent's childNodes entry is replaced, not appended
+            val parent = nodeManager.getNodeByID("ID_1001")
+            parent shouldNotBe null
+            parent?.childNodes?.count { it.id == "ID_1002" } shouldBe 1
+            parent?.childNodes?.first { it.id == "ID_1002" }?.text shouldBe "edited text"
+
+            // allNodes stream carries the update, without duplicating the node
+            val allNodes = nodeManager.allNodes.first()
+            allNodes.count { it.id == "ID_1002" } shouldBe 1
+            allNodes.first { it.id == "ID_1002" }.text shouldBe "edited text"
+        }
+
+        "updateNodeText should return null for unknown node id" {
+            val nodeManager = loadedNodeManager()
+            nodeManager.updateNodeText("ID_does_not_exist", "nope") shouldBe null
+        }
+
+        "addNodeToMindmap should append child to parent and register it in indexes" {
+            val nodeManager = loadedNodeManager()
+            val parentBefore = nodeManager.getNodeByID("ID_1001")!!.childNodes.size
+
+            val newNumericId = nodeManager.addNodeToMindmap("brand new child", nodeManager.getNodeByID("ID_1001"))
+            newNumericId shouldNotBe null
+
+            val newNode = nodeManager.getNodeByNumericId(newNumericId!!)
+            newNode shouldNotBe null
+            newNode?.text shouldBe "brand new child"
+            newNode?.parentNode?.id shouldBe "ID_1001"
+            newNode?.creationDate shouldNotBe null
+
+            val parentAfter = nodeManager.getNodeByID("ID_1001")
+            parentAfter?.childNodes?.size shouldBe parentBefore + 1
+            parentAfter?.childNodes?.last()?.id shouldBe newNode?.id
+
+            nodeManager.allNodes.first().count { it.id == newNode?.id } shouldBe 1
+        }
+
+        "addNodeToMindmap should reject blank text" {
+            val nodeManager = loadedNodeManager()
+            nodeManager.addNodeToMindmap("   ", nodeManager.getNodeByID("ID_1001")) shouldBe null
+        }
+
+        "serializeMindmap should round-trip a document preserving text and hierarchy" {
+            val nodeManager = loadedNodeManager()
+            val outDir = createTempDirectory(prefix = "droidplane-serialize")
+
+            var saved: java.io.File? = null
+            nodeManager.serializeMindmap(
+                filePath = outDir.toAbsolutePath().toString(),
+                filename = "round_trip.mm",
+                onError = { throw it },
+                onSaveFinished = { saved = it },
+            )
+            saved shouldNotBe null
+            val savedFile = saved!!
+            savedFile.name shouldBe "round_trip.mm"
+
+            val xml = savedFile.readText()
+            xml shouldContain "ID_1000"
+            xml shouldContain "Droidplane Root"
+            xml shouldContain "ID_1002"
+            // formatting tags must survive the round-trip
+            xml shouldContain "<icon"
+            xml shouldContain "<font"
+
+            // reload the saved document into a fresh manager: structure must survive
+            val reloaded = initNodeManager()
+            reloaded.loadMindMapFromInputStream(
+                inputStream = savedFile.inputStream(),
+                onError = { throw it },
+                onParentNodeUpdate = {},
+                onLoadFinished = {},
+            )
+            reloaded.allNodes.first().size shouldBe 11
+            reloaded.rootNode?.text shouldBe "Droidplane Root"
+            reloaded.getNodeByID("ID_1002")?.parentNode?.id shouldBe "ID_1001"
+            reloaded.getNodeByID("ID_1002")?.parentNode?.childNodes?.size shouldBe nodeManager.getNodeByID("ID_1001")?.childNodes?.size
+        }
+    }
+
+    /** Loads test_map.mm and fails loudly if anything goes wrong. */
+    private suspend fun loadedNodeManager(): NodeManager {
+        val nodeManager = initNodeManager()
+        val inputStream: InputStream? = java.lang.ClassLoader.getSystemResourceAsStream("test_map.mm")
+        inputStream shouldNotBe null
+        nodeManager.loadMindMapFromInputStream(
+            inputStream = inputStream!!,
+            onError = { throw it },
+            onParentNodeUpdate = {},
+            onLoadFinished = {},
+        )
+        return nodeManager
     }
 
     private fun initNodeManager(

@@ -38,6 +38,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import fr.julien.quievreux.droidplane2.MainUiState.SearchUiState
 import fr.julien.quievreux.droidplane2.ui.components.AppTopBarAction.Backpress
 import fr.julien.quievreux.droidplane2.ui.components.AppTopBarAction.Help
 import fr.julien.quievreux.droidplane2.ui.components.AppTopBarAction.Open
@@ -57,6 +58,7 @@ enum class AppTopBarAction {
     Help,
     Save,
     Backpress,
+    ExitSearch,
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -65,17 +67,13 @@ fun AppTopBar(
     text: String,
     hasBackIcon: Boolean,
     onBarAction: (AppTopBarAction) -> Unit,
-    hasSearchNavigateButton: Pair<Boolean,Boolean>,
+    hasSearchNavigateButton: Pair<Boolean, Boolean>,
     onQuery: (String) -> Unit,
+    searchUiState: SearchUiState = SearchUiState(),
+    onExitSearch: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     var showMenu by remember { mutableStateOf(false) }
-    var showSearch by remember { mutableStateOf(false) }
-
-    var expanded by rememberSaveable { mutableStateOf(false) }
-    var searchQuery by remember { mutableStateOf("") }
-    val items = listOf("Apple", "Banana", "Cherry", "Date", "Elderberry", "Fig", "Grape", "Honeydew")
-    val filteredItems = items.filter { it.contains(searchQuery, ignoreCase = true) }
 
     TopAppBar(
         modifier = modifier,
@@ -88,17 +86,17 @@ fun AppTopBar(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.Start,
             ) {
-                if (showSearch) {
+                if (searchUiState.isSearchActive) {
                     val colors = SearchBarDefaults.colors(
                         containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
                     )
+                    var expanded by rememberSaveable { mutableStateOf(true) }
                     SearchBar(
                         inputField = {
                             SearchBarDefaults.InputField(
-                                query = searchQuery,
-                                onQueryChange = {
-                                    searchQuery = it
-                                    onQuery(searchQuery)
+                                query = searchUiState.searchQuery,
+                                onQueryChange = { query ->
+                                    onQuery(query)
                                 },
                                 onSearch = { expanded = false },
                                 expanded = expanded,
@@ -111,8 +109,7 @@ fun AppTopBar(
                                         contentDescription = null,
                                         tint = MaterialTheme.colorScheme.onSurfaceVariant,
                                         modifier = Modifier.clickable {
-                                            searchQuery = ""
-                                            showSearch = false
+                                            onExitSearch()
                                         }
                                     )
                                 },
@@ -121,9 +118,8 @@ fun AppTopBar(
                                         Icon(
                                             imageVector = Icons.Rounded.Close,
                                             contentDescription = null,
-                                            modifier.clickable {
-                                                searchQuery = ""
-                                                onBarAction(Top)
+                                            modifier = Modifier.clickable {
+                                                onExitSearch()
                                             }
                                         )
                                 },
@@ -133,7 +129,6 @@ fun AppTopBar(
                         expanded = expanded,
                         onExpandedChange = { expanded = it },
                         modifier = modifier
-//                            .background(Color.Gray)
                             .weight(1f),
                         shape = SearchBarDefaults.inputFieldShape,
                         colors = colors,
@@ -141,32 +136,34 @@ fun AppTopBar(
                         shadowElevation = SearchBarDefaults.ShadowElevation,
                         windowInsets = WindowInsets(
                             top = 0.dp,
-                        ), //SearchBarDefaults.windowInsets,
+                        ),
                     ) {
-                        //Search content here
-                        filteredItems.forEach { item ->
-                            Text(text = item, fontSize = 15.sp)
-                        }
+                        // Search results content would go here if needed
                     }
-//                    if(hasSearchNavigateButton.first) {
+
+                    if (hasSearchNavigateButton.first) {
                         BarIcon(
                             imageVector = Filled.KeyboardArrowLeft,
-                            onClick = { onBarAction(SearchNext) },
-                        )
-//                    }
-
-//                    if(hasSearchNavigateButton.second) {
-                        BarIcon(
-                            imageVector = Filled.KeyboardArrowRight,
+                            contentDescription = stringResource(R.string.search_prev),
                             onClick = { onBarAction(SearchPrevious) },
                         )
-//                    }
+                    }
+
+                    if (hasSearchNavigateButton.second) {
+                        BarIcon(
+                            imageVector = Filled.KeyboardArrowRight,
+                            contentDescription = stringResource(R.string.search_next),
+                            onClick = { onBarAction(SearchNext) },
+                        )
+                    }
                 } else {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
-                        modifier = modifier.clickable {
-                            showSearch = true
-                        }
+                        modifier = modifier
+                            .fillMaxWidth()
+                            .clickable {
+                                // Click on title area could trigger search or do nothing
+                            }
                     ) {
                         Image(
                             painter = painterResource(R.drawable.ic_launcher),
@@ -184,7 +181,7 @@ fun AppTopBar(
             }
         },
         navigationIcon = {
-            if (hasBackIcon && !showSearch) {
+            if (hasBackIcon && !searchUiState.isSearchActive) {
                 FilledIconButton(
                     onClick = {
                         onBarAction(Backpress)
@@ -202,16 +199,18 @@ fun AppTopBar(
             }
         },
         actions = {
-            if (!showSearch) {
+            if (!searchUiState.isSearchActive) {
                 BarIcon(
                     imageVector = Icons.Default.Search,
+                    contentDescription = stringResource(R.string.search),
                     onClick = {
-                        showSearch = true
+                        onQuery("")
                     },
                 )
             }
             BarIcon(
                 imageVector = Icons.Default.MoreVert,
+                contentDescription = "More options",
                 onClick = { showMenu = true },
             )
 
@@ -269,4 +268,23 @@ fun AppTopBar(
             }
         }
     )
+}
+
+@Composable
+private fun BarIcon(
+    imageVector: androidx.compose.ui.graphics.vector.ImageVector,
+    contentDescription: String? = null,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    androidx.compose.material3.IconButton(
+        onClick = onClick,
+        modifier = modifier,
+    ) {
+        Icon(
+            imageVector = imageVector,
+            contentDescription = contentDescription,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
 }

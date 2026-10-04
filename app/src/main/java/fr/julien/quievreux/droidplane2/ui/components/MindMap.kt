@@ -118,9 +118,7 @@ fun MindMap(
 }
 
 @Composable
-fun Dp.toPx(): Float {
-    return with(LocalDensity.current) { this@toPx.toPx() }
-}
+fun Dp.toPx(): Float = with(LocalDensity.current) { this@toPx.toPx() }
 
 fun calculateCellSizePx(
     text: String,

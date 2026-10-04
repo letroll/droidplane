@@ -33,12 +33,14 @@ data class Node(
     var isBold: Boolean = false,
     var isItalic: Boolean = false,
     val position: String? = null,
-    // TODO: this has nothing to do with the model
-    var isSelected: Boolean = false,
     val arrowLinkDestinationIds: MutableList<String> = mutableListOf(),
     val arrowLinkDestinationNodes: MutableList<Node> = mutableListOf(),
     val arrowLinkIncomingNodes: MutableList<Node> = mutableListOf(),
 ) {
+
+    override fun toString(): String {
+        return "Node(id=$id, numericId=$numericId, text=$text, parentNodeId=${parentNode?.id}, childCount=${childNodes.size})"
+    }
 
     override fun equals(other: Any?): Boolean {
         if (this === other) return true
@@ -96,13 +98,7 @@ data class Node(
         arrowLinkDestinationIds.add(destinationId)
     }
 
-    fun deselectAllChildNodes(): Node {
-        childNodes.forEach {
-            it.isSelected = false
-        }
-        return this
     }
-}
 
 // if the link has a "#ID123", it's an internal link within the document
 fun Node.isInternalLink(): Boolean = link?.fragment != null && link.fragment?.startsWith("ID") == true

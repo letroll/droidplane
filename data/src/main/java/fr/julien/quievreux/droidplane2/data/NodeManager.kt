@@ -35,9 +35,10 @@ class NodeManager(
     private val nodeUtils: NodeUtils,
     private val xmlParseUtils: XmlParseUtils,
     val coroutineScope: CoroutineScope,
-) {
+) : NodeManagerContract {
 
     private val _allNodes = MutableStateFlow(emptyList<Node>())
+    override val allNodes: StateFlow<List<Node>> = _allNodes
 
     val allNodesId = _allNodes.map { nodes ->
         nodes.map { node ->
@@ -50,7 +51,7 @@ class NodeManager(
      */
     private var mindmapIndexes: MindmapIndexes? = null
 
-    var rootNode: Node? = null
+    override var rootNode: Node? = null
         private set
 
     private var currentMindMapUri: Uri? = null
@@ -62,7 +63,7 @@ class NodeManager(
         fetchText = { node -> getNodeText(node) }
     )
 
-    fun getNodeByID(id: String?): Node? = mindmapIndexes?.nodesByIdIndex?.get(id)
+    override fun getNodeByID(id: String?): Node? = mindmapIndexes?.nodesByIdIndex?.get(id)
 
     fun getNodeByNumericIndex(): Map<Int, Node>? = mindmapIndexes?.nodesByNumericIndex
 
@@ -70,9 +71,9 @@ class NodeManager(
 
     inline fun <reified K, reified V> Map<K, V>?.orMutableMap(): MutableMap<K, V> = if (this == null) mutableMapOf() else toMutableMap()
 
-    fun getNodeByNumericId(nodeId: Int): Node? = getNodeByID(getNodeID(nodeId))
+    override fun getNodeByNumericId(nodeId: Int): Node? = getNodeByID(getNodeID(nodeId))
 
-    fun getNodeParent(childNodeId: Int): Node? = getNodeByNumericId(childNodeId)?.parentNode
+    override fun getNodeParent(childNodeId: Int): Node? = getNodeByNumericId(childNodeId)?.parentNode
 
     fun updatemMindmapIndexes(mindmapIndexes: MindmapIndexes) {
         this.mindmapIndexes = mindmapIndexes
@@ -97,11 +98,11 @@ class NodeManager(
      *
      * @param inputStream the inputStream to load
      */
-    suspend fun loadMindMapFromInputStream(
+    override suspend fun loadMindMapFromInputStream(
         inputStream: InputStream,
         onError: (Exception) -> Unit,
         onParentNodeUpdate: (Node) -> Unit,
-        onLoadFinished: (() -> Unit)? = null,
+        onLoadFinished: (() -> Unit)?,
     ) {
         logger.e("loadMindMapFromInputStream")
         val xpp: XmlPullParser?
@@ -133,6 +134,7 @@ class NodeManager(
         logger.e("loadMindMapFromXml")
         try {
             val nodes = mutableListOf<Node>()
+            val allParsedNodes = mutableListOf<Node>() // Collect all parsed nodes in order
             var eventType = xpp.eventType
             var hasStartDocument = false
             while (eventType != XmlPullParser.END_DOCUMENT) {
@@ -143,7 +145,15 @@ class NodeManager(
                     }
 
                     XmlPullParser.START_TAG -> {
+                        // Track nodes before parsing
+                        val sizeBefore = _allNodes.value.size
                         loadXmlTagNode(xpp, nodes, onParentNodeUpdate)
+                        // Capture newly added nodes
+                        val sizeAfter = _allNodes.value.size
+                        if (sizeAfter > sizeBefore) {
+                            val newNodes = _allNodes.value.subList(sizeBefore, sizeAfter)
+                            allParsedNodes.addAll(newNodes)
+                        }
                     }
 
                     XmlPullParser.END_TAG -> {
@@ -170,10 +180,19 @@ class NodeManager(
             // stack should now be empty
             if (nodes.isNotEmpty()) {
                 onError(Exception("Stack should be empty"))
-                // TODO: we could try to be lenient here to allow opening partial documents
-                //  (which sometimes happens when dropbox doesn't fully sync).
-                //  Probably doesn't work anyways, as we already throw a runtime exception above if we receive garbage
             }
+
+            // After parsing, find the root node (first parsed node with no parent)
+            if (rootNode == null && allParsedNodes.isNotEmpty()) {
+                rootNode = allParsedNodes.firstOrNull { it.parentNode == null }
+                // If not found, use the first node
+                if (rootNode == null) {
+                    rootNode = allParsedNodes.first()
+                }
+            }
+
+            // Ensure _allNodes contains all parsed nodes in the correct order
+            _allNodes.value = allParsedNodes
 
             onReadFinish?.invoke()
             processMindMap()
@@ -189,9 +208,12 @@ class NodeManager(
                     nodes = nodes,
                     xpp = xpp,
                     addChildIntoParent = ::addChildIntoParent,
-                    onParentNodeUpdate = { updatedRootNode ->
-                        onParentNodeUpdate(updatedRootNode)
-                        updateRootNode(updatedRootNode)
+                    onParentNodeUpdate = { parsedNode ->
+                        // For root node (no parent), add it to _allNodes
+                        if (parsedNode.parentNode == null) {
+                            _allNodes.update { it + parsedNode }
+                        }
+                        onParentNodeUpdate(parsedNode)
                     },
                 )
 
@@ -239,7 +261,7 @@ class NodeManager(
         }
     }
 
-    fun getNodeText(node: Node): String? {
+    override fun getNodeText(node: Node): String? {
         getNodeByID(node.id)?.let { actualNode ->
             // if this is a cloned node, get the text from the original node
             if (actualNode.isClone()) {
@@ -254,6 +276,30 @@ class NodeManager(
             if (actualNode.text == null && actualNode.richTextContents.isNotEmpty()) {
                 val richTextContent = actualNode.richTextContents.first()
                 return Html.fromHtml(richTextContent).toString()
+            }
+
+            return actualNode.text
+        } ?: run {
+            return node.text
+        }
+    }
+
+    /**
+     * Returns the full text content of a node for copying to clipboard.
+     * Includes raw HTML for rich text nodes.
+     */
+    fun getNodeTextForCopy(node: Node): String? {
+        getNodeByID(node.id)?.let { actualNode ->
+            if (actualNode.isClone()) {
+                val linkedNode = getNodeByID(actualNode.treeIdAttribute)
+                if (linkedNode != null) {
+                    return getNodeTextForCopy(linkedNode)
+                }
+            }
+
+            // if this is a rich text node, return raw HTML
+            if (actualNode.richTextContents.isNotEmpty()) {
+                return actualNode.richTextContents.first()
             }
 
             return actualNode.text
@@ -317,7 +363,7 @@ class NodeManager(
         return null
     }
 
-    fun search(
+    override fun search(
         query: String,
         onResultFound: () -> Unit,
     ) {
@@ -326,11 +372,11 @@ class NodeManager(
 
     fun getResultCount() = searchManager.getResultCount()
 
-    fun getSearchResult(): List<Node> = searchManager.getSearchResult().value
+    override fun getSearchResult(): List<Node> = searchManager.getSearchResult().value
 
     fun getSearchResultFlow(): StateFlow<List<Node>> = searchManager.getSearchResult()
 
-    fun getSearchResultCount() = searchManager.getSearchResult().value.size
+    override fun getSearchResultCount(): Int = searchManager.getSearchResult().value.size
 
 //    fun generateNodeID(): String {
 //        var returnValue: String
@@ -368,11 +414,11 @@ class NodeManager(
         logger.e("setMapUri uri:$currentMindMapUri")
     }
 
-    suspend fun serializeMindmap(
+    override suspend fun serializeMindmap(
         filePath: String,
         filename: String,
         onError: (Exception) -> Unit,
-        onSaveFinished: ((File) -> Unit)? = null,
+        onSaveFinished: ((File) -> Unit)?,
     ) {
         if (isInvalidFilePath(filePath)) onError.invoke(
             Exception("Invalid file path")
@@ -578,7 +624,7 @@ class NodeManager(
     /**
      * addNode : try to add a node and return it's id on success
      */
-    suspend fun addNodeToMindmap(newValue: String, parentNode: Node? = null): Int? {
+    override suspend fun addNodeToMindmap(newValue: String, parentNode: Node?): Int? {
         return if (newValue.isBlank()) {
             null
         } else {
@@ -665,6 +711,73 @@ class NodeManager(
                 nodeNumericId
             }
         }
+    }
+
+    override suspend fun updateNodeText(nodeId: String, newText: String): Node? {
+        val targetNode = getNodeByID(nodeId) ?: return null
+        val time = System.currentTimeMillis()
+        val updatedNode = targetNode.copy(
+            text = newText,
+            modificationDate = time,
+        )
+
+        var updatedParentNode: Node? = null
+        _allNodes.update { nodes ->
+            nodes.map { node ->
+                when {
+                    node.id == nodeId -> updatedNode
+
+                    node.id == targetNode.parentNode?.id -> {
+                        val childIndex = node.childNodes.indexOfFirst { it.id == nodeId }
+                        if (childIndex != -1) {
+                            val newChildren = ArrayList(node.childNodes)
+                            newChildren[childIndex] = updatedNode
+                            node.copy(childNodes = newChildren).also { updatedParentNode = it }
+                        } else {
+                            node
+                        }
+                    }
+
+                    else -> node
+                }
+            }
+        }
+
+        updateNodeInMindMapIndexes(updatedNode)
+        // Re-index the parent from the just-updated stream: the index still holds the
+        // pre-edit parent copy, so re-reading it here would drop the new childNodes.
+        updatedParentNode?.let { updatedParent ->
+            updateNodeInMindMapIndexes(updatedParent)
+            if (updatedParent.id == rootNode?.id) {
+                rootNode = updatedParent
+            }
+        }
+
+        if (targetNode.parentNode == null && updatedNode.id == rootNode?.id) {
+            rootNode = updatedNode
+        }
+
+        return updatedNode
+    }
+
+    override suspend fun deleteNode(nodeId: String): Boolean {
+        val targetNode = getNodeByID(nodeId) ?: return false
+        _allNodes.update { nodes ->
+            nodes.filter { it.id != nodeId }.map { node ->
+                if (node.id == targetNode.parentNode?.id) {
+                    val newChildren = node.childNodes.filter { it.id != nodeId }.toMutableList()
+                    node.copy(childNodes = newChildren)
+                } else {
+                    node
+                }
+            }
+        }
+        val nodesById = getNodeByIdIndex().orMutableMap()
+        val nodesByNumeric = getNodeByNumericIndex().orMutableMap()
+        nodesById.remove(nodeId)
+        nodesByNumeric.remove(targetNode.numericId)
+        updatemMindmapIndexes(MindmapIndexes(nodesById, nodesByNumeric))
+        return true
     }
 
     suspend fun generateNodeNumericID(): Int {

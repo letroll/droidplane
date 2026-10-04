@@ -30,7 +30,6 @@ object FakeDataSource {
         modificationDate = null,
         isBold = false,
         isItalic = false,
-        isSelected = false,
         arrowLinkDestinationIds = mutableListOf(),
         arrowLinkDestinationNodes = mutableListOf(),
         arrowLinkIncomingNodes = mutableListOf(),

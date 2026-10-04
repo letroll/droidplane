@@ -1,7 +1,6 @@
 package fr.julien.quievreux.droidplane2.data
 
 import android.net.Uri
-import android.util.Pair
 import fr.julien.quievreux.droidplane2.data.model.MindmapIndexes
 import fr.julien.quievreux.droidplane2.data.model.Node
 import fr.julien.quievreux.droidplane2.data.model.NodeAttribute
@@ -97,30 +96,23 @@ class NodeUtilsDefaultImpl : NodeUtils {
      * @param root
      */
     override fun loadAndIndexNodesByIds(root: Node?): MindmapIndexes {
-        // TODO: check if this optimization was necessary - otherwise go back to old implementation
-
-        // TODO: this causes us to load all viewModel nodes, defeating the lazy loading in.Node.getChildNodes
-
         val nodes = mutableListOf<Node?>()
-        nodes.add(root)
+        root?.let { nodes.add(it) }
 
-        // try first to just extract all IDs and the respective node, and
-        // only insert into the hashmap once we know the size of the hashmap
         val idAndNode: MutableList<Pair<String, Node>> = mutableListOf()
         val numericIdAndNode: MutableList<Pair<Int, Node>> = mutableListOf()
 
         while (!nodes.isEmpty()) {
             val node = nodes.removeAt(nodes.size - 1)
 
-            idAndNode.add(Pair(node?.id, node))
             node?.let {
-                numericIdAndNode.add(Pair(node.numericId, node))
+                idAndNode.add(it.id to it)
+                numericIdAndNode.add(it.numericId to it)
 
-                for (mindmapNode in node.childNodes) {
+                for (mindmapNode in it.childNodes) {
                     nodes.add(mindmapNode)
                 }
             }
-
         }
 
         val newNodesById: MutableMap<String, Node> = HashMap(idAndNode.size)
