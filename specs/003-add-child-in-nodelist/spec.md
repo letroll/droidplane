@@ -21,7 +21,7 @@ As a user browsing a mindmap node's children list in NodeList, I want to add a c
 **Acceptance Scenarios**:
 
 1. **Given** a mindmap is displayed where parent node "Project" has child nodes "Design" and "Development" in the list, **When** the user opens the context menu on "Design" and selects "Add child node", enters "Wireframes", and confirms, **Then** "Wireframes" is created as a child of "Design" (not as a child of "Project").
-2. **Given** a listed node receives a new child node via its context menu, **When** the user subsequently navigates into that listed node, **Then** the newly created child node is visible in its children list.
+2. **Given** a listed node receives a new child node via its context menu, **When** the user subsequently navigates into that listed node, **Then** the newly created child node is visible in its children list directly after the node creation.
 3. **Given** a listed node previously had no children, **When** a child node is added to it, **Then** the listed node's visual indicator (expand/children toggle indicator) reflects that it now contains child nodes.
 
 ---

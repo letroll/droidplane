@@ -150,6 +150,25 @@ class MainActivity : FragmentActivity(), FileRegister {
                     )
                 }
 
+                LaunchedEffect(state.value.snackbarMessage?.eventId) {
+                    state.value.snackbarMessage?.let { snackbarMsg ->
+                        scope.launch {
+                            val result = snackbarHostState.showSnackbar(
+                                message = snackbarMsg.message,
+                                actionLabel = snackbarMsg.actionLabel?.let { getString(it) },
+                                duration = androidx.compose.material3.SnackbarDuration.Short,
+                            )
+                            when (result) {
+                                ActionPerformed -> {
+                                    snackbarMsg.onAction?.invoke()
+                                }
+                                Dismissed -> {}
+                            }
+                            viewModel.clearSnackbarMessage()
+                        }
+                    }
+                }
+
                 when (val dialog = state.value.dialogUiState.dialogType) {
                     None -> {}
                     is EditNodeDescription -> {
@@ -196,6 +215,7 @@ class MainActivity : FragmentActivity(), FileRegister {
                             hasSearchNavigateButton = Pair(state.value.searchUiState.currentResultIndex > 0, state.value.searchUiState.currentResultIndex < nodeFindList.value.size - 1),
                             searchUiState = state.value.searchUiState,
                             onExitSearch = { viewModel.onExitSearchMode() },
+                            canUndoDelete = state.value.canUndoDelete,
                             onBarAction = { action ->
                                 when (action) {
                                     Backpress -> viewModel.upOrClose()

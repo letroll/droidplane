@@ -28,6 +28,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -74,6 +75,9 @@ import fr.julien.quievreux.droidplane2.model.getNodeFontIconsFromName
 import fr.julien.quievreux.droidplane2.model.getNodeIconsResIdFromName
 import fr.julien.quievreux.droidplane2.ui.theme.ContrastAwareReplyTheme
 import java.util.Locale
+import java.util.concurrent.ConcurrentHashMap
+
+private val drawableResIdCache = ConcurrentHashMap<String, Int>()
 
 fun LazyListScope.nodeList(
     node: Node,
@@ -231,6 +235,9 @@ fun NodeItem(
         mutableStateOf(0.dp)
     }
 
+    val currentNode by rememberUpdatedState(node)
+    val currentOnNodeClick by rememberUpdatedState(onNodeClick)
+
     Card(
         modifier = Modifier
 //TODO use it when available            .animateItem()
@@ -250,7 +257,7 @@ fun NodeItem(
         Row(
             modifier = Modifier
                 .indication(interactionSource, LocalIndication.current)
-                .pointerInput(true) {
+                .pointerInput(node.id) {
                     detectTapGestures(
                         onLongPress = {
                             isContextMenuVisble = true
@@ -263,7 +270,7 @@ fun NodeItem(
                             interactionSource.emit(Release(press))
                         },
                         onTap = {
-                            onNodeClick(node)
+                            currentOnNodeClick(currentNode)
                         }
                     )
                 },
@@ -284,7 +291,12 @@ fun NodeItem(
                     iconResourceIds.add(it)
                 } ?: run {
                     val drawableName = getDrawableNameFromMindmapIcon(iconName)
-                    iconResourceIds.add(context.resources.getIdentifier("@drawable/$drawableName", "id", context.packageName))
+                    val resId = drawableResIdCache.getOrPut(drawableName) {
+                        context.resources.getIdentifier("@drawable/$drawableName", "id", context.packageName)
+                    }
+                    if (resId != 0) {
+                        iconResourceIds.add(resId)
+                    }
                 }
             }
 

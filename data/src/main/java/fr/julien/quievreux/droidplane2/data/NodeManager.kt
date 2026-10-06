@@ -64,11 +64,7 @@ class NodeManager(
         fetchText = { node -> getNodeText(node) }
     )
 
-    override fun getNodeByID(id: String?): Node? {
-        val result = mindmapIndexes?.nodesByIdIndex?.get(id)
-        println("DEBUG NodeManager.getNodeByID: id=$id, result=${result?.id}, parentNodeId=${result?.parentNode?.id}, childCount=${result?.childNodes?.size}, hashCode=${System.identityHashCode(result)}")
-        return result
-    }
+    override fun getNodeByID(id: String?): Node? = mindmapIndexes?.nodesByIdIndex?.get(id)
 
     fun getNodeByNumericIndex(): Map<Int, Node>? = mindmapIndexes?.nodesByNumericIndex
 
@@ -81,9 +77,7 @@ class NodeManager(
     override fun getNodeParent(childNodeId: Int): Node? = getNodeByNumericId(childNodeId)?.parentNode
 
     fun updatemMindmapIndexes(mindmapIndexes: MindmapIndexes) {
-        println("DEBUG updatemMindmapIndexes: old hash=${this.mindmapIndexes?.hashCode()}, new hash=${mindmapIndexes.hashCode()}, new nodesById size=${mindmapIndexes.nodesByIdIndex.size}")
         this.mindmapIndexes = mindmapIndexes
-        println("DEBUG updatemMindmapIndexes: new hash=${this.mindmapIndexes?.hashCode()}")
     }
 
     fun updateNodeInMindMapIndexes(node: Node) {
@@ -749,7 +743,11 @@ class NodeManager(
 
             val fixedChild = currentChild.copy(parentNode = updatedAncestor)
             updatedNodesMap[fixedChild.id] = fixedChild
-            updateDescendantParents(fixedChild, updatedNodesMap)
+            fixedChild.childNodes.replaceAll { c ->
+                val updatedC = c.copy(parentNode = fixedChild)
+                updatedNodesMap[updatedC.id] = updatedC
+                updatedC
+            }
 
             if (childIdx != -1) {
                 newAncestorChildren[childIdx] = fixedChild
@@ -761,7 +759,7 @@ class NodeManager(
                 } else {
                     val updatedC = c.copy(parentNode = updatedAncestor)
                     updatedNodesMap[updatedC.id] = updatedC
-                    updateDescendantParents(updatedC, updatedNodesMap)
+                    updatedC
                 }
             }
             updatedNodesMap[updatedAncestor.id] = updatedAncestor
@@ -971,12 +969,9 @@ class NodeManager(
 
 
     suspend fun generateNodeNumericID(): Int {
-        val currentIds = allNodesId.first().toSet()
-        if (currentIds.size >= Int.MAX_VALUE) {
-            throw IllegalStateException("No more available IDs")
-        }
-        var newId = 0
-        while (currentIds.contains(newId)) {
+        val numericIndex = mindmapIndexes?.nodesByNumericIndex
+        var newId = abs(Random.nextInt(UNDEFINED_NODE_ID))
+        while (newId == 0 || numericIndex?.containsKey(newId) == true) {
             newId = abs(Random.nextInt(UNDEFINED_NODE_ID))
         }
         return newId

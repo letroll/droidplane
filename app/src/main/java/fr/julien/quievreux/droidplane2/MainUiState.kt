@@ -13,12 +13,20 @@ data class MainUiState(
     val nodeCurrentlyDisplayed: Node? = null,
     val error: String = "",
     val errorAction: ErrorAction? = null,
+    val snackbarMessage: SnackbarMessage? = null,
+    val canUndoDelete: Boolean = false,
     val viewIntentNode: ViewIntentNode? = null,
     val contentNodeType: ContentNodeType = Classic,
     val searchUiState: SearchUiState = SearchUiState(),
     val dialogUiState: DialogUiState = DialogUiState(),
     val navigationStack: List<String> = emptyList(),
 ) {
+    data class SnackbarMessage(
+        val message: String,
+        val actionLabel: Int? = null,
+        val onAction: (() -> Unit)? = null,
+        val eventId: Long = System.currentTimeMillis(),
+    )
     data class ErrorAction(
         val actionLabel: Int,
         val action: () -> Unit,

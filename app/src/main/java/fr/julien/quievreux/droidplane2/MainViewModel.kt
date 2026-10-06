@@ -225,25 +225,26 @@ class MainViewModel(
         node: Node,
     ) {
         viewModelScope.launch {
+            val targetNode = nodeManager.getNodeByID(node.id) ?: node
             when {
-                node.childNodes.isNotEmpty() -> {
-                    showNode(node)
+                targetNode.childNodes.isNotEmpty() -> {
+                    showNode(targetNode, updateStack = true)
                 }
 
-                node.link != null -> {
-                    if (node.isInternalLink()) {
-                        openInternalFragmentLink(node = node)
+                targetNode.link != null -> {
+                    if (targetNode.isInternalLink()) {
+                        openInternalFragmentLink(node = targetNode)
                     } else {
-                        openIntentLink(node = node)
+                        openIntentLink(node = targetNode)
                     }
                 }
 
-                node.richTextContents.isNotEmpty() -> {
+                targetNode.richTextContents.isNotEmpty() -> {
                     updateUiState {
                         it.copy(
                             viewIntentNode = ViewIntentNode(
                                 intent = Intent(),
-                                node = node,
+                                node = targetNode,
                             ),
                             contentNodeType = ContentNodeType.RichText
                         )
@@ -251,7 +252,7 @@ class MainViewModel(
                 }
 
                 else -> {
-                    setTitle(getNodeText(node))
+                    setTitle(getNodeText(targetNode))
                 }
             }
         }
@@ -263,17 +264,22 @@ class MainViewModel(
      *
      * @param node
      */
-    private suspend fun showNode(node: Node) {
-        updateUiState {
-            it.copy(
+    private fun showNode(node: Node, updateStack: Boolean = false) {
+        val titleText = getNodeText(node).orEmpty()
+        val canGoBack = node.parentNode != null
+        updateUiState { currentState ->
+            val newStack = if (updateStack) {
+                if (node.parentNode == null) listOf(node.id) else currentState.navigationStack + node.id
+            } else {
+                currentState.navigationStack
+            }
+            currentState.copy(
                 nodeCurrentlyDisplayed = node,
+                title = titleText,
+                canGoBack = canGoBack,
+                navigationStack = newStack,
             )
         }
-
-        enableHomeButtonIfNeeded(node)
-
-        // get the title of the parent of the rightmost column (i.e. the selected node in the 2nd-rightmost column)
-        setTitle(getNodeText(node))
     }
 
     private fun enableHomeButtonIfNeeded(node: Node?) {
@@ -311,19 +317,7 @@ class MainViewModel(
                 nodeManager.getNodeByID(nodeId)?.let { node ->
                     // Use NodeManager's index to get parent directly
                     nodeManager.getNodeParent(node.numericId)?.let { parent ->
-                        updateUiState {
-                            it.copy(
-                                nodeCurrentlyDisplayed = parent,
-                            )
-                        }
-
-                        // enable the up navigation with the Home (app) button (top left corner)
-                        enableHomeButtonIfNeeded(parent)
-
-                        // get the title of the parent of the rightmost column (i.e. the selected node in the 2nd-rightmost column)
-                        parent?.let {
-                            setTitle(getNodeText(it))
-                        }
+                        showNode(parent)
                     }
                 } ?: run {
                     if (force) {
@@ -778,6 +772,17 @@ nodeFindList:${nodeManager.getSearchResult().map { getNodeText(it) }.joinToStrin
                     showNode(parent)
                 }
             }
+            val nodeTitle = node.text ?: "Node"
+            updateUiState {
+                it.copy(
+                    canUndoDelete = undoStack.isNotEmpty(),
+                    snackbarMessage = MainUiState.SnackbarMessage(
+                        message = "\"$nodeTitle\" deleted",
+                        actionLabel = R.string.undo,
+                        onAction = { onUndoDelete() }
+                    )
+                )
+            }
             setMindmapIsLoading(false)
             setDialogState(DialogType.None)
         }
@@ -795,7 +800,19 @@ nodeFindList:${nodeManager.getSearchResult().map { getNodeText(it) }.joinToStrin
                     restoredNode?.let { showNode(it) }
                 }
             }
+            updateUiState {
+                it.copy(
+                    canUndoDelete = undoStack.isNotEmpty(),
+                    snackbarMessage = null
+                )
+            }
             setMindmapIsLoading(false)
+        }
+    }
+
+    fun clearSnackbarMessage() {
+        updateUiState {
+            it.copy(snackbarMessage = null)
         }
     }
 
@@ -808,7 +825,6 @@ nodeFindList:${nodeManager.getSearchResult().map { getNodeText(it) }.joinToStrin
             return
         }
         viewModelScope.launch(Dispatchers.IO) {
-            setMindmapIsLoading(true)
             val currentScreenNode = _uiState.value.nodeCurrentlyDisplayed
             val targetParent = parentNode ?: currentScreenNode
             val newNodeId = nodeManager.addNodeToMindmap(newValue, targetParent)
@@ -826,7 +842,6 @@ nodeFindList:${nodeManager.getSearchResult().map { getNodeText(it) }.joinToStrin
                 }
             }
             hasUnsavedChanges = true
-            setMindmapIsLoading(false)
         }
     }
 }

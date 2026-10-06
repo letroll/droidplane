@@ -13,6 +13,7 @@ import fr.julien.quievreux.droidplane2.data.XmlParseUtilsDefaultImpl
 import fr.julien.quievreux.droidplane2.data.model.Node
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.shouldNotBe
+import io.kotest.matchers.string.shouldContain
 import io.mockk.coEvery
 import io.mockk.mockk
 import kotlinx.coroutines.delay
@@ -347,6 +348,64 @@ class MainViewModelTest : KStringSpec() {
             childAfter.childNodes.size shouldBe 0
             val rootAfter = nodeManager.getNodeByID(root.id)!!
             rootAfter.childNodes.first { it.id == child.id }.childNodes.size shouldBe 0
+        }
+
+        "onNodeClick on target child immediately after adding subchild navigates to target and displays subchild" {
+            val nodeManager = realNodeManager()
+            val viewModel = MainViewModel(logger = mockk(relaxed = true), injectedNodeManager = nodeManager)
+            val root = nodeManager.rootNode!!
+            viewModel.setInitialStateForTest(root)
+
+            val child = nodeManager.getNodeByID(root.id)!!.childNodes[0]
+
+            viewModel.addNode("grandchild 1", parentNode = child)
+
+            // Simulate user tapping the list item
+            viewModel.onNodeClick(child)
+
+            eventually {
+                viewModel.uiState.value.nodeCurrentlyDisplayed?.id shouldBe child.id
+                val displayed = viewModel.uiState.value.nodeCurrentlyDisplayed!!
+                displayed.childNodes.size shouldBe 1
+                displayed.childNodes[0].text shouldBe "grandchild 1"
+                viewModel.uiState.value.canGoBack shouldBe true
+            }
+
+            viewModel.onNavigateUp()
+
+            eventually {
+                viewModel.uiState.value.nodeCurrentlyDisplayed?.id shouldBe root.id
+            }
+        }
+
+        "node deletion emits undo snackbar and sets canUndoDelete, and undoing restores the node" {
+            val nodeManager = realNodeManager()
+            val viewModel = MainViewModel(logger = mockk(relaxed = true), injectedNodeManager = nodeManager)
+            val root = nodeManager.rootNode!!
+            viewModel.setInitialStateForTest(root)
+
+            val child = nodeManager.getNodeByID(root.id)!!.childNodes[0]
+
+            // Delete child
+            viewModel.onDeleteNode(child)
+            viewModel.onConfirmDelete()
+
+            eventually {
+                viewModel.uiState.value.canUndoDelete shouldBe true
+                viewModel.uiState.value.snackbarMessage shouldNotBe null
+                viewModel.uiState.value.snackbarMessage?.message shouldContain child.text.orEmpty()
+                viewModel.uiState.value.snackbarMessage?.actionLabel shouldBe R.string.undo
+            }
+
+            // Execute undo action from the snackbar
+            viewModel.uiState.value.snackbarMessage?.onAction?.invoke()
+
+            eventually {
+                viewModel.uiState.value.canUndoDelete shouldBe false
+                viewModel.uiState.value.snackbarMessage shouldBe null
+                val rootAfter = nodeManager.getNodeByID(root.id)!!
+                rootAfter.childNodes.any { it.id == child.id } shouldBe true
+            }
         }
     }
 

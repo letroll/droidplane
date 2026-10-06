@@ -22,6 +22,12 @@ class MainViewModel(...) {
      * Sets dialog state to display the child creation dialog.
      */
     fun setDialogState(dialogType: MainUiState.DialogType)
+
+    /**
+     * Handles clicking on a node item in NodeList.
+     * When the node has children, navigates to that node and updates the view.
+     */
+    fun onNodeClick(node: Node)
 }
 ```
 
