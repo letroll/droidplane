@@ -535,6 +535,76 @@ class NodeManagerTest : KStringSpec() {
             rootAfter.childNodes.size shouldBe 2  // Navigation and Search
         }
 
+        "restoreSubtree should restore deleted subtree and update parentNode references" {
+            val nodeManager = loadedNodeManager()
+            val architecture = nodeManager.getNodeByID("ID_1001")!!
+            val coreModule = nodeManager.getNodeByID("ID_1002")!!
+            val initialChildCount = architecture.childNodes.size
+
+            // Create snapshot before deletion
+            val snapshot = nodeManager.createDeleteSnapshot(coreModule.id)
+            snapshot shouldNotBe null
+
+            // Delete node
+            nodeManager.deleteNode(coreModule.id) shouldBe true
+            nodeManager.getNodeByID(coreModule.id) shouldBe null
+
+            // Restore subtree
+            val restored = nodeManager.restoreSubtree(snapshot!!)
+            restored shouldBe true
+
+            // Verify node is restored in index and parent's children
+            val coreModuleRestored = nodeManager.getNodeByID(coreModule.id)
+            coreModuleRestored shouldNotBe null
+
+            val architectureAfter = nodeManager.getNodeByID(architecture.id)!!
+            architectureAfter.childNodes.size shouldBe initialChildCount
+
+            // Verify parent references of restored node and siblings point to the updated architecture instance
+            coreModuleRestored!!.parentNode?.id shouldBe architectureAfter.id
+            coreModuleRestored.parentNode shouldBe architectureAfter
+
+            val dataModuleAfter = nodeManager.getNodeByID("ID_1003")!!
+            dataModuleAfter.parentNode?.id shouldBe architectureAfter.id
+            dataModuleAfter.parentNode shouldBe architectureAfter
+        }
+
+        "delete node then navigate to sibling then navigate back should not cause deleted node to reappear" {
+            val nodeManager = loadedNodeManager()
+            val architecture = nodeManager.getNodeByID("ID_1001")!!
+            val coreModule = architecture.childNodes.first { it.text == ":core Module" }
+            val dataModule = architecture.childNodes.first { it.text == ":data Module" }
+
+            // Delete :core Module
+            nodeManager.deleteNode(coreModule.id) shouldBe true
+
+            // User navigates to sibling (:data Module)
+            val sibling = nodeManager.getNodeByID(dataModule.id)
+            sibling shouldNotBe null
+
+            // User navigates back up to parent using parentNode reference
+            val parentFromSibling = sibling!!.parentNode
+            parentFromSibling shouldNotBe null
+            parentFromSibling!!.id shouldBe architecture.id
+
+            // Deleted node must NOT be present in parent's children
+            val parentChildrenIds = parentFromSibling.childNodes.map { it.id }
+            parentChildrenIds shouldNotContain coreModule.id
+            val parentChildrenTexts = parentFromSibling.childNodes.mapNotNull { it.text }
+            parentChildrenTexts shouldNotContain ":core Module"
+            parentChildrenTexts shouldNotContain coreModule.text
+
+            // Also check navigation via getNodeParent
+            val parentFromGetNodeParent = nodeManager.getNodeParent(sibling.numericId)
+            parentFromGetNodeParent shouldNotBe null
+            parentFromGetNodeParent!!.childNodes.map { it.id } shouldNotContain coreModule.id
+
+            // Also check rootNode hierarchy
+            val root = nodeManager.rootNode!!
+            val archFromRoot = root.childNodes.first { it.id == architecture.id }
+            archFromRoot.childNodes.map { it.id } shouldNotContain coreModule.id
+        }
+
 
     "serializeMindmap should round-trip a document preserving text and hierarchy" {
             val nodeManager = loadedNodeManager()

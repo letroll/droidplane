@@ -226,6 +226,45 @@ class MainViewModelTest : KStringSpec() {
 
             nodeManager.getNodeByID(root.id)!!.childNodes.size shouldBe before
         }
+
+        "delete node and navigate to sibling and back should not restore deleted node in UI state" {
+            val nodeManager = realNodeManager()
+            val viewModel = MainViewModel(logger = mockk(relaxed = true), injectedNodeManager = nodeManager)
+            val root = nodeManager.rootNode!!
+            viewModel.setInitialStateForTest(root)
+
+            // Add second child so root has two children
+            val secondChildId = nodeManager.addNodeToMindmap("second child", nodeManager.getNodeByID(root.id))
+            secondChildId shouldNotBe null
+            val rootUpdated = nodeManager.getNodeByID(root.id)!!
+            rootUpdated.childNodes.size shouldBe 2
+            val firstChild = rootUpdated.childNodes[0]
+            val secondChild = rootUpdated.childNodes[1]
+
+            // Display root
+            viewModel.setInitialStateForTest(rootUpdated)
+
+            // Delete firstChild
+            viewModel.onDeleteNode(firstChild)
+            viewModel.onConfirmDelete()
+
+            eventually {
+                viewModel.uiState.value.nodeCurrentlyDisplayed?.childNodes?.size shouldBe 1
+                viewModel.uiState.value.nodeCurrentlyDisplayed?.childNodes?.none { it.id == firstChild.id } shouldBe true
+            }
+
+            // Click surviving sibling
+            val survivingChild = nodeManager.getNodeByID(secondChild.id)!!
+            viewModel.onChildNodeClicked(survivingChild)
+
+            // Navigate up to parent
+            viewModel.onNavigateUp()
+
+            // Parent displayed must NOT contain firstChild
+            val parentState = viewModel.uiState.value.nodeCurrentlyDisplayed!!
+            parentState.childNodes.size shouldBe 1
+            parentState.childNodes.none { it.id == firstChild.id } shouldBe true
+        }
     }
 
     /** Polls [condition] until it stops throwing, or fails after ~2s. */

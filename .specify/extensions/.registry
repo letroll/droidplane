@@ -8,7 +8,7 @@
       "enabled": true,
       "priority": 10,
       "registered_commands": {
-        "opencode": [
+        "gemini": [
           "speckit.git.feature",
           "speckit.git.validate",
           "speckit.git.remote",
@@ -26,7 +26,7 @@
       "enabled": true,
       "priority": 10,
       "registered_commands": {
-        "opencode": [
+        "gemini": [
           "speckit.bug.assess",
           "speckit.bug.fix",
           "speckit.bug.test"
@@ -34,6 +34,24 @@
       },
       "registered_skills": [],
       "installed_at": "2026-10-04T17:21:09.077642+00:00"
+    },
+    "assess": {
+      "version": "1.0.1",
+      "source": "local",
+      "manifest_hash": "sha256:a1c87d9ce8088e7865f1d352137777a693b0595ccc310957c7c051a604ca1db2",
+      "enabled": true,
+      "priority": 10,
+      "registered_commands": {
+        "gemini": [
+          "speckit.assess.intake",
+          "speckit.assess.research",
+          "speckit.assess.define",
+          "speckit.assess.shape",
+          "speckit.assess.decide"
+        ]
+      },
+      "registered_skills": [],
+      "installed_at": "2026-10-06T08:24:30.772938+00:00"
     }
   }
 }

@@ -315,16 +315,7 @@ class NodeManager(
         }
     }
 
-    private fun getParentFromStack(nodes: MutableList<Node>): Node? {
-        var parentNode: Node? = null
-        if (nodes.isNotEmpty()) {
-            parentNode = nodes.last()
-        }
-        return parentNode
-    }
-
     //TODO Try with clone
-    // TODO use suspend
     /** Depth-first search in the core text of the nodes in this sub-tree.  */ // TODO: this doesn't work while viewModel is still loading
     suspend fun findFilledNode(
         parentNodeId: String,
@@ -384,19 +375,6 @@ class NodeManager(
     fun getSearchResultFlow(): StateFlow<List<Node>> = searchManager.getSearchResult()
 
     override fun getSearchResultCount(): Int = searchManager.getSearchResult().value.size
-
-//    fun generateNodeID(): String {
-//        var returnValue: String
-//        do {
-//            val prefix = "ID_"
-//            /*
-//			 * The prefix is to enable the id to be an ID in the sense of
-//			 * XML/DTD.
-//			 */
-//            returnValue = prefix + random.nextInt(UNDEFINED_NODE_ID).toString()
-//        } while (nodes.containsKey(returnValue))
-//        return returnValue
-//    }
 
     fun getMindmapDirectoryPath(debug: Boolean = false): String? {
         if (debug) logger.e("uri:$currentMindMapUri")
@@ -767,6 +745,60 @@ class NodeManager(
         return updatedNode
     }
 
+    private fun updateDescendantParents(node: Node, updatedNodesMap: MutableMap<String, Node>): Node {
+        node.childNodes.replaceAll { child ->
+            val updatedChild = child.copy(parentNode = node)
+            updatedNodesMap[updatedChild.id] = updatedChild
+            updateDescendantParents(updatedChild, updatedNodesMap)
+        }
+        return node
+    }
+
+    private fun propagateUpdatedParentToRoot(
+        updatedParent: Node,
+        updatedNodesMap: MutableMap<String, Node>,
+    ) {
+        if (updatedParent.id == rootNode?.id) {
+            rootNode = updatedParent
+            return
+        }
+
+        var currentChild = updatedParent
+        var currentParent = currentChild.parentNode?.id?.let { getNodeByID(it) }
+
+        while (currentParent != null) {
+            val newAncestorChildren = currentParent.childNodes.toMutableList()
+            val childIdx = newAncestorChildren.indexOfFirst { it.id == currentChild.id }
+            val updatedAncestor = currentParent.copy(childNodes = mutableListOf())
+
+            val fixedChild = currentChild.copy(parentNode = updatedAncestor)
+            updatedNodesMap[fixedChild.id] = fixedChild
+            updateDescendantParents(fixedChild, updatedNodesMap)
+
+            if (childIdx != -1) {
+                newAncestorChildren[childIdx] = fixedChild
+            }
+            updatedAncestor.childNodes.addAll(newAncestorChildren)
+            updatedAncestor.childNodes.replaceAll { c ->
+                if (c.id == fixedChild.id) {
+                    fixedChild
+                } else {
+                    val updatedC = c.copy(parentNode = updatedAncestor)
+                    updatedNodesMap[updatedC.id] = updatedC
+                    updateDescendantParents(updatedC, updatedNodesMap)
+                }
+            }
+            updatedNodesMap[updatedAncestor.id] = updatedAncestor
+
+            if (updatedAncestor.id == rootNode?.id) {
+                rootNode = updatedAncestor
+                break
+            }
+            currentChild = updatedAncestor
+            currentParent = currentChild.parentNode?.id?.let { getNodeByID(it) }
+        }
+    }
+
     override suspend fun deleteNode(nodeId: String): Boolean {
         val targetNode = getNodeByID(nodeId) ?: return false
 
@@ -785,62 +817,50 @@ class NodeManager(
             }
         }
         collectDescendants(targetNode)
-        println("DEBUG deleteNode: idsToDelete=$idsToDelete, targetNode=${targetNode.id}, targetNode.parentNode=${targetNode.parentNode?.id}")
 
         // Collect all numeric IDs to delete
         val numericIdsToDelete = idsToDelete.mapNotNull { id ->
             getNodeByID(id)?.numericId
         }.toSet()
 
-        // Update the nodes list: remove all deleted nodes, update parent's children
-        val parentNodeId = targetNode.parentNode?.id
+        val directParent = getNodeByID(targetNode.parentNode?.id) ?: targetNode.parentNode!!
+        val updatedNodesMap = mutableMapOf<String, Node>()
+
+        // Filter out deleted nodes from parent's children
+        val survivingChildren = directParent.childNodes.filter { it.id !in idsToDelete }
+        val updatedParent = directParent.copy(childNodes = mutableListOf())
+        val updatedChildren = survivingChildren.map { child ->
+            val updatedChild = child.copy(parentNode = updatedParent)
+            updatedNodesMap[updatedChild.id] = updatedChild
+            updateDescendantParents(updatedChild, updatedNodesMap)
+            updatedChild
+        }.toMutableList()
+        updatedParent.childNodes.addAll(updatedChildren)
+        updatedNodesMap[updatedParent.id] = updatedParent
+
+        // Propagate updated parent upward through ancestor nodes to rootNode
+        propagateUpdatedParentToRoot(updatedParent, updatedNodesMap)
+
+        // Update the nodes list: remove all deleted nodes, update modified nodes
         _allNodes.update { nodes ->
             nodes.filter { it.id !in idsToDelete }.map { node ->
-                if (node.id == parentNodeId) {
-                    val newChildren = node.childNodes.filter { it.id !in idsToDelete }.toMutableList()
-                    println("DEBUG: node.id=${node.id}, node.childNodes.size=${node.childNodes.size}, idsToDelete=$idsToDelete, newChildren.size=${newChildren.size}, newChildren=${newChildren.map { it.id }}")
-                    // Create the new parent first, then update children's parentNode to point to it
-                    val newParent = node.copy(childNodes = newChildren)
-                    val updatedChildren = newChildren.map { child ->
-                        if (child.parentNode?.id == node.id) {
-                            child.copy(parentNode = newParent)
-                        } else {
-                            child
-                        }
-                    }.toMutableList()
-                    newParent.copy(childNodes = updatedChildren)
-                } else {
-                    node
-                }
+                updatedNodesMap[node.id] ?: node
             }
         }
 
-
-        // Update indexes: remove all deleted nodes
-        val nodesById = getNodeByIdIndex().orMutableMap()
-        val nodesByNumeric = getNodeByNumericIndex().orMutableMap()
-        idsToDelete.forEach { nodesById.remove(it) }
-        numericIdsToDelete.forEach { nodesByNumeric.remove(it) }
         // Rebuild indexes from the updated _allNodes to ensure consistency
         val allNodes = _allNodes.value
         val newNodesById = allNodes.associateBy { it.id }
         val newNodesByNumeric = allNodes.associateBy { it.numericId }
-        println("DEBUG: rebuilt indexes, size: ${newNodesById.size}, ${newNodesByNumeric.size}")
-        println("DEBUG: rebuilt index parentNodeId=$parentNodeId, index has parent: ${newNodesById.containsKey(parentNodeId)}, index parent children: ${newNodesById[parentNodeId]?.childNodes?.size}")
-        println("DEBUG: _allNodes parent children: ${_allNodes.value.firstOrNull { it.id == parentNodeId }?.childNodes?.size}")
         updatemMindmapIndexes(MindmapIndexes(newNodesById, newNodesByNumeric))
 
         // Clean up external links for deleted nodes
         for (deletedId in idsToDelete) {
             val deletedNode = getNodeByID(deletedId)
-            if (deletedNode != null && deletedNode.link != null) {
-                // The link will be garbage collected since the node is removed
-                // But we should also clean up any references to this link from other nodes
-                // (handled by arrow link cleanup above)
+            if (deletedNode?.link != null) {
+                // Link is cleaned up with node removal
             }
         }
-
-
 
         val remainingNodes = _allNodes.value
         for (node in remainingNodes) {
@@ -864,12 +884,6 @@ class NodeManager(
                 e.printStackTrace()
             }
         }
-
-        // If root node was deleted, clear root
-        if (targetNode.id == rootNode?.id) {
-            rootNode = null
-        }
-
 
         return true
     }
@@ -930,47 +944,59 @@ class NodeManager(
         val restoredRoot = restoredNodes[snapshot.deletedNodeId]!!
         val newChildren = parentNode.childNodes.toMutableList()
         newChildren.add(snapshot.parentChildIndex, restoredRoot)
-        
-        val updatedParent = parentNode.copy(childNodes = newChildren)
-        
-        // Update restored root's parentNode reference
+
+        val updatedParent = parentNode.copy(childNodes = mutableListOf())
         val updatedRestoredRoot = restoredRoot.copy(parentNode = updatedParent)
         restoredNodes[snapshot.deletedNodeId] = updatedRestoredRoot
-        
-        // Update all nodes in the hierarchy
-        _allNodes.update { nodes ->
-            nodes.map { node ->
-                when {
-                    node.id == snapshot.parentNodeId -> updatedParent
-                    node.id in snapshot.deletedSubtree.map { it.id }.toMutableList() -> restoredNodes[node.id]!!
-                    else -> node
-                }
+
+        val updatedParentChildren = newChildren.map { child ->
+            if (child.id == snapshot.deletedNodeId) {
+                updatedRestoredRoot
+            } else {
+                child.copy(parentNode = updatedParent)
+            }
+        }.toMutableList()
+        updatedParent.childNodes.addAll(updatedParentChildren)
+
+        val updatedNodesMap = mutableMapOf<String, Node>()
+        updatedNodesMap[updatedParent.id] = updatedParent
+        for (child in updatedParentChildren) {
+            updatedNodesMap[child.id] = child
+            updateDescendantParents(child, updatedNodesMap)
+        }
+        for ((k, v) in restoredNodes) {
+            if (k != snapshot.deletedNodeId) {
+                updatedNodesMap[k] = v
             }
         }
-        
-        // Update indexes for all restored nodes
-        for (node in snapshot.deletedSubtree) {
-            val restoredNode = restoredNodes[node.id]!!
-            updateNodeInMindMapIndexes(restoredNode)
+
+        propagateUpdatedParentToRoot(updatedParent, updatedNodesMap)
+
+        // Update all nodes in the hierarchy
+        _allNodes.update { nodes ->
+            val existingUpdated = nodes.map { node ->
+                updatedNodesMap[node.id] ?: node
+            }
+            val existingIds = existingUpdated.map { it.id }.toSet()
+            val nodesToAdd = snapshot.deletedSubtree
+                .filter { it.id !in existingIds }
+                .map { updatedNodesMap[it.id] ?: restoredNodes[it.id] ?: it }
+            existingUpdated + nodesToAdd
         }
-        
-        // Update parent in indexes
-        updateNodeInMindMapIndexes(updatedParent)
-        
-        // Update root if necessary
-        if (snapshot.parentNodeId == rootNode?.id) {
-            rootNode = updatedParent
-        }
-        
+
+        // Rebuild indexes from the updated _allNodes to ensure consistency
+        val allNodes = _allNodes.value
+        val newNodesById = allNodes.associateBy { it.id }
+        val newNodesByNumeric = allNodes.associateBy { it.numericId }
+        updatemMindmapIndexes(MindmapIndexes(newNodesById, newNodesByNumeric))
+
         return true
     }
 
 
     suspend fun generateNodeNumericID(): Int {
         val currentIds = allNodesId.first().toSet()
-        if (currentIds.size >= Int.MAX_VALUE) {
-            throw IllegalStateException("No more available IDs")
-        }
+        check(currentIds.size >= Int.MAX_VALUE, { "No more available IDs" })
         var newId = 0
         while (currentIds.contains(newId)) {
             newId = abs(Random.nextInt(UNDEFINED_NODE_ID))
