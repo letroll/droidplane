@@ -4,6 +4,7 @@ import fr.julien.quievreux.droidplane2.model.ContentNodeType.Classic
 import fr.julien.quievreux.droidplane2.data.model.Node
 import fr.julien.quievreux.droidplane2.model.ContentNodeType
 import fr.julien.quievreux.droidplane2.model.DisplayMode
+import fr.julien.quievreux.droidplane2.model.RecentFile
 import fr.julien.quievreux.droidplane2.model.ViewIntentNode
 
 data class MainUiState(
@@ -68,6 +69,20 @@ data class MainUiState(
     data class ExitConfirmation(
         val onConfirm: () -> Unit,
         val onCancel: () -> Unit,
+    ):DialogType()
+
+    data class DiscardConfirmation(
+        val onConfirm: () -> Unit,
+        val onCancel: () -> Unit,
+    ):DialogType()
+
+    data class StartupChooser(
+        val recentFiles: List<RecentFile>,
+        val onNewMindmap: () -> Unit,
+        val onOpenRecent: (RecentFile) -> Unit,
+        val onBrowse: () -> Unit,
+        val onOpenDemo: () -> Unit,
+        val onDismiss: () -> Unit,
     ):DialogType()
 }
 }

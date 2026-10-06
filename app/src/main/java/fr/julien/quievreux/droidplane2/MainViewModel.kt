@@ -26,6 +26,7 @@ import fr.julien.quievreux.droidplane2.model.ContextMenuAction.NodeLink
 import fr.julien.quievreux.droidplane2.model.ContextMenuAction.AddChildNode
 import fr.julien.quievreux.droidplane2.model.ContextMenuAction.OpenLink
 import fr.julien.quievreux.droidplane2.model.DisplayMode
+import fr.julien.quievreux.droidplane2.model.RecentFile
 import fr.julien.quievreux.droidplane2.model.ViewIntentNode
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
@@ -106,16 +107,30 @@ class MainViewModel(
         onLoadFinished: (() -> Unit)? = null,
     ) {
         setMindmapIsLoading(true)
-        try {
-            viewModelScope.launch {
+        hasUnsavedChanges = false
+        undoStack.clear()
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
                 nodeManager.loadMindMapFromInputStream(
                     inputStream = inputStream,
-                    onLoadFinished = onLoadFinished,
+                    onLoadFinished = {
+                        setMindmapIsLoading(false)
+                        updateUiState { currentState ->
+                            currentState.copy(
+                                treeVersion = currentState.treeVersion + 1,
+                                collapsedNodeIds = emptySet(),
+                                canUndoDelete = false,
+                                snackbarMessage = null,
+                            )
+                        }
+                        onLoadFinished?.invoke()
+                    },
                     onError = { exception ->
                         logger.e("Error loading mind map:$exception")
+                        setMindmapIsLoading(false)
                         updateUiState {
                             it.copy(
-                                error = exception.message ?: "exception without message"//exception.stackTraceToString()
+                                error = exception.message ?: "exception without message"
                             )
                         }
                     },
@@ -124,11 +139,15 @@ class MainViewModel(
                         updateNodeDisplayed(parentNode)
                     }
                 )
+            } catch (exception: Exception) {
+                logger.e("loadMindMap exc:$exception")
+                setMindmapIsLoading(false)
+            } finally {
+                try {
+                    inputStream.close()
+                } catch (_: Exception) {}
             }
-        } catch (exception: Exception) {
-            logger.e("loadMindMap exc:$exception")
         }
-        setMindmapIsLoading(false)
     }
 
     private fun updateNodeDisplayed(parentNode: Node) {
@@ -139,8 +158,10 @@ class MainViewModel(
             it.copy(
                 title = title,
                 nodeCurrentlyDisplayed = parentNode,
+                selectedNodeId = parentNode.id,
                 canGoBack = !isRoot,
                 navigationStack = initialStack,
+                treeVersion = it.treeVersion + 1,
             )
         }
     }
@@ -231,6 +252,113 @@ class MainViewModel(
     fun getNodeByID(id: String): Node? = nodeManager.getNodeByID(id)
 
     /**
+     * Handles user request to create a new empty mindmap.
+     * Shows DiscardConfirmation dialog if unsaved modifications exist.
+     */
+    fun onNewMindmapRequested(defaultTitle: String = "Central Idea") {
+        if (hasUnsavedChangesState) {
+            setDialogState(
+                MainUiState.DialogType.DiscardConfirmation(
+                    onConfirm = {
+                        setDialogState(MainUiState.DialogType.None)
+                        createEmptyMindmap(defaultTitle)
+                    },
+                    onCancel = {
+                        setDialogState(MainUiState.DialogType.None)
+                    }
+                )
+            )
+        } else {
+            createEmptyMindmap(defaultTitle)
+        }
+    }
+
+    /**
+     * Handles user request to load the bundled Help & Demo mindmap.
+     * Shows DiscardConfirmation dialog if unsaved modifications exist.
+     */
+    fun onHelpDemoRequested(onConfirmLoad: () -> Unit) {
+        if (hasUnsavedChangesState) {
+            setDialogState(
+                MainUiState.DialogType.DiscardConfirmation(
+                    onConfirm = {
+                        setDialogState(MainUiState.DialogType.None)
+                        hasUnsavedChanges = false
+                        undoStack.clear()
+                        onConfirmLoad()
+                    },
+                    onCancel = {
+                        setDialogState(MainUiState.DialogType.None)
+                    }
+                )
+            )
+        } else {
+            hasUnsavedChanges = false
+            undoStack.clear()
+            onConfirmLoad()
+        }
+    }
+
+    /**
+     * Displays the startup chooser dialog allowing the user to create a new mindmap,
+     * select from existing recent files, browse storage, or open the demo.
+     */
+    fun showStartupChooser(
+        recentFiles: List<RecentFile>,
+        onOpenRecent: (RecentFile) -> Unit,
+        onBrowse: () -> Unit,
+        onOpenDemo: () -> Unit,
+    ) {
+        setDialogState(
+            MainUiState.DialogType.StartupChooser(
+                recentFiles = recentFiles,
+                onNewMindmap = {
+                    setDialogState(MainUiState.DialogType.None)
+                    createEmptyMindmap()
+                },
+                onOpenRecent = { recent ->
+                    setDialogState(MainUiState.DialogType.None)
+                    onOpenRecent(recent)
+                },
+                onBrowse = {
+                    setDialogState(MainUiState.DialogType.None)
+                    onBrowse()
+                },
+                onOpenDemo = {
+                    setDialogState(MainUiState.DialogType.None)
+                    onOpenDemo()
+                },
+                onDismiss = {
+                    setDialogState(MainUiState.DialogType.None)
+                }
+            )
+        )
+    }
+
+    /**
+     * Creates a new empty mindmap in memory with a single root node.
+     */
+    fun createEmptyMindmap(rootTitle: String = "Central Idea") {
+        val newRoot = nodeManager.createNewMindmap(rootTitle)
+        hasUnsavedChanges = false
+        undoStack.clear()
+        updateUiState { currentState ->
+            currentState.copy(
+                nodeCurrentlyDisplayed = newRoot,
+                selectedNodeId = newRoot.id,
+                collapsedNodeIds = emptySet(),
+                navigationStack = listOf(newRoot.id),
+                title = rootTitle,
+                treeVersion = currentState.treeVersion + 1,
+                canGoBack = false,
+                canUndoDelete = false,
+                snackbarMessage = null,
+                searchUiState = MainUiState.SearchUiState(),
+            )
+        }
+    }
+
+    /**
      * Toggles the display mode between [DisplayMode.LIST] and [DisplayMode.MIND_MAP].
      */
     fun toggleDisplayMode() {
@@ -263,9 +391,17 @@ class MainViewModel(
                 currentState.nodeCurrentlyDisplayed
             }
 
+            val newSelectedId = if (mode == DisplayMode.MIND_MAP && currentState.nodeCurrentlyDisplayed != null) {
+                currentState.nodeCurrentlyDisplayed.id
+            } else {
+                currentState.selectedNodeId
+            }
+
             currentState.copy(
                 displayMode = mode,
                 nodeCurrentlyDisplayed = targetNode,
+                selectedNodeId = newSelectedId,
+                treeVersion = currentState.treeVersion + 1,
             )
         }
     }
@@ -358,6 +494,7 @@ class MainViewModel(
             }
             currentState.copy(
                 nodeCurrentlyDisplayed = node,
+                selectedNodeId = node.id,
                 title = titleText,
                 canGoBack = canGoBack,
                 navigationStack = newStack,
@@ -755,33 +892,53 @@ nodeFindList:${nodeManager.getSearchResult().map { getNodeText(it) }.joinToStrin
                 reloadedNode?.let { updated ->
                     updateNodeDisplayed(updated)
                 }
-                updateUiState { it.copy(treeVersion = it.treeVersion + 1) }
+                updateUiState { currentState ->
+                    val updatedTitle = if (node.parentNode == null) {
+                        newValue
+                    } else {
+                        currentState.title
+                    }
+                    currentState.copy(
+                        title = updatedTitle,
+                        treeVersion = currentState.treeVersion + 1,
+                    )
+                }
             }
         }
     }
 
     fun setMapUri(data: Uri?) = nodeManager.setMapUri(data)
 
+    fun getSaveFilename(): String {
+        val currentName = nodeManager.getMindmapFileName()
+        if (!currentName.isNullOrBlank() && currentName.endsWith(".mm", ignoreCase = true)) {
+            return currentName
+        }
+        val title = _uiState.value.title.trim().ifBlank {
+            nodeManager.rootNode?.let { getNodeText(it) }?.trim() ?: "mindmap"
+        }
+        val sanitized = title.replace(Regex("[^a-zA-Z0-9._-]"), "_").trim('_').ifBlank { "mindmap" }
+        return if (sanitized.endsWith(".mm", ignoreCase = true)) sanitized else "$sanitized.mm"
+    }
+
     fun launchSaveFile() {
         nodeBeforeFileSave = _uiState.value.nodeCurrentlyDisplayed
         nodeBeforeFileSave?.let {
             top()
-            nodeManager.getMindmapFileName()?.let { filename ->
-                fileRegister?.let { register ->
-                    viewModelScope.launch {
-                        nodeManager.serializeMindmap(
-                            filePath = register.getfilesDir(),
-                            filename = filename,
-                            onError = {
-                                logger.e("error saving file:$it")
-                            },
-                            onSaveFinished = { file ->
-                                fileToSave = file
-                                fileRegister?.registerFile(file)
-                                hasUnsavedChanges = false
-                            }
-                        )
-                    }
+            val filename = getSaveFilename()
+            fileRegister?.let { register ->
+                viewModelScope.launch {
+                    nodeManager.serializeMindmap(
+                        filePath = register.getfilesDir(),
+                        filename = filename,
+                        onError = {
+                            logger.e("error saving file:$it")
+                        },
+                        onSaveFinished = { file ->
+                            fileToSave = file
+                            fileRegister?.registerFile(file)
+                        }
+                    )
                 }
             }
         }
@@ -793,9 +950,10 @@ nodeFindList:${nodeManager.getSearchResult().map { getNodeText(it) }.joinToStrin
 
     fun saveFile(outputStream: OutputStream) {
         fileToSave?.let { file ->
-            logger.e("Saving file ${file.name} ")//content:${file.readText()}")
+            logger.e("Saving file ${file.name} ")
             outputStream.write(file.readText().toByteArray())
         }
+        hasUnsavedChanges = false
         nodeBeforeFileSave?.let {
             onNodeClick(it)
         }

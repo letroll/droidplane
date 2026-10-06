@@ -27,6 +27,12 @@ interface NodeManagerContract {
     fun getNodeText(node: Node): String?
 
     /**
+     * Initializes a fresh empty mindmap in memory with a single root node.
+     * Clears previous index structures, resets search, and emits the new root to [allNodes].
+     */
+    fun createNewMindmap(rootTitle: String = "Central Idea"): Node
+
+    /**
      * Loads a Freeplane XML (.mm) input stream into the in-memory tree and builds indexes.
      */
     suspend fun loadMindMapFromInputStream(

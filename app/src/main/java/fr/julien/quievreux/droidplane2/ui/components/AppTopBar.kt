@@ -1,5 +1,6 @@
 package fr.julien.quievreux.droidplane2.ui.components
 
+import android.content.res.Configuration
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -36,8 +37,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import fr.julien.quievreux.droidplane2.ui.theme.ContrastAwareReplyTheme
 import fr.julien.quievreux.droidplane2.MainUiState.SearchUiState
 import fr.julien.quievreux.droidplane2.model.DisplayMode
 import fr.julien.quievreux.droidplane2.ui.components.AppTopBarAction.Backpress
@@ -55,6 +58,7 @@ enum class AppTopBarAction {
     SearchPrevious,
     Up,
     Top,
+    NewMindmap,
     Open,
     Help,
     Save,
@@ -246,6 +250,15 @@ fun AppTopBar(
                 DropdownMenuItem(
                     onClick = {
                         showMenu = false
+                        onBarAction(AppTopBarAction.NewMindmap)
+                    },
+                    text = {
+                        Text(stringResource(R.string.new_mindmap))
+                    },
+                )
+                DropdownMenuItem(
+                    onClick = {
+                        showMenu = false
                         onBarAction(Open)
                     },
                     text = {
@@ -272,7 +285,7 @@ fun AppTopBar(
                         onBarAction(Help)
                     },
                     text = {
-                        Text(stringResource(R.string.help))
+                        Text(stringResource(R.string.help_demo))
                     },
                 )
                 DropdownMenuItem(
@@ -316,6 +329,21 @@ private fun BarIcon(
             imageVector = imageVector,
             contentDescription = contentDescription,
             tint = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+}
+
+@Preview(name = "AppTopBar Light")
+@Preview(name = "AppTopBar Dark", uiMode = Configuration.UI_MODE_NIGHT_YES)
+@Composable
+fun PreviewAppTopBar() {
+    ContrastAwareReplyTheme {
+        AppTopBar(
+            text = "Central Idea",
+            hasBackIcon = false,
+            onBarAction = {},
+            hasSearchNavigateButton = Pair(false, false),
+            onQuery = {},
         )
     }
 }

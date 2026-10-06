@@ -35,4 +35,14 @@
     <string name="undo">Undo</string>
     <string name="switch_to_mindmap_view">Mind Map View</string>
     <string name="switch_to_list_view">List View</string>
+    <string name="new_mindmap">New Mindmap</string>
+    <string name="help_demo">Help &amp; Demo</string>
+    <string name="discard_changes_title">Discard Changes?</string>
+    <string name="discard_changes_message">You have unsaved changes that will be lost. Do you want to proceed?</string>
+    <string name="discard">Discard</string>
+    <string name="default_root_node_title">Central Idea</string>
+    <string name="startup_title">Welcome to DroidPlane</string>
+    <string name="recent_files">Recent Files</string>
+    <string name="browse_files">Browse other file…</string>
+    <string name="no_recent_files">No recent files found</string>
 </resources>

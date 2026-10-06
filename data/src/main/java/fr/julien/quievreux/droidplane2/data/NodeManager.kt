@@ -108,6 +108,9 @@ class NodeManager(
         logger.e("loadMindMapFromInputStream")
         val xpp: XmlPullParser?
         try {
+            rootNode = null
+            _allNodes.value = emptyList()
+            updatemMindmapIndexes(MindmapIndexes(emptyMap(), emptyMap()))
             // set up XML pull parsing
             val factory = XmlPullParserFactory.newInstance()
             factory.isNamespaceAware = true
@@ -183,20 +186,16 @@ class NodeManager(
                 onError(Exception("Stack should be empty"))
             }
 
-            // After parsing, find the root node (first parsed node with no parent)
-            if (rootNode == null && allParsedNodes.isNotEmpty()) {
-                rootNode = allParsedNodes.firstOrNull { it.parentNode == null }
-                // If not found, use the first node
-                if (rootNode == null) {
-                    rootNode = allParsedNodes.first()
-                }
+            // After parsing, set the root node (first parsed node with no parent)
+            if (allParsedNodes.isNotEmpty()) {
+                rootNode = allParsedNodes.firstOrNull { it.parentNode == null } ?: allParsedNodes.first()
             }
 
             // Ensure _allNodes contains all parsed nodes in the correct order
             _allNodes.value = allParsedNodes
 
-            onReadFinish?.invoke()
             processMindMap()
+            onReadFinish?.invoke()
         } catch (exception: Exception) {
             onError(exception)
         }
@@ -260,6 +259,31 @@ class NodeManager(
         _allNodes.update {
             listOf(newNode)
         }
+    }
+
+    override fun createNewMindmap(rootTitle: String): Node {
+        val time = System.currentTimeMillis()
+        val numericId = 1
+        val stringId = "ID_$numericId"
+        val newRoot = Node(
+            parentNode = null,
+            id = stringId,
+            numericId = numericId,
+            text = rootTitle,
+            creationDate = time,
+            modificationDate = time,
+            childNodes = mutableListOf(),
+        )
+
+        rootNode = newRoot
+        currentMindMapUri = null
+        _allNodes.value = listOf(newRoot)
+
+        val newNodesById = mapOf(stringId to newRoot)
+        val newNodesByNumeric = mapOf(numericId to newRoot)
+        updatemMindmapIndexes(MindmapIndexes(newNodesById, newNodesByNumeric))
+
+        return newRoot
     }
 
     override fun getNodeText(node: Node): String? {

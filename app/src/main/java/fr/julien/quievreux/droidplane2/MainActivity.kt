@@ -11,6 +11,7 @@ import android.content.Intent.ACTION_VIEW
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Bundle
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.SystemBarStyle
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
@@ -44,7 +45,13 @@ import fr.julien.quievreux.droidplane2.MainUiState.DialogType.AddChildNode
 import fr.julien.quievreux.droidplane2.MainUiState.DialogType.EditNodeDescription
 import fr.julien.quievreux.droidplane2.MainUiState.DialogType.None
 import fr.julien.quievreux.droidplane2.ui.view.DeleteConfirmationDialog
+import fr.julien.quievreux.droidplane2.ui.view.DiscardConfirmationDialog
 import fr.julien.quievreux.droidplane2.ui.view.ExitConfirmationDialog
+import fr.julien.quievreux.droidplane2.ui.view.StartupChooserDialog
+import fr.julien.quievreux.droidplane2.data.RecentFilesRepository
+import fr.julien.quievreux.droidplane2.data.RecentFilesRepositoryImpl
+import fr.julien.quievreux.droidplane2.data.createStorageFileChecker
+import fr.julien.quievreux.droidplane2.data.getFileNameFromUri
 import fr.julien.quievreux.droidplane2.core.PermissionUtils.checkStoragePermissions
 import fr.julien.quievreux.droidplane2.core.PermissionUtils.requestForStoragePermissions
 import fr.julien.quievreux.droidplane2.core.extensions.getOpenFileLauncher
@@ -61,6 +68,7 @@ import fr.julien.quievreux.droidplane2.ui.components.AppTopBar
 import fr.julien.quievreux.droidplane2.ui.components.AppTopBarAction.Backpress
 import fr.julien.quievreux.droidplane2.ui.components.AppTopBarAction.ExitSearch
 import fr.julien.quievreux.droidplane2.ui.components.AppTopBarAction.Help
+import fr.julien.quievreux.droidplane2.ui.components.AppTopBarAction.NewMindmap
 import fr.julien.quievreux.droidplane2.ui.components.AppTopBarAction.Open
 import fr.julien.quievreux.droidplane2.ui.components.AppTopBarAction.Save
 import fr.julien.quievreux.droidplane2.ui.components.AppTopBarAction.SearchNext
@@ -99,15 +107,52 @@ class MainActivity : FragmentActivity(), FileRegister {
         getSystemService(CLIPBOARD_SERVICE) as ClipboardManager
     }
 
-    private val openFileLauncher = getOpenFileLauncher()
+    private val recentFilesRepository: RecentFilesRepository by lazy {
+        RecentFilesRepositoryImpl(getSharedPreferences("droidplane_recent_files", MODE_PRIVATE))
+    }
+
+    private val openFileLauncher = registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri: Uri? ->
+        uri?.let { u ->
+            try {
+                contentResolver.takePersistableUriPermission(u, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            } catch (_: Exception) {}
+            openSelectedUri(u)
+        }
+    }
 
     private val saveFileLauncher = getSaveFileLauncher(
         actionOnResultOk = { uri ->
+            try {
+                contentResolver.takePersistableUriPermission(
+                    uri,
+                    Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION
+                )
+            } catch (_: Exception) {}
             contentResolver.openOutputStream(uri)?.use { outputStream ->
                 viewModel.saveFile(outputStream)
+                val fileName = getFileNameFromUri(this@MainActivity, uri)
+                recentFilesRepository.addRecentFile(uri.toString(), fileName)
             }
         }
     )
+
+    private fun openSelectedUri(uri: Uri) {
+        val fileName = getFileNameFromUri(this, uri)
+        recentFilesRepository.addRecentFile(uri.toString(), fileName)
+        viewModel.setMapUri(uri)
+        lifecycleScope.launch {
+            try {
+                val stream = contentResolver.openInputStream(uri)
+                if (stream != null) {
+                    viewModel.loadMindMap(stream)
+                } else {
+                    logger.e("Failed to open stream for $uri")
+                }
+            } catch (e: Exception) {
+                logger.e("Error opening file: $e")
+            }
+        }
+    }
 
     @SuppressLint("RemeddmberReturnType")
     public override fun onCreate(savedInstanceState: Bundle?) {
@@ -204,6 +249,16 @@ class MainActivity : FragmentActivity(), FileRegister {
                             confirmation = dialog,
                         )
                     }
+                    is DialogType.DiscardConfirmation -> {
+                        DiscardConfirmationDialog(
+                            confirmation = dialog,
+                        )
+                    }
+                    is DialogType.StartupChooser -> {
+                        StartupChooserDialog(
+                            chooser = dialog,
+                        )
+                    }
                 }
 
                 Scaffold(
@@ -232,9 +287,21 @@ class MainActivity : FragmentActivity(), FileRegister {
 
                                     Top -> viewModel.navigateToTop()
 
-                                    Open -> openFileLauncher.launch("*/*")
+                                    NewMindmap -> {
+                                        val defaultTitle = getString(R.string.default_root_node_title)
+                                        viewModel.onNewMindmapRequested(defaultTitle)
+                                    }
 
-                                    Help -> showHelp()
+                                    Open -> openFileLauncher.launch(arrayOf("*/*"))
+
+                                    Help -> {
+                                        viewModel.onHelpDemoRequested {
+                                            viewModel.setMapUri(Uri.parse("android.resource://$packageName/raw/example.mm"))
+                                            lifecycleScope.launch {
+                                                resources.openRawResource(R.raw.example).let { viewModel.loadMindMap(it) }
+                                            }
+                                        }
+                                    }
 
                                     Save -> viewModel.launchSaveFile()
 
@@ -330,14 +397,38 @@ class MainActivity : FragmentActivity(), FileRegister {
         viewModel.apply {
             setFileRegister(this@MainActivity)
             if (isAnExternalMindMapEdit()) {
-                setMapUri(intent.data)
+                val uri = intent.data
+                setMapUri(uri)
+                uri?.let { u ->
+                    val fileName = u.lastPathSegment?.substringAfterLast('/') ?: "mindmap.mm"
+                    recentFilesRepository.addRecentFile(u.toString(), fileName)
+                }
+                lifecycleScope.launch {
+                    getDocumentInputStream(true)?.let { loadMindMap(it) }
+                }
             } else {
-                setMapUri(Uri.parse("android.resource://$packageName/raw/example.mm"))
-            }
+                // Initialize an empty mindmap by default
+                createEmptyMindmap(getString(R.string.default_root_node_title))
 
-            lifecycleScope.launch {
-                logger.e("lifecycleScope")
-                getDocumentInputStream(isAnExternalMindMapEdit())?.let { loadMindMap(it) }
+                // Query accessible recent files
+                val recentFiles = recentFilesRepository.getRecentFiles(createStorageFileChecker(this@MainActivity))
+
+                // Show Startup Chooser Dialog
+                showStartupChooser(
+                    recentFiles = recentFiles,
+                    onOpenRecent = { recent ->
+                        openSelectedUri(Uri.parse(recent.uriString))
+                    },
+                    onBrowse = {
+                        openFileLauncher.launch(arrayOf("*/*"))
+                    },
+                    onOpenDemo = {
+                        setMapUri(Uri.parse("android.resource://$packageName/raw/example.mm"))
+                        lifecycleScope.launch {
+                            resources.openRawResource(R.raw.example).let { loadMindMap(it) }
+                        }
+                    }
+                )
             }
         }
     }
@@ -511,17 +602,7 @@ class MainActivity : FragmentActivity(), FileRegister {
     }
 
     override fun registerFile(file: File) {
-        if (checkStoragePermissions(this)) {
-            logger.e("Need write external storage permission")
-            // Permission is not granted, request it
-//            ActivityCompat.requestPermissions(this@MainActivity, arrayOf(WRITE_EXTERNAL_STORAGE), CREATE_FILE_REQUEST_CODE)
-            requestForStoragePermissions(
-                this,
-                logger,
-            )
-        } else {
-            logger.e("Permission granted, proceed with file saving")
-            // Permission is already granted, proceed with file saving
+        runOnUiThread {
             launchFileSavingIntent(file.name)
         }
     }

@@ -4,6 +4,7 @@ import app.cash.turbine.test
 import fr.julien.quievreux.droidplane2.model.ContentNodeType.Classic
 import fr.julien.quievreux.droidplane2.model.ContextMenuAction
 import fr.julien.quievreux.droidplane2.model.DisplayMode
+import fr.julien.quievreux.droidplane2.model.RecentFile
 import fr.julien.quievreux.droidplane2.MainUiState.DialogUiState
 import fr.julien.quievreux.droidplane2.MainUiState.SearchUiState
 import fr.julien.quievreux.droidplane2.core.log.Logger
@@ -563,6 +564,274 @@ class MainViewModelTest : KStringSpec() {
                 // Restored node is selected
                 viewModel.uiState.value.selectedNodeId shouldBe child.id
                 viewModel.uiState.value.canUndoDelete shouldBe false
+            }
+        }
+
+        "onNewMindmapRequested creates new mindmap immediately when no unsaved changes" {
+            val nodeManager = realNodeManager()
+            val viewModel = MainViewModel(logger = mockk(relaxed = true), injectedNodeManager = nodeManager)
+            val root = nodeManager.rootNode!!
+            viewModel.setInitialStateForTest(root)
+
+            viewModel.onNewMindmapRequested("Brainstorming")
+
+            viewModel.uiState.value.title shouldBe "Brainstorming"
+            viewModel.uiState.value.nodeCurrentlyDisplayed?.text shouldBe "Brainstorming"
+            viewModel.uiState.value.selectedNodeId shouldBe "ID_1"
+            viewModel.uiState.value.navigationStack shouldBe listOf("ID_1")
+            viewModel.uiState.value.dialogUiState.dialogType shouldBe MainUiState.DialogType.None
+            viewModel.hasUnsavedChangesState shouldBe false
+        }
+
+        "onNewMindmapRequested shows DiscardConfirmation when unsaved changes exist" {
+            val nodeManager = realNodeManager()
+            val viewModel = MainViewModel(logger = mockk(relaxed = true), injectedNodeManager = nodeManager)
+            val root = nodeManager.rootNode!!
+            viewModel.setInitialStateForTest(root)
+
+            // Make an unsaved change
+            viewModel.addNode("Unsaved child", root)
+            eventually {
+                viewModel.hasUnsavedChangesState shouldBe true
+            }
+
+            viewModel.onNewMindmapRequested("Fresh Map")
+
+            val dialog = viewModel.uiState.value.dialogUiState.dialogType
+            (dialog is MainUiState.DialogType.DiscardConfirmation) shouldBe true
+            val discardDialog = dialog as MainUiState.DialogType.DiscardConfirmation
+
+            // Cancel
+            discardDialog.onCancel()
+            viewModel.uiState.value.dialogUiState.dialogType shouldBe MainUiState.DialogType.None
+            viewModel.uiState.value.title shouldBe root.text
+
+            // Re-request and Confirm
+            viewModel.onNewMindmapRequested("Fresh Map")
+            val discardDialog2 = viewModel.uiState.value.dialogUiState.dialogType as MainUiState.DialogType.DiscardConfirmation
+            discardDialog2.onConfirm()
+
+            viewModel.uiState.value.title shouldBe "Fresh Map"
+            viewModel.uiState.value.nodeCurrentlyDisplayed?.text shouldBe "Fresh Map"
+            viewModel.uiState.value.dialogUiState.dialogType shouldBe MainUiState.DialogType.None
+            viewModel.hasUnsavedChangesState shouldBe false
+        }
+
+        "onHelpDemoRequested executes onConfirmLoad immediately when no unsaved changes" {
+            val nodeManager = realNodeManager()
+            val viewModel = MainViewModel(logger = mockk(relaxed = true), injectedNodeManager = nodeManager)
+            val root = nodeManager.rootNode!!
+            viewModel.setInitialStateForTest(root)
+
+            var loaded = false
+            viewModel.onHelpDemoRequested {
+                loaded = true
+            }
+
+            loaded shouldBe true
+            viewModel.uiState.value.dialogUiState.dialogType shouldBe MainUiState.DialogType.None
+        }
+
+        "onHelpDemoRequested shows DiscardConfirmation when unsaved changes exist" {
+            val nodeManager = realNodeManager()
+            val viewModel = MainViewModel(logger = mockk(relaxed = true), injectedNodeManager = nodeManager)
+            val root = nodeManager.rootNode!!
+            viewModel.setInitialStateForTest(root)
+
+            // Make an unsaved change
+            viewModel.addNode("Unsaved child", root)
+            eventually {
+                viewModel.hasUnsavedChangesState shouldBe true
+            }
+
+            var loaded = false
+            viewModel.onHelpDemoRequested {
+                loaded = true
+            }
+
+            loaded shouldBe false
+            val dialog = viewModel.uiState.value.dialogUiState.dialogType
+            (dialog is MainUiState.DialogType.DiscardConfirmation) shouldBe true
+            val discardDialog = dialog as MainUiState.DialogType.DiscardConfirmation
+
+            // Cancel
+            discardDialog.onCancel()
+            loaded shouldBe false
+            viewModel.uiState.value.dialogUiState.dialogType shouldBe MainUiState.DialogType.None
+
+            // Re-request and Confirm
+            viewModel.onHelpDemoRequested {
+                loaded = true
+            }
+            val discardDialog2 = viewModel.uiState.value.dialogUiState.dialogType as MainUiState.DialogType.DiscardConfirmation
+            discardDialog2.onConfirm()
+
+            loaded shouldBe true
+            viewModel.uiState.value.dialogUiState.dialogType shouldBe MainUiState.DialogType.None
+            viewModel.hasUnsavedChangesState shouldBe false
+        }
+
+        "editing root node on an empty mindmap updates document title and enables unsaved changes" {
+            val nodeManager = realNodeManager()
+            val viewModel = MainViewModel(logger = mockk(relaxed = true), injectedNodeManager = nodeManager)
+            viewModel.createEmptyMindmap("Initial Idea")
+
+            viewModel.uiState.value.title shouldBe "Initial Idea"
+            val root = viewModel.uiState.value.nodeCurrentlyDisplayed!!
+
+            viewModel.updateNodeText(root, "Renamed Project")
+
+            eventually {
+                viewModel.uiState.value.title shouldBe "Renamed Project"
+                viewModel.uiState.value.nodeCurrentlyDisplayed?.text shouldBe "Renamed Project"
+                viewModel.hasUnsavedChangesState shouldBe true
+            }
+        }
+
+        "showStartupChooser presents dialog and dispatches choices correctly" {
+            val nodeManager = realNodeManager()
+            val viewModel = MainViewModel(logger = mockk(relaxed = true), injectedNodeManager = nodeManager)
+            val sampleRecents = listOf(
+                RecentFile("content://test/map.mm", "map.mm", 1000L)
+            )
+
+            var openedRecent: RecentFile? = null
+            var browsed = false
+            var openedDemo = false
+
+            viewModel.showStartupChooser(
+                recentFiles = sampleRecents,
+                onOpenRecent = { openedRecent = it },
+                onBrowse = { browsed = true },
+                onOpenDemo = { openedDemo = true },
+            )
+
+            val dialog = viewModel.uiState.value.dialogUiState.dialogType
+            (dialog is MainUiState.DialogType.StartupChooser) shouldBe true
+            val chooser = dialog as MainUiState.DialogType.StartupChooser
+            chooser.recentFiles shouldBe sampleRecents
+
+            // Test onNewMindmap
+            chooser.onNewMindmap()
+            viewModel.uiState.value.dialogUiState.dialogType shouldBe MainUiState.DialogType.None
+            viewModel.uiState.value.selectedNodeId shouldBe "ID_1"
+
+            // Test onOpenRecent
+            viewModel.showStartupChooser(sampleRecents, { openedRecent = it }, { browsed = true }, { openedDemo = true })
+            val chooser2 = viewModel.uiState.value.dialogUiState.dialogType as MainUiState.DialogType.StartupChooser
+            chooser2.onOpenRecent(sampleRecents.first())
+            openedRecent shouldBe sampleRecents.first()
+            viewModel.uiState.value.dialogUiState.dialogType shouldBe MainUiState.DialogType.None
+
+            // Test onBrowse
+            viewModel.showStartupChooser(sampleRecents, { openedRecent = it }, { browsed = true }, { openedDemo = true })
+            val chooser3 = viewModel.uiState.value.dialogUiState.dialogType as MainUiState.DialogType.StartupChooser
+            chooser3.onBrowse()
+            browsed shouldBe true
+            viewModel.uiState.value.dialogUiState.dialogType shouldBe MainUiState.DialogType.None
+
+            // Test onOpenDemo
+            viewModel.showStartupChooser(sampleRecents, { openedRecent = it }, { browsed = true }, { openedDemo = true })
+            val chooser4 = viewModel.uiState.value.dialogUiState.dialogType as MainUiState.DialogType.StartupChooser
+            chooser4.onOpenDemo()
+            openedDemo shouldBe true
+            viewModel.uiState.value.dialogUiState.dialogType shouldBe MainUiState.DialogType.None
+        }
+
+        "loading new mindmap after creating empty mindmap replaces root and preserves displayed map across view modes" {
+            val nodeManager = realNodeManager()
+            val viewModel = MainViewModel(logger = mockk(relaxed = true), injectedNodeManager = nodeManager)
+
+            // Step 1: Start with empty mindmap
+            viewModel.createEmptyMindmap("Empty Initial")
+            viewModel.uiState.value.title shouldBe "Empty Initial"
+            val initialRoot = nodeManager.rootNode!!
+            initialRoot.text shouldBe "Empty Initial"
+
+            // Step 2: Now load a new mindmap with different root
+            val secondRoot = Node(
+                parentNode = null,
+                id = "ID_DEMO_ROOT",
+                numericId = 99,
+                text = "Demo Mindmap Root",
+                creationDate = 0L,
+                modificationDate = 0L,
+            )
+            val demoChild = Node(
+                parentNode = secondRoot,
+                id = "ID_DEMO_CHILD",
+                numericId = 100,
+                text = "Demo Guide",
+                creationDate = 0L,
+                modificationDate = 0L,
+            )
+            secondRoot.childNodes.add(demoChild)
+
+            // Simulate loading new mindmap
+            nodeManager.updateRootNode(secondRoot)
+            viewModel.loadMindMap(
+                inputStream = "".byteInputStream(),
+                onLoadFinished = {
+                    nodeManager.updateRootNode(secondRoot)
+                }
+            )
+
+            eventually {
+                nodeManager.rootNode?.id shouldBe "ID_DEMO_ROOT"
+                nodeManager.rootNode?.text shouldBe "Demo Mindmap Root"
+            }
+
+            // Step 3: Switch between LIST and MIND_MAP, verify the active mindmap remains the loaded one
+            viewModel.setDisplayMode(DisplayMode.LIST)
+            viewModel.uiState.value.displayMode shouldBe DisplayMode.LIST
+
+            viewModel.setDisplayMode(DisplayMode.MIND_MAP)
+            viewModel.uiState.value.displayMode shouldBe DisplayMode.MIND_MAP
+            viewModel.getRootNode()?.id shouldBe "ID_DEMO_ROOT"
+            viewModel.getRootNode()?.text shouldBe "Demo Mindmap Root"
+        }
+
+        "loadMindMap reads stream asynchronously without error and closes it in finally" {
+            val nodeManager = realNodeManager()
+            val viewModel = MainViewModel(logger = mockk(relaxed = true), injectedNodeManager = nodeManager)
+
+            var streamClosed = false
+            val trackingStream = object : java.io.ByteArrayInputStream("<map><node TEXT=\"Root\"/></map>".toByteArray()) {
+                override fun close() {
+                    super.close()
+                    streamClosed = true
+                }
+            }
+
+            viewModel.loadMindMap(trackingStream)
+
+            eventually {
+                viewModel.uiState.value.error shouldBe ""
+                viewModel.uiState.value.loading shouldBe false
+                streamClosed shouldBe true
+            }
+        }
+
+        "launchSaveFile derives valid filename from title for a newly created empty mindmap and invokes registerFile" {
+            val nodeManager = realNodeManager()
+            val viewModel = MainViewModel(logger = mockk(relaxed = true), injectedNodeManager = nodeManager)
+
+            viewModel.createEmptyMindmap("My Fresh Brainstorm")
+            viewModel.getSaveFilename() shouldBe "My_Fresh_Brainstorm.mm"
+
+            var registeredFileName: String? = null
+            val mockRegister = object : fr.julien.quievreux.droidplane2.helper.FileRegister {
+                override fun registerFile(file: java.io.File) {
+                    registeredFileName = file.name
+                }
+                override fun getfilesDir(): String = System.getProperty("java.io.tmpdir")
+            }
+            viewModel.setFileRegister(mockRegister)
+
+            viewModel.launchSaveFile()
+
+            eventually {
+                registeredFileName shouldBe "My_Fresh_Brainstorm.mm"
             }
         }
     }

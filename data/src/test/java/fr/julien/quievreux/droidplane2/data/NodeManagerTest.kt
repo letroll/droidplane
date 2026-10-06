@@ -673,6 +673,22 @@ class NodeManagerTest : KStringSpec() {
             reloaded.getNodeByID("ID_1002")?.parentNode?.id shouldBe "ID_1001"
             reloaded.getNodeByID("ID_1002")?.parentNode?.childNodes?.size shouldBe nodeManager.getNodeByID("ID_1001")?.childNodes?.size
         }
+
+        "createNewMindmap initializes empty mindmap with single root node and resets state" {
+            val nodeManager = initNodeManager()
+            val newRoot = nodeManager.createNewMindmap("My Project")
+
+            newRoot.text shouldBe "My Project"
+            newRoot.parentNode shouldBe null
+            newRoot.childNodes.size shouldBe 0
+            newRoot.id shouldBe "ID_1"
+            newRoot.numericId shouldBe 1
+
+            nodeManager.rootNode shouldBe newRoot
+            nodeManager.allNodes.first() shouldBe listOf(newRoot)
+            nodeManager.getNodeByID("ID_1") shouldBe newRoot
+            nodeManager.getNodeByNumericId(1) shouldBe newRoot
+        }
     }
 
     /** Loads test_map.mm and fails loudly if anything goes wrong. */
