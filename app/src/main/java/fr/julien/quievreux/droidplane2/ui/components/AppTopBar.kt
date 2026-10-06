@@ -39,6 +39,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import fr.julien.quievreux.droidplane2.MainUiState.SearchUiState
+import fr.julien.quievreux.droidplane2.model.DisplayMode
 import fr.julien.quievreux.droidplane2.ui.components.AppTopBarAction.Backpress
 import fr.julien.quievreux.droidplane2.ui.components.AppTopBarAction.Help
 import fr.julien.quievreux.droidplane2.ui.components.AppTopBarAction.Open
@@ -60,6 +61,7 @@ enum class AppTopBarAction {
     Undo,
     Backpress,
     ExitSearch,
+    ToggleDisplayMode,
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -73,6 +75,7 @@ fun AppTopBar(
     searchUiState: SearchUiState = SearchUiState(),
     onExitSearch: () -> Unit = {},
     canUndoDelete: Boolean = false,
+    displayMode: DisplayMode = DisplayMode.LIST,
     modifier: Modifier = Modifier,
 ) {
     var showMenu by remember { mutableStateOf(false) }
@@ -247,6 +250,20 @@ fun AppTopBar(
                     },
                     text = {
                         Text(stringResource(R.string.open))
+                    },
+                )
+                DropdownMenuItem(
+                    onClick = {
+                        showMenu = false
+                        onBarAction(AppTopBarAction.ToggleDisplayMode)
+                    },
+                    text = {
+                        val textRes = if (displayMode == DisplayMode.LIST) {
+                            R.string.switch_to_mindmap_view
+                        } else {
+                            R.string.switch_to_list_view
+                        }
+                        Text(stringResource(textRes))
                     },
                 )
                 DropdownMenuItem(

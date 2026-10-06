@@ -33,4 +33,6 @@
     <string name="open_link">Open Link</string>
     <string name="delete">Delete</string>
     <string name="undo">Undo</string>
+    <string name="switch_to_mindmap_view">Mind Map View</string>
+    <string name="switch_to_list_view">List View</string>
 </resources>

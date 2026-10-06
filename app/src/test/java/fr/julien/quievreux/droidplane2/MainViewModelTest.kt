@@ -2,6 +2,8 @@ package fr.julien.quievreux.droidplane2
 
 import app.cash.turbine.test
 import fr.julien.quievreux.droidplane2.model.ContentNodeType.Classic
+import fr.julien.quievreux.droidplane2.model.ContextMenuAction
+import fr.julien.quievreux.droidplane2.model.DisplayMode
 import fr.julien.quievreux.droidplane2.MainUiState.DialogUiState
 import fr.julien.quievreux.droidplane2.MainUiState.SearchUiState
 import fr.julien.quievreux.droidplane2.core.log.Logger
@@ -41,6 +43,9 @@ class MainViewModelTest : KStringSpec() {
                     searchUiState shouldBe SearchUiState()
                     dialogUiState shouldBe DialogUiState()
                     navigationStack shouldBe emptyList()
+                    displayMode shouldBe DisplayMode.LIST
+                    selectedNodeId shouldBe null
+                    collapsedNodeIds shouldBe emptySet()
                 }
             }
         }
@@ -406,6 +411,98 @@ class MainViewModelTest : KStringSpec() {
                 val rootAfter = nodeManager.getNodeByID(root.id)!!
                 rootAfter.childNodes.any { it.id == child.id } shouldBe true
             }
+        }
+
+        "toggleDisplayMode toggles between LIST and MIND_MAP preserving state" {
+            val viewModel = initMainViewModelWithLoadedMindmap()
+            val initialTitle = viewModel.uiState.value.title
+            val initialNode = viewModel.uiState.value.nodeCurrentlyDisplayed
+
+            viewModel.uiState.value.displayMode shouldBe DisplayMode.LIST
+
+            viewModel.toggleDisplayMode()
+            viewModel.uiState.value.displayMode shouldBe DisplayMode.MIND_MAP
+            viewModel.uiState.value.title shouldBe initialTitle
+            viewModel.uiState.value.nodeCurrentlyDisplayed shouldBe initialNode
+
+            viewModel.toggleDisplayMode()
+            viewModel.uiState.value.displayMode shouldBe DisplayMode.LIST
+            viewModel.uiState.value.title shouldBe initialTitle
+            viewModel.uiState.value.nodeCurrentlyDisplayed shouldBe initialNode
+        }
+
+        "selectNode and clearNodeSelection updates selectedNodeId in uiState" {
+            val viewModel = initMainViewModelWithLoadedMindmap()
+            val root = viewModel.uiState.value.nodeCurrentlyDisplayed!!
+            val child = root.childNodes.first()
+
+            viewModel.selectNode(child)
+            viewModel.uiState.value.selectedNodeId shouldBe child.id
+
+            viewModel.clearNodeSelection()
+            viewModel.uiState.value.selectedNodeId shouldBe null
+        }
+
+        "toggleNodeCollapse adds and removes node ID from collapsedNodeIds" {
+            val viewModel = initMainViewModelWithLoadedMindmap()
+            val root = viewModel.uiState.value.nodeCurrentlyDisplayed!!
+
+            viewModel.uiState.value.collapsedNodeIds shouldBe emptySet()
+
+            viewModel.toggleNodeCollapse(root)
+            viewModel.uiState.value.collapsedNodeIds shouldBe setOf(root.id)
+
+            viewModel.toggleNodeCollapse(root)
+            viewModel.uiState.value.collapsedNodeIds shouldBe emptySet()
+        }
+
+        "switching from MIND_MAP to LIST focuses nodeCurrentlyDisplayed on selectedNodeId" {
+            val nodeManager = realNodeManager()
+            val viewModel = MainViewModel(logger = mockk(relaxed = true), injectedNodeManager = nodeManager)
+            val root = nodeManager.rootNode!!
+            viewModel.setInitialStateForTest(root)
+
+            val child = nodeManager.getNodeByID(root.id)!!.childNodes[0]
+
+            // In mindmap mode
+            viewModel.setDisplayMode(DisplayMode.MIND_MAP)
+            viewModel.selectNode(child)
+
+            // Switch to LIST
+            viewModel.toggleDisplayMode()
+            viewModel.uiState.value.displayMode shouldBe DisplayMode.LIST
+            val expectedDisplayed = if (child.childNodes.isNotEmpty()) child else (child.parentNode ?: child)
+            viewModel.uiState.value.nodeCurrentlyDisplayed?.id shouldBe expectedDisplayed.id
+        }
+
+        "context menu node operations and node addition work while in MIND_MAP mode" {
+            val nodeManager = realNodeManager()
+            val viewModel = MainViewModel(logger = mockk(relaxed = true), injectedNodeManager = nodeManager)
+            val root = nodeManager.rootNode!!
+            viewModel.setInitialStateForTest(root)
+
+            viewModel.setDisplayMode(DisplayMode.MIND_MAP)
+            viewModel.uiState.value.displayMode shouldBe DisplayMode.MIND_MAP
+
+            val child = nodeManager.getNodeByID(root.id)!!.childNodes[0]
+
+            // Trigger AddChildNode context menu
+            viewModel.onNodeContextMenuClick(ContextMenuAction.AddChildNode(parentNode = child))
+            viewModel.uiState.value.dialogUiState.dialogType shouldBe MainUiState.DialogType.AddChildNode(parentNode = child)
+
+            // Add node
+            viewModel.addNode("mindmap child", parentNode = child)
+
+            eventually {
+                val updatedChild = nodeManager.getNodeByID(child.id)!!
+                updatedChild.childNodes.size shouldBe 1
+                updatedChild.childNodes[0].text shouldBe "mindmap child"
+            }
+
+            // Trigger Edit context menu
+            viewModel.onNodeContextMenuClick(ContextMenuAction.Edit(node = child))
+            val dialog = viewModel.uiState.value.dialogUiState.dialogType
+            (dialog is MainUiState.DialogType.EditNodeDescription) shouldBe true
         }
     }
 

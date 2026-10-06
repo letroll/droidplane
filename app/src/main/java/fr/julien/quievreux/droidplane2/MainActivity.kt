@@ -56,6 +56,7 @@ import fr.julien.quievreux.droidplane2.helper.FileRegister
 import fr.julien.quievreux.droidplane2.model.ContentNodeType.Classic
 import fr.julien.quievreux.droidplane2.model.ContentNodeType.RelativeFile
 import fr.julien.quievreux.droidplane2.model.ContentNodeType.RichText
+import fr.julien.quievreux.droidplane2.model.DisplayMode
 import fr.julien.quievreux.droidplane2.ui.components.AppTopBar
 import fr.julien.quievreux.droidplane2.ui.components.AppTopBarAction.Backpress
 import fr.julien.quievreux.droidplane2.ui.components.AppTopBarAction.ExitSearch
@@ -64,11 +65,13 @@ import fr.julien.quievreux.droidplane2.ui.components.AppTopBarAction.Open
 import fr.julien.quievreux.droidplane2.ui.components.AppTopBarAction.Save
 import fr.julien.quievreux.droidplane2.ui.components.AppTopBarAction.SearchNext
 import fr.julien.quievreux.droidplane2.ui.components.AppTopBarAction.SearchPrevious
+import fr.julien.quievreux.droidplane2.ui.components.AppTopBarAction.ToggleDisplayMode
 import fr.julien.quievreux.droidplane2.ui.components.AppTopBarAction.Top
 import fr.julien.quievreux.droidplane2.ui.components.AppTopBarAction.Undo
 import fr.julien.quievreux.droidplane2.ui.components.AppTopBarAction.Up
 import fr.julien.quievreux.droidplane2.core.ui.component.CustomDialog
 import fr.julien.quievreux.droidplane2.ui.components.nodeList
+import fr.julien.quievreux.droidplane2.ui.mindmap.MindMapCanvasScreen
 import fr.julien.quievreux.droidplane2.ui.theme.ContrastAwareReplyTheme
 import fr.julien.quievreux.droidplane2.ui.theme.primaryContainerLight
 import fr.julien.quievreux.droidplane2.ui.theme.primaryLight
@@ -216,6 +219,7 @@ class MainActivity : FragmentActivity(), FileRegister {
                             searchUiState = state.value.searchUiState,
                             onExitSearch = { viewModel.onExitSearchMode() },
                             canUndoDelete = state.value.canUndoDelete,
+                            displayMode = state.value.displayMode,
                             onBarAction = { action ->
                                 when (action) {
                                     Backpress -> viewModel.upOrClose()
@@ -237,6 +241,8 @@ class MainActivity : FragmentActivity(), FileRegister {
                                     Undo -> viewModel.onUndoDelete()
 
                                     ExitSearch -> viewModel.onExitSearchMode()
+
+                                    ToggleDisplayMode -> viewModel.toggleDisplayMode()
                                 }
                             },
                         )
@@ -248,7 +254,14 @@ class MainActivity : FragmentActivity(), FileRegister {
                     floatingActionButton = {
                         AppFloatingActionButton(
                             onClick = {
-                                state.value.nodeCurrentlyDisplayed?.let { node ->
+                                val targetParent = if (state.value.displayMode == DisplayMode.MIND_MAP && state.value.selectedNodeId != null) {
+                                    viewModel.getNodeByID(state.value.selectedNodeId!!)
+                                        ?: viewModel.getRootNode()
+                                        ?: state.value.nodeCurrentlyDisplayed
+                                } else {
+                                    state.value.nodeCurrentlyDisplayed
+                                }
+                                targetParent?.let { node ->
                                     viewModel.setDialogState(AddChildNode(parentNode = node))
                                 }
                             },
@@ -261,30 +274,52 @@ class MainActivity : FragmentActivity(), FileRegister {
                     //                    contentColor =,
                     //                    contentWindowInsets =,
                     content = { innerPadding ->
-                        state.value.nodeCurrentlyDisplayed?.let { node ->
-                                LazyColumn(
-                                    modifier = Modifier
-                                        .fillMaxSize()
-                                        .background(MaterialTheme.colorScheme.surfaceContainer)
-                                        .padding(innerPadding),
-                                ) {
-                                    val searchResults = nodeFindList.value
-                                    val searchResultToShow = if (state.value.searchUiState.isSearchActive && state.value.searchUiState.currentResultIndex in searchResults.indices) {
-                                        searchResults[state.value.searchUiState.currentResultIndex]
-                                    } else {
-                                        null
+                        when (state.value.displayMode) {
+                            DisplayMode.LIST -> {
+                                state.value.nodeCurrentlyDisplayed?.let { node ->
+                                    LazyColumn(
+                                        modifier = Modifier
+                                            .fillMaxSize()
+                                            .background(MaterialTheme.colorScheme.surfaceContainer)
+                                            .padding(innerPadding),
+                                    ) {
+                                        val searchResults = nodeFindList.value
+                                        val searchResultToShow = if (state.value.searchUiState.isSearchActive && state.value.searchUiState.currentResultIndex in searchResults.indices) {
+                                            searchResults[state.value.searchUiState.currentResultIndex]
+                                        } else {
+                                            null
+                                        }
+                                        nodeList(
+                                            node = node,
+                                            searchResultToShow = searchResultToShow,
+                                            fetchText = viewModel::getNodeText,
+                                            fetchTextForCopy = viewModel::getNodeTextForCopy,
+                                            updateClipBoard = ::updateClipboard,
+                                            onNodeClick = viewModel::onNodeClick,
+                                            onNodeContextMenuClick = viewModel::onNodeContextMenuClick,
+                                            currentlyDisplayedNodeId = state.value.nodeCurrentlyDisplayed?.id,
+                                        )
                                     }
-                                    nodeList(
-                                        node = node,
-                                        searchResultToShow = searchResultToShow,
-                                        fetchText = viewModel::getNodeText,
-                                        fetchTextForCopy = viewModel::getNodeTextForCopy,
-                                        updateClipBoard = ::updateClipboard,
-                                        onNodeClick = viewModel::onNodeClick,
+                                }
+                            }
+
+                            DisplayMode.MIND_MAP -> {
+                                val rootNode = viewModel.getRootNode() ?: state.value.nodeCurrentlyDisplayed
+                                rootNode?.let { node ->
+                                    MindMapCanvasScreen(
+                                        rootNode = node,
+                                        selectedNodeId = state.value.selectedNodeId,
+                                        collapsedNodeIds = state.value.collapsedNodeIds,
+                                        onNodeSelect = viewModel::selectNode,
+                                        onNodeToggleCollapse = viewModel::toggleNodeCollapse,
                                         onNodeContextMenuClick = viewModel::onNodeContextMenuClick,
-                                        currentlyDisplayedNodeId = state.value.nodeCurrentlyDisplayed?.id,
+                                        fetchText = viewModel::getNodeText,
+                                        modifier = Modifier
+                                            .fillMaxSize()
+                                            .padding(innerPadding),
                                     )
                                 }
+                            }
                         }
                     }
                 )

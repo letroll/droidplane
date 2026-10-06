@@ -3,6 +3,7 @@ package fr.julien.quievreux.droidplane2
 import fr.julien.quievreux.droidplane2.model.ContentNodeType.Classic
 import fr.julien.quievreux.droidplane2.data.model.Node
 import fr.julien.quievreux.droidplane2.model.ContentNodeType
+import fr.julien.quievreux.droidplane2.model.DisplayMode
 import fr.julien.quievreux.droidplane2.model.ViewIntentNode
 
 data class MainUiState(
@@ -20,6 +21,9 @@ data class MainUiState(
     val searchUiState: SearchUiState = SearchUiState(),
     val dialogUiState: DialogUiState = DialogUiState(),
     val navigationStack: List<String> = emptyList(),
+    val displayMode: DisplayMode = DisplayMode.LIST,
+    val selectedNodeId: String? = null,
+    val collapsedNodeIds: Set<String> = emptySet(),
 ) {
     data class SnackbarMessage(
         val message: String,

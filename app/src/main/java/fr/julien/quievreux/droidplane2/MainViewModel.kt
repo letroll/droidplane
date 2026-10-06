@@ -25,6 +25,7 @@ import fr.julien.quievreux.droidplane2.model.ContextMenuAction.Edit
 import fr.julien.quievreux.droidplane2.model.ContextMenuAction.NodeLink
 import fr.julien.quievreux.droidplane2.model.ContextMenuAction.AddChildNode
 import fr.julien.quievreux.droidplane2.model.ContextMenuAction.OpenLink
+import fr.julien.quievreux.droidplane2.model.DisplayMode
 import fr.julien.quievreux.droidplane2.model.ViewIntentNode
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
@@ -217,6 +218,88 @@ class MainViewModel(
      */
     fun navigateToTop() {
         viewModelScope.launch { onNavigateToTop() }
+    }
+
+    /**
+     * Returns the root node of the active mindmap document, if loaded.
+     */
+    fun getRootNode(): Node? = nodeManager.rootNode
+
+    /**
+     * Finds a node by its string ID.
+     */
+    fun getNodeByID(id: String): Node? = nodeManager.getNodeByID(id)
+
+    /**
+     * Toggles the display mode between [DisplayMode.LIST] and [DisplayMode.MIND_MAP].
+     */
+    fun toggleDisplayMode() {
+        val nextMode = when (_uiState.value.displayMode) {
+            DisplayMode.LIST -> DisplayMode.MIND_MAP
+            DisplayMode.MIND_MAP -> DisplayMode.LIST
+        }
+        setDisplayMode(nextMode)
+    }
+
+    /**
+     * Sets the active display mode, synchronizing node context when switching to List mode.
+     */
+    fun setDisplayMode(mode: DisplayMode) {
+        updateUiState { currentState ->
+            if (currentState.displayMode == mode) return@updateUiState currentState
+
+            val targetNode = if (mode == DisplayMode.LIST && currentState.selectedNodeId != null) {
+                val selected = nodeManager.getNodeByID(currentState.selectedNodeId)
+                if (selected != null) {
+                    if (selected.childNodes.isNotEmpty()) {
+                        selected
+                    } else {
+                        selected.parentNode ?: selected
+                    }
+                } else {
+                    currentState.nodeCurrentlyDisplayed
+                }
+            } else {
+                currentState.nodeCurrentlyDisplayed
+            }
+
+            currentState.copy(
+                displayMode = mode,
+                nodeCurrentlyDisplayed = targetNode,
+            )
+        }
+    }
+
+    /**
+     * Sets the currently selected node in Mind Map view.
+     */
+    fun selectNode(node: Node) {
+        updateUiState {
+            it.copy(selectedNodeId = node.id)
+        }
+    }
+
+    /**
+     * Clears any active node selection.
+     */
+    fun clearNodeSelection() {
+        updateUiState {
+            it.copy(selectedNodeId = null)
+        }
+    }
+
+    /**
+     * Toggles the collapsed/expanded branch state for [node].
+     */
+    fun toggleNodeCollapse(node: Node) {
+        updateUiState { currentState ->
+            val updatedCollapsed = if (currentState.collapsedNodeIds.contains(node.id)) {
+                currentState.collapsedNodeIds - node.id
+            } else {
+                currentState.collapsedNodeIds + node.id
+            }
+            currentState.copy(collapsedNodeIds = updatedCollapsed)
+        }
     }
 
     fun getSearchResultFlow() = nodeManager.getSearchResultFlow()
