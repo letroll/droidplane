@@ -610,92 +610,65 @@ class NodeManager(
      * addNode : try to add a node and return it's id on success
      */
     override suspend fun addNodeToMindmap(newValue: String, parentNode: Node?): Int? {
-        return if (newValue.isBlank()) {
-            null
-        } else {
-            generateNodeNumericID().let { nodeNumericId ->
-                val time = System.currentTimeMillis()
-
-                // First create the new node
-                var newNode = Node(
-                    id = getNodeID(nodeNumericId),
-                    numericId = nodeNumericId,
-                    text = newValue,
-                    parentNode = parentNode,
-                    creationDate = time,
-                    modificationDate = time,
-                )
-
-                var updatedParentNode: Node? = null
-
-                _allNodes.update { nodes ->
-                    val updatedNodes = if (parentNode != null) {
-                        // If we have a parent, update it with the new child
-                        nodes.map { node ->
-                            if (node.id == parentNode.id) {
-                                // Create a deep copy of the parent with all its mutable lists
-                                val updatedParent = node.copy(
-                                    childNodes = ArrayList(node.childNodes),
-                                    richTextContents = ArrayList(node.richTextContents),
-                                    iconNames = ArrayList(node.iconNames),
-                                    arrowLinkDestinationIds = ArrayList(node.arrowLinkDestinationIds),
-                                    arrowLinkDestinationNodes = ArrayList(node.arrowLinkDestinationNodes),
-                                    arrowLinkIncomingNodes = ArrayList(node.arrowLinkIncomingNodes)
-                                )
-                                // Add the new node to the fresh copy of childNodes
-                                updatedParent.childNodes.add(newNode)
-                                // Keep reference to updated parent for later use
-                                updatedParentNode = updatedParent
-                                // Update the parent reference in the new node to point to the updated parent
-                                newNode = newNode.copy(parentNode = updatedParent)
-                                updatedParent
-                            } else node
-                        }.toMutableList()
-                    } else {
-                        // If no parent, this is a root node
-                        nodes.toMutableList()
-                    }
-
-                    // Add the new node
-                    updatedNodes.add(newNode)
-                    updatedNodes
-                }
-
-                // Update the indexes
-                if (parentNode != null) {
-                    // If we have a parent, update it first
-                    updatedParentNode?.let { parent ->
-                        updateNodeInMindMapIndexes(parent)
-                        // If parent is root or is in root's path, update rootNode
-                        if (parent.id == rootNode?.id) {
-                            rootNode = parent
-                        } else {
-                            // Find the path from root to parent
-                            var current = parent
-                            while (current.parentNode != null) {
-                                current.parentNode?.let { new ->
-                                    current = new
-                                }
-                                if (current.id == rootNode?.id) {
-                                    rootNode = current
-                                    break
-                                }
-                            }
-                        }
-                    }
-                } else {
-                    // If no parent, this is a root node
-                    if (rootNode == null) {
-                        rootNode = newNode
-                    }
-                }
-
-                // Update the new node in indexes
-                updateNodeInMindMapIndexes(newNode)
-
-                nodeNumericId
-            }
+        if (newValue.isBlank()) {
+            return null
         }
+        val nodeNumericId = generateNodeNumericID()
+        val time = System.currentTimeMillis()
+
+        val newNode = Node(
+            id = getNodeID(nodeNumericId),
+            numericId = nodeNumericId,
+            text = newValue,
+            parentNode = parentNode,
+            creationDate = time,
+            modificationDate = time,
+        )
+
+        val updatedNodesMap = mutableMapOf<String, Node>()
+
+        if (parentNode != null) {
+            val currentParent = getNodeByID(parentNode.id) ?: parentNode
+            val updatedParent = currentParent.copy(
+                childNodes = ArrayList(currentParent.childNodes),
+                richTextContents = ArrayList(currentParent.richTextContents),
+                iconNames = ArrayList(currentParent.iconNames),
+                arrowLinkDestinationIds = ArrayList(currentParent.arrowLinkDestinationIds),
+                arrowLinkDestinationNodes = ArrayList(currentParent.arrowLinkDestinationNodes),
+                arrowLinkIncomingNodes = ArrayList(currentParent.arrowLinkIncomingNodes),
+                modificationDate = time,
+            )
+            val fixedNewNode = newNode.copy(parentNode = updatedParent)
+            updatedParent.childNodes.add(fixedNewNode)
+
+            updatedNodesMap[fixedNewNode.id] = fixedNewNode
+            updatedNodesMap[updatedParent.id] = updatedParent
+
+            propagateUpdatedParentToRoot(updatedParent, updatedNodesMap)
+
+            _allNodes.update { nodes ->
+                val existingUpdated = nodes.map { node ->
+                    updatedNodesMap[node.id] ?: node
+                }
+                if (existingUpdated.none { it.id == fixedNewNode.id }) {
+                    existingUpdated + fixedNewNode
+                } else {
+                    existingUpdated
+                }
+            }
+        } else {
+            if (rootNode == null) {
+                rootNode = newNode
+            }
+            _allNodes.update { it + newNode }
+        }
+
+        val allNodes = _allNodes.value
+        val newNodesById = allNodes.associateBy { it.id }
+        val newNodesByNumeric = allNodes.associateBy { it.numericId }
+        updatemMindmapIndexes(MindmapIndexes(newNodesById, newNodesByNumeric))
+
+        return nodeNumericId
     }
 
     override suspend fun updateNodeText(nodeId: String, newText: String): Node? {
@@ -769,7 +742,10 @@ class NodeManager(
         while (currentParent != null) {
             val newAncestorChildren = currentParent.childNodes.toMutableList()
             val childIdx = newAncestorChildren.indexOfFirst { it.id == currentChild.id }
-            val updatedAncestor = currentParent.copy(childNodes = mutableListOf())
+            val updatedAncestor = currentParent.copy(
+                childNodes = mutableListOf(),
+                modificationDate = updatedParent.modificationDate ?: System.currentTimeMillis(),
+            )
 
             val fixedChild = currentChild.copy(parentNode = updatedAncestor)
             updatedNodesMap[fixedChild.id] = fixedChild
@@ -996,7 +972,9 @@ class NodeManager(
 
     suspend fun generateNodeNumericID(): Int {
         val currentIds = allNodesId.first().toSet()
-        check(currentIds.size >= Int.MAX_VALUE, { "No more available IDs" })
+        if (currentIds.size >= Int.MAX_VALUE) {
+            throw IllegalStateException("No more available IDs")
+        }
         var newId = 0
         while (currentIds.contains(newId)) {
             newId = abs(Random.nextInt(UNDEFINED_NODE_ID))

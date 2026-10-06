@@ -803,28 +803,25 @@ nodeFindList:${nodeManager.getSearchResult().map { getNodeText(it) }.joinToStrin
         setDialogState(DialogType.None)
     }
 
-    fun addNode(newValue: String) {
+    fun addNode(newValue: String, parentNode: Node? = _uiState.value.nodeCurrentlyDisplayed) {
+        if (newValue.isBlank()) {
+            return
+        }
         viewModelScope.launch(Dispatchers.IO) {
             setMindmapIsLoading(true)
-            val newNodeId = nodeManager.addNodeToMindmap(newValue, _uiState.value.nodeCurrentlyDisplayed)
-            newNodeId?.let { newNodeId ->
-                // Get the node ID from the numeric ID
-                val nodeId = nodeManager.getNodeID(newNodeId)
-                // Get the updated node with all its children
-                val updatedNode = nodeManager.getNodeByID(nodeId)
-                updatedNode?.let { node ->
-                    // If this is a child node, show its parent
-                    val parentNode = node.parentNode
-                    if (parentNode != null) {
-                        logger.e("addNode done updating UI with parent: ${parentNode.shortFamily()}")
-                        val updatedParent = nodeManager.getNodeByID(parentNode.id)
-                        if (updatedParent != null) {
-                            showNode(updatedParent)
-                        }
-                    } else {
-                        // This is a root node
-                        logger.e("addNode done updating UI with new node")
-                        showNode(node)
+            val currentScreenNode = _uiState.value.nodeCurrentlyDisplayed
+            val targetParent = parentNode ?: currentScreenNode
+            val newNodeId = nodeManager.addNodeToMindmap(newValue, targetParent)
+            newNodeId?.let {
+                if (currentScreenNode != null) {
+                    val refreshedScreenNode = nodeManager.getNodeByID(currentScreenNode.id)
+                    if (refreshedScreenNode != null) {
+                        showNode(refreshedScreenNode)
+                    }
+                } else if (targetParent != null) {
+                    val updatedParent = nodeManager.getNodeByID(targetParent.id)
+                    if (updatedParent != null) {
+                        showNode(updatedParent)
                     }
                 }
             }

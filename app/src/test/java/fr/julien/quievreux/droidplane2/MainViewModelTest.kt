@@ -265,6 +265,89 @@ class MainViewModelTest : KStringSpec() {
             parentState.childNodes.size shouldBe 1
             parentState.childNodes.none { it.id == firstChild.id } shouldBe true
         }
+
+        "addNode targeting a child of currently displayed node should keep current node displayed and attach child to target" {
+            val nodeManager = realNodeManager()
+            val viewModel = MainViewModel(logger = mockk(relaxed = true), injectedNodeManager = nodeManager)
+            val root = nodeManager.rootNode!!
+            viewModel.setInitialStateForTest(root)
+
+            // root has 1 child: "child"
+            val child = nodeManager.getNodeByID(root.id)!!.childNodes[0]
+
+            // User triggers context menu on "child" to add a sub-child
+            viewModel.addNode("grandchild 1", parentNode = child)
+
+            eventually {
+                // Currently displayed node should still be root
+                viewModel.uiState.value.nodeCurrentlyDisplayed?.id shouldBe root.id
+                // Root's child list should have the updated child containing 1 grandchild
+                val displayedChild = viewModel.uiState.value.nodeCurrentlyDisplayed?.childNodes?.first { it.id == child.id }
+                displayedChild shouldNotBe null
+                displayedChild!!.childNodes.size shouldBe 1
+                displayedChild.childNodes[0].text shouldBe "grandchild 1"
+            }
+
+            // Clicking the child navigates to it and displays the grandchild
+            val updatedChild = nodeManager.getNodeByID(child.id)!!
+            viewModel.onChildNodeClicked(updatedChild)
+
+            viewModel.uiState.value.nodeCurrentlyDisplayed?.id shouldBe child.id
+            viewModel.uiState.value.nodeCurrentlyDisplayed?.childNodes?.size shouldBe 1
+            viewModel.uiState.value.nodeCurrentlyDisplayed?.childNodes?.get(0)?.text shouldBe "grandchild 1"
+        }
+
+        "FAB addition targets screen node while context menu addition targets listed item" {
+            val nodeManager = realNodeManager()
+            val viewModel = MainViewModel(logger = mockk(relaxed = true), injectedNodeManager = nodeManager)
+            val root = nodeManager.rootNode!!
+            viewModel.setInitialStateForTest(root)
+
+            val child1 = nodeManager.getNodeByID(root.id)!!.childNodes[0]
+
+            // 1. Simulate FAB addition (targets current screen node: root)
+            viewModel.addNode("child2 via FAB", parentNode = viewModel.uiState.value.nodeCurrentlyDisplayed)
+
+            eventually {
+                val displayed = viewModel.uiState.value.nodeCurrentlyDisplayed!!
+                displayed.id shouldBe root.id
+                displayed.childNodes.size shouldBe 2
+                displayed.childNodes.any { it.text == "child2 via FAB" } shouldBe true
+            }
+
+            // 2. Simulate context menu addition on child1 (targets child1)
+            viewModel.addNode("subchild of child1", parentNode = child1)
+
+            eventually {
+                val displayed = viewModel.uiState.value.nodeCurrentlyDisplayed!!
+                // Still showing root
+                displayed.id shouldBe root.id
+                // Root child count unchanged
+                displayed.childNodes.size shouldBe 2
+                // child1 now has 1 child
+                val updatedChild1 = displayed.childNodes.first { it.id == child1.id }
+                updatedChild1.childNodes.size shouldBe 1
+                updatedChild1.childNodes[0].text shouldBe "subchild of child1"
+            }
+        }
+
+        "addNode with blank or whitespace text should reject addition and leave target node unchanged" {
+            val nodeManager = realNodeManager()
+            val viewModel = MainViewModel(logger = mockk(relaxed = true), injectedNodeManager = nodeManager)
+            val root = nodeManager.rootNode!!
+            viewModel.setInitialStateForTest(root)
+
+            val child = nodeManager.getNodeByID(root.id)!!.childNodes[0]
+
+            viewModel.addNode("   ", parentNode = child)
+            viewModel.addNode("", parentNode = child)
+
+            // Child's childNodes must remain 0
+            val childAfter = nodeManager.getNodeByID(child.id)!!
+            childAfter.childNodes.size shouldBe 0
+            val rootAfter = nodeManager.getNodeByID(root.id)!!
+            rootAfter.childNodes.first { it.id == child.id }.childNodes.size shouldBe 0
+        }
     }
 
     /** Polls [condition] until it stops throwing, or fails after ~2s. */

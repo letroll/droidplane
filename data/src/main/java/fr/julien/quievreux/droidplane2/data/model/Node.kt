@@ -54,6 +54,7 @@ data class Node(
         if (childNodes.size != other.childNodes.size) return false
         for (i in childNodes.indices) {
             if (childNodes[i].id != other.childNodes[i].id ||
+                childNodes[i].childNodes.size != other.childNodes[i].childNodes.size ||
                 childNodes[i].modificationDate != other.childNodes[i].modificationDate) {
                 return false
             }

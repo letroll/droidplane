@@ -171,7 +171,7 @@ class MainActivity : FragmentActivity(), FileRegister {
                                 viewModel.setDialogState(None)
                             }
                         ) { newValue ->
-                            viewModel.addNode(newValue)
+                            viewModel.addNode(newValue, dialog.parentNode)
                         }
                     }
                     is DialogType.DeleteConfirmation -> {

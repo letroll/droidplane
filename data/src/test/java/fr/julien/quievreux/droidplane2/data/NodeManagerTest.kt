@@ -472,6 +472,37 @@ class NodeManagerTest : KStringSpec() {
             nodeManager.allNodes.first().count { it.id == newNode?.id } shouldBe 1
         }
 
+        "addNodeToMindmap under non-root child should update parent, ancestors up to rootNode, and indexes" {
+            val nodeManager = loadedNodeManager()
+            val coreModule = nodeManager.getNodeByID("ID_1002")!! // :core Module under Architecture (ID_1001) under Root (ID_1000)
+            val initialCoreChildCount = coreModule.childNodes.size
+
+            val newNumericId = nodeManager.addNodeToMindmap("Sub-child of core", coreModule)
+            newNumericId shouldNotBe null
+
+            val newNode = nodeManager.getNodeByNumericId(newNumericId!!)
+            newNode shouldNotBe null
+            newNode?.text shouldBe "Sub-child of core"
+            newNode?.parentNode?.id shouldBe "ID_1002"
+
+            // Target node (coreModule) must have the new child
+            val coreAfter = nodeManager.getNodeByID("ID_1002")!!
+            coreAfter.childNodes.size shouldBe initialCoreChildCount + 1
+            coreAfter.childNodes.last().id shouldBe newNode!!.id
+            newNode.parentNode shouldBe coreAfter
+
+            // Ancestor (Architecture) must contain the updated coreModule
+            val archAfter = nodeManager.getNodeByID("ID_1001")!!
+            val coreUnderArch = archAfter.childNodes.first { it.id == "ID_1002" }
+            coreUnderArch.childNodes.size shouldBe initialCoreChildCount + 1
+
+            // Root must contain the updated Architecture which contains the updated coreModule
+            val root = nodeManager.rootNode!!
+            val archUnderRoot = root.childNodes.first { it.id == "ID_1001" }
+            val coreUnderRoot = archUnderRoot.childNodes.first { it.id == "ID_1002" }
+            coreUnderRoot.childNodes.size shouldBe initialCoreChildCount + 1
+        }
+
         "addNodeToMindmap should reject blank text" {
             val nodeManager = loadedNodeManager()
             nodeManager.addNodeToMindmap("   ", nodeManager.getNodeByID("ID_1001")) shouldBe null
