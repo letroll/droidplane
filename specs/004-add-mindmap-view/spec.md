@@ -118,7 +118,7 @@ As a user interacting with a selected node in Mind Map view, I want to access st
 
 ## Assumptions
 
-- The default initial display mode remains the established hierarchical List view when a document is first opened, ensuring backward compatibility for existing user habits.
+- The default initial display mode is the 2D Mind Map view when a document is opened, providing immediate spatial visual representation, with the ability to switch to the traditional List view at any time via the options menu.
 - The 2D mindmap layout arranges nodes horizontally (left-to-right and right-to-left branching from the root), matching Freeplane desktop conventions and utilizing existing node position attributes where available.
 - Existing dialogs for node editing, child node creation, and deletion confirmations are reused to ensure UI consistency and reduce duplication across view modes.
 - Pan and zoom gestures follow standard mobile multi-touch conventions (one finger drag to pan, two finger pinch to zoom).

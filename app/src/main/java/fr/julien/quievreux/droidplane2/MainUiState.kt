@@ -21,9 +21,10 @@ data class MainUiState(
     val searchUiState: SearchUiState = SearchUiState(),
     val dialogUiState: DialogUiState = DialogUiState(),
     val navigationStack: List<String> = emptyList(),
-    val displayMode: DisplayMode = DisplayMode.LIST,
+    val displayMode: DisplayMode = DisplayMode.MIND_MAP,
     val selectedNodeId: String? = null,
     val collapsedNodeIds: Set<String> = emptySet(),
+    val treeVersion: Long = 0L,
 ) {
     data class SnackbarMessage(
         val message: String,

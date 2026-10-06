@@ -33,17 +33,17 @@
 
 1. **Launch App**: Open Droidplane with the default sample mindmap (`example.mm`).
 2. **Inspect Initial State**:
-   - Verify document renders in the standard hierarchical `nodeList` view.
+   - Verify document renders by default in the 2D Mind Map view (`MindMapCanvasScreen`), showing the root node centered with branches extending horizontally.
    - Tap the overflow menu (⋮) in the top right.
-   - Confirm menu item displays **"Mind Map View"** (or localized "Vue Carte mentale").
-3. **Switch to Mind Map View**:
-   - Tap the menu item.
-   - **Expected Result**: Screen switches immediately to `MindMapCanvasScreen` showing the 2D spatial mindmap with the root node centered and branches extending to the left and right.
-4. **Switch Back to List View**:
-   - Tap the overflow menu (⋮) again.
    - Confirm menu item displays **"List View"** (or localized "Vue Liste").
+3. **Switch to List View**:
    - Tap the menu item.
-   - **Expected Result**: Screen returns immediately to the hierarchical `nodeList` view.
+   - **Expected Result**: Screen switches immediately to the hierarchical `nodeList` view.
+4. **Switch Back to Mind Map View**:
+   - Tap the overflow menu (⋮) again.
+   - Confirm menu item displays **"Mind Map View"** (or localized "Vue Carte mentale").
+   - Tap the menu item.
+   - **Expected Result**: Screen returns immediately to the 2D spatial Mind Map view.
 5. **State Preservation**:
    - Edit a node or add a child in either view.
    - Toggle view modes.

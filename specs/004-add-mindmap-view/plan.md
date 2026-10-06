@@ -6,7 +6,7 @@
 
 ## Summary
 
-Implement a 2D spatial Mind Map visualization mode in Droidplane similar to desktop Freeplane, along with an options menu action allowing users to seamlessly toggle between the existing hierarchical List view and the new Mind Map view. The technical approach creates a native Jetpack Compose 2D canvas (`MindMapCanvasScreen`) driven by a deterministic layout engine (`MindMapLayoutEngine`) that positions nodes horizontally (left and right of root) connected by cubic Bezier branch curves. Visual node components (`MindMapNodeCard`) dynamically resize according to their text content, line wrapping, and interactive indicators (fold toggles, formatting). Central state management in `MainViewModel` and `MainUiState` tracks `DisplayMode`, active selection, and collapsed branches, ensuring zero data loss and instantaneous view transitions.
+Implement a 2D spatial Mind Map visualization mode as the default display mode in Droidplane similar to desktop Freeplane, along with an options menu action allowing users to seamlessly toggle between the Mind Map view and the traditional hierarchical List view. The technical approach creates a native Jetpack Compose 2D canvas (`MindMapCanvasScreen`) driven by a deterministic layout engine (`MindMapLayoutEngine`) that positions nodes horizontally (left and right of root) connected by cubic Bezier branch curves. Visual node components (`MindMapNodeCard`) dynamically resize according to their text content, line wrapping, and interactive indicators (fold toggles, formatting). Central state management in `MainViewModel` and `MainUiState` tracks `DisplayMode`, active selection, and collapsed branches, ensuring zero data loss and instantaneous view transitions.
 
 ## Technical Context
 

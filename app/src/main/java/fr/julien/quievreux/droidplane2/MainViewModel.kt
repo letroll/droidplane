@@ -755,6 +755,7 @@ nodeFindList:${nodeManager.getSearchResult().map { getNodeText(it) }.joinToStrin
                 reloadedNode?.let { updated ->
                     updateNodeDisplayed(updated)
                 }
+                updateUiState { it.copy(treeVersion = it.treeVersion + 1) }
             }
         }
     }
@@ -847,17 +848,27 @@ nodeFindList:${nodeManager.getSearchResult().map { getNodeText(it) }.joinToStrin
             nodeManager.deleteNode(node.id)
             hasUnsavedChanges = true
             val parent = node.parentNode
-            if (parent != null) {
-                val updatedParent = nodeManager.getNodeByID(parent.id)
-                if (updatedParent != null) {
-                    showNode(updatedParent)
-                } else {
-                    showNode(parent)
-                }
+            val updatedParent = parent?.id?.let { nodeManager.getNodeByID(it) } ?: parent
+            if (updatedParent != null) {
+                showNode(updatedParent)
             }
             val nodeTitle = node.text ?: "Node"
-            updateUiState {
-                it.copy(
+            updateUiState { currentState ->
+                val newSelectedId = if (currentState.selectedNodeId == node.id) {
+                    updatedParent?.id
+                } else {
+                    currentState.selectedNodeId
+                }
+                val newCollapsedIds = currentState.collapsedNodeIds.toMutableSet().apply {
+                    remove(node.id)
+                    if (updatedParent != null && updatedParent.childNodes.isEmpty()) {
+                        remove(updatedParent.id)
+                    }
+                }
+                currentState.copy(
+                    treeVersion = currentState.treeVersion + 1,
+                    selectedNodeId = newSelectedId,
+                    collapsedNodeIds = newCollapsedIds,
                     canUndoDelete = undoStack.isNotEmpty(),
                     snackbarMessage = MainUiState.SnackbarMessage(
                         message = "\"$nodeTitle\" deleted",
@@ -874,17 +885,28 @@ nodeFindList:${nodeManager.getSearchResult().map { getNodeText(it) }.joinToStrin
     fun onUndoDelete() {
         viewModelScope.launch(Dispatchers.IO) {
             setMindmapIsLoading(true)
+            var restoredParentId: String? = null
+            var restoredNode: Node? = null
             undoStack.firstOrNull()?.let { snapshot ->
+                restoredParentId = snapshot.parentNodeId
                 val success = nodeManager.restoreSubtree(snapshot)
                 if (success) {
                     undoStack.removeAt(0)
                     // Navigate to restored node
-                    val restoredNode = snapshot.rootDeletedNode
+                    restoredNode = snapshot.rootDeletedNode
                     restoredNode?.let { showNode(it) }
                 }
             }
-            updateUiState {
-                it.copy(
+            updateUiState { currentState ->
+                val newCollapsed = if (restoredParentId != null) {
+                    currentState.collapsedNodeIds - restoredParentId!!
+                } else {
+                    currentState.collapsedNodeIds
+                }
+                currentState.copy(
+                    treeVersion = currentState.treeVersion + 1,
+                    collapsedNodeIds = newCollapsed,
+                    selectedNodeId = restoredNode?.id ?: currentState.selectedNodeId,
                     canUndoDelete = undoStack.isNotEmpty(),
                     snackbarMessage = null
                 )
@@ -922,6 +944,19 @@ nodeFindList:${nodeManager.getSearchResult().map { getNodeText(it) }.joinToStrin
                     if (updatedParent != null) {
                         showNode(updatedParent)
                     }
+                }
+                val createdNodeId = nodeManager.getNodeID(newNodeId)
+                updateUiState { currentState ->
+                    val newCollapsed = if (targetParent != null) {
+                        currentState.collapsedNodeIds - targetParent.id
+                    } else {
+                        currentState.collapsedNodeIds
+                    }
+                    currentState.copy(
+                        treeVersion = currentState.treeVersion + 1,
+                        collapsedNodeIds = newCollapsed,
+                        selectedNodeId = createdNodeId ?: currentState.selectedNodeId,
+                    )
                 }
             }
             hasUnsavedChanges = true

@@ -8,6 +8,7 @@ import fr.julien.quievreux.droidplane2.MainUiState.DialogUiState
 import fr.julien.quievreux.droidplane2.MainUiState.SearchUiState
 import fr.julien.quievreux.droidplane2.core.log.Logger
 import fr.julien.quievreux.droidplane2.core.testutils.KStringSpec
+import io.kotest.matchers.comparables.shouldBeGreaterThan
 import fr.julien.quievreux.droidplane2.data.FakeDataSource
 import fr.julien.quievreux.droidplane2.data.NodeManager
 import fr.julien.quievreux.droidplane2.data.NodeUtilsDefaultImpl
@@ -43,9 +44,10 @@ class MainViewModelTest : KStringSpec() {
                     searchUiState shouldBe SearchUiState()
                     dialogUiState shouldBe DialogUiState()
                     navigationStack shouldBe emptyList()
-                    displayMode shouldBe DisplayMode.LIST
+                    displayMode shouldBe DisplayMode.MIND_MAP
                     selectedNodeId shouldBe null
                     collapsedNodeIds shouldBe emptySet()
+                    treeVersion shouldBe 0L
                 }
             }
         }
@@ -413,20 +415,20 @@ class MainViewModelTest : KStringSpec() {
             }
         }
 
-        "toggleDisplayMode toggles between LIST and MIND_MAP preserving state" {
+        "toggleDisplayMode toggles between MIND_MAP and LIST preserving state" {
             val viewModel = initMainViewModelWithLoadedMindmap()
             val initialTitle = viewModel.uiState.value.title
             val initialNode = viewModel.uiState.value.nodeCurrentlyDisplayed
 
-            viewModel.uiState.value.displayMode shouldBe DisplayMode.LIST
+            viewModel.uiState.value.displayMode shouldBe DisplayMode.MIND_MAP
 
             viewModel.toggleDisplayMode()
-            viewModel.uiState.value.displayMode shouldBe DisplayMode.MIND_MAP
+            viewModel.uiState.value.displayMode shouldBe DisplayMode.LIST
             viewModel.uiState.value.title shouldBe initialTitle
             viewModel.uiState.value.nodeCurrentlyDisplayed shouldBe initialNode
 
             viewModel.toggleDisplayMode()
-            viewModel.uiState.value.displayMode shouldBe DisplayMode.LIST
+            viewModel.uiState.value.displayMode shouldBe DisplayMode.MIND_MAP
             viewModel.uiState.value.title shouldBe initialTitle
             viewModel.uiState.value.nodeCurrentlyDisplayed shouldBe initialNode
         }
@@ -503,6 +505,65 @@ class MainViewModelTest : KStringSpec() {
             viewModel.onNodeContextMenuClick(ContextMenuAction.Edit(node = child))
             val dialog = viewModel.uiState.value.dialogUiState.dialogType
             (dialog is MainUiState.DialogType.EditNodeDescription) shouldBe true
+        }
+
+        "deleting a node increments treeVersion and cleans selection and collapsed state" {
+            val nodeManager = realNodeManager()
+            val viewModel = MainViewModel(logger = mockk(relaxed = true), injectedNodeManager = nodeManager)
+            val root = nodeManager.rootNode!!
+            viewModel.setInitialStateForTest(root)
+
+            val child = nodeManager.getNodeByID(root.id)!!.childNodes[0]
+            viewModel.selectNode(child)
+            viewModel.toggleNodeCollapse(child)
+
+            val initialVersion = viewModel.uiState.value.treeVersion
+
+            viewModel.onDeleteNode(child)
+            viewModel.onConfirmDelete()
+
+            eventually {
+                viewModel.uiState.value.treeVersion shouldBeGreaterThan initialVersion
+                viewModel.uiState.value.selectedNodeId shouldBe root.id
+                viewModel.uiState.value.collapsedNodeIds.contains(child.id) shouldBe false
+                viewModel.uiState.value.canUndoDelete shouldBe true
+            }
+        }
+
+        "restoring a deleted node increments treeVersion, auto-expands collapsed parent, and selects restored node" {
+            val nodeManager = realNodeManager()
+            val viewModel = MainViewModel(logger = mockk(relaxed = true), injectedNodeManager = nodeManager)
+            val root = nodeManager.rootNode!!
+            viewModel.setInitialStateForTest(root)
+
+            val child = nodeManager.getNodeByID(root.id)!!.childNodes[0]
+
+            // Delete child
+            viewModel.onDeleteNode(child)
+            viewModel.onConfirmDelete()
+
+            eventually {
+                viewModel.uiState.value.canUndoDelete shouldBe true
+            }
+
+            // User puts parent in collapsed mode (mode réduit) while child was deleted
+            viewModel.toggleNodeCollapse(root)
+            viewModel.uiState.value.collapsedNodeIds shouldBe setOf(root.id)
+
+            val versionBeforeUndo = viewModel.uiState.value.treeVersion
+
+            // Undo delete
+            viewModel.onUndoDelete()
+
+            eventually {
+                // treeVersion incremented so mindmap canvas recalculates layout immediately
+                viewModel.uiState.value.treeVersion shouldBeGreaterThan versionBeforeUndo
+                // Parent must be automatically un-collapsed so restored node is visible
+                viewModel.uiState.value.collapsedNodeIds.contains(root.id) shouldBe false
+                // Restored node is selected
+                viewModel.uiState.value.selectedNodeId shouldBe child.id
+                viewModel.uiState.value.canUndoDelete shouldBe false
+            }
         }
     }
 

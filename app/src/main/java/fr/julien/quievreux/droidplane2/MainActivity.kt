@@ -310,6 +310,7 @@ class MainActivity : FragmentActivity(), FileRegister {
                                         rootNode = node,
                                         selectedNodeId = state.value.selectedNodeId,
                                         collapsedNodeIds = state.value.collapsedNodeIds,
+                                        treeVersion = state.value.treeVersion,
                                         onNodeSelect = viewModel::selectNode,
                                         onNodeToggleCollapse = viewModel::toggleNodeCollapse,
                                         onNodeContextMenuClick = viewModel::onNodeContextMenuClick,

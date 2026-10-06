@@ -29,10 +29,10 @@ enum class DisplayMode {
 ```
 
 - **Validation Rules**:
-  - Must never be null; defaults to `DisplayMode.LIST`.
+  - Must never be null; defaults to `DisplayMode.MIND_MAP`.
 - **Transitions**:
-  - `LIST` → `MIND_MAP`: Triggered when user selects "Switch to Mind Map view" in the top bar menu.
   - `MIND_MAP` → `LIST`: Triggered when user selects "Switch to List view" in the top bar menu.
+  - `LIST` → `MIND_MAP`: Triggered when user selects "Switch to Mind Map view" in the top bar menu.
 
 ---
 
@@ -49,9 +49,10 @@ data class MainUiState(
     val canGoBack: Boolean = false,
     val nodeCurrentlyDisplayed: Node? = null,
     // ...
-    val displayMode: DisplayMode = DisplayMode.LIST,
+    val displayMode: DisplayMode = DisplayMode.MIND_MAP,
     val selectedNodeId: String? = null,
     val collapsedNodeIds: Set<String> = emptySet(),
+    val treeVersion: Long = 0L,
 )
 ```
 

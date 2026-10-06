@@ -75,7 +75,7 @@ fun AppTopBar(
     searchUiState: SearchUiState = SearchUiState(),
     onExitSearch: () -> Unit = {},
     canUndoDelete: Boolean = false,
-    displayMode: DisplayMode = DisplayMode.LIST,
+    displayMode: DisplayMode = DisplayMode.MIND_MAP,
     modifier: Modifier = Modifier,
 ) {
     var showMenu by remember { mutableStateOf(false) }

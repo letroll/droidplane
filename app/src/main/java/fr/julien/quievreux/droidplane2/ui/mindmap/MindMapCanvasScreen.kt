@@ -35,6 +35,7 @@ fun MindMapCanvasScreen(
     rootNode: Node,
     selectedNodeId: String?,
     collapsedNodeIds: Set<String>,
+    treeVersion: Long = 0L,
     onNodeSelect: (Node) -> Unit,
     onNodeToggleCollapse: (Node) -> Unit,
     onNodeContextMenuClick: (ContextMenuAction) -> Unit = {},
@@ -46,7 +47,7 @@ fun MindMapCanvasScreen(
 
     val density = LocalDensity.current
 
-    val layoutResult = remember(rootNode, collapsedNodeIds, selectedNodeId, density.density) {
+    val layoutResult = remember(rootNode, treeVersion, collapsedNodeIds, selectedNodeId, density.density) {
         MindMapLayoutEngine.computeLayout(
             rootNode = rootNode,
             collapsedNodeIds = collapsedNodeIds,
