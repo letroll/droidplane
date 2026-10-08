@@ -13,6 +13,7 @@ import fr.julien.quievreux.droidplane2.MainViewModel
 import fr.julien.quievreux.droidplane2.data.model.Node
 import fr.julien.quievreux.droidplane2.model.ContextMenuAction
 import fr.julien.quievreux.droidplane2.MainUiState.DialogType.DeleteConfirmation
+import fr.julien.quievreux.droidplane2.ui.theme.ContrastAwareReplyTheme
 import fr.julien.quievreux.droidplane2.ui.view.DeleteConfirmationDialog
 
 @Composable
@@ -78,7 +79,7 @@ private fun NodeListScreen(
 @Composable
 @androidx.compose.ui.tooling.preview.Preview
 fun PreviewMindMapScreen() {
-    fr.julien.quievreux.droidplane2.ui.theme.ContrastAwareReplyTheme {
+    ContrastAwareReplyTheme {
         MindMapScreen()
     }
 }

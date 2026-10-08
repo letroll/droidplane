@@ -24,6 +24,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import fr.julien.quievreux.droidplane2.data.model.Node
 import fr.julien.quievreux.droidplane2.MainUiState.DialogType.DeleteConfirmation
+import fr.julien.quievreux.droidplane2.ui.theme.ContrastAwareReplyTheme
 
 @Composable
 fun DeleteConfirmationDialog(
@@ -98,7 +99,7 @@ fun DeleteConfirmationDialog(
 @Composable
 @androidx.compose.ui.tooling.preview.Preview
 fun PreviewDeleteConfirmationDialog() {
-    fr.julien.quievreux.droidplane2.ui.theme.ContrastAwareReplyTheme {
+    ContrastAwareReplyTheme {
         DeleteConfirmationDialog(
             confirmation = DeleteConfirmation(
                 node = Node(

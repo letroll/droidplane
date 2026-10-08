@@ -19,6 +19,14 @@ interface XmlParseUtils {
 
     fun parseIcon(xpp: XmlPullParser, nodes: MutableList<Node>)
 
+    fun parseAttribute(xpp: XmlPullParser, nodes: MutableList<Node>)
+
+    fun parseCloud(xpp: XmlPullParser, nodes: MutableList<Node>)
+
+    fun parseEdge(xpp: XmlPullParser, nodes: MutableList<Node>)
+
+    fun parseHook(xpp: XmlPullParser, nodes: MutableList<Node>)
+
     fun parseNodeText(
         nodes: MutableList<Node>,
         xpp: XmlPullParser,

@@ -88,6 +88,7 @@ fun LazyListScope.nodeList(
     onNodeContextMenuClick: (ContextMenuAction) -> Unit,
     searchResultToShow: Node?,
     currentlyDisplayedNodeId: String? = null,
+    onNodeDoubleClick: (Node) -> Unit = {},
 ) {
     var isFoundInList = searchResultToShow == null
 
@@ -116,6 +117,7 @@ fun LazyListScope.nodeList(
                 onNodeContextMenuClick = onNodeContextMenuClick,
                 node = child,
                 currentlyDisplayedNodeId = currentlyDisplayedNodeId,
+                onNodeDoubleClick = onNodeDoubleClick,
             )
         }
     }
@@ -159,6 +161,7 @@ fun NodeItem(
     onNodeContextMenuClick: (ContextMenuAction) -> Unit,
     node: Node,
     currentlyDisplayedNodeId: String? = null,
+    onNodeDoubleClick: (Node) -> Unit = {},
 ) {
     val text = fetchText(node) ?: ""
     val copyText = fetchTextForCopy(node) ?: text
@@ -184,6 +187,10 @@ fun NodeItem(
         ContextMenuDropDownItem(
             text = stringResource(id = R.string.edit),
             action = Edit(node)
+        ),
+        ContextMenuDropDownItem(
+            text = stringResource(id = R.string.node_properties),
+            action = ContextMenuAction.Properties(node = node)
         ),
         ContextMenuDropDownItem(
             text = stringResource(id = R.string.add_child_node),
@@ -259,6 +266,9 @@ fun NodeItem(
                 .indication(interactionSource, LocalIndication.current)
                 .pointerInput(node.id) {
                     detectTapGestures(
+                        onDoubleTap = {
+                            onNodeDoubleClick(currentNode)
+                        },
                         onLongPress = {
                             isContextMenuVisble = true
                             pressOffset = DpOffset(it.x.toDp(), it.y.toDp())
@@ -371,7 +381,7 @@ fun NodeItem(
                         item.action?.let { action ->
                             when (action) {
                                 is CopyText -> updateClipBoard(action.text)
-                                is Edit, is NodeLink, is AddChildNode, is ContextMenuAction.OpenLink, is DeleteNode -> onNodeContextMenuClick(action)
+                                is Edit, is NodeLink, is AddChildNode, is ContextMenuAction.OpenLink, is DeleteNode, is ContextMenuAction.Properties -> onNodeContextMenuClick(action)
                             }
                         }
                         isContextMenuVisble = false
@@ -394,6 +404,7 @@ fun NodeItem(
         imageVector = when (action) {
             is CopyText -> FontAwesomeIcons.Regular.Clipboard
             is Edit -> FontAwesomeIcons.Regular.Edit
+            is ContextMenuAction.Properties -> FontAwesomeIcons.Regular.Edit
             is NodeLink -> FontAwesomeIcons.Solid.Link
             is AddChildNode -> FontAwesomeIcons.Solid.Plus
             is DeleteNode -> FontAwesomeIcons.Solid.Minus

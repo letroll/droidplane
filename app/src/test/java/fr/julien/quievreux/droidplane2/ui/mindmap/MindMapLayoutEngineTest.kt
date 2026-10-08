@@ -223,5 +223,28 @@ class MindMapLayoutEngineTest : KStringSpec() {
             scaledShortSize.first shouldBe (shortSize.first * 2f)
             scaledShortSize.second shouldBe (shortSize.second * 2f)
         }
+
+        "measureNode expands height for long multi-line paragraphs beyond 4 lines without truncation" {
+            val multiLineText = "Line 1\nLine 2\nLine 3\nLine 4\nLine 5\nLine 6\nLine 7"
+            val multiLineNode = Node(parentNode = null, id = "m", numericId = 1, text = multiLineText, creationDate = 0L, modificationDate = 0L)
+            val fourLineText = "Line 1\nLine 2\nLine 3\nLine 4"
+            val fourLineNode = Node(parentNode = null, id = "f", numericId = 2, text = fourLineText, creationDate = 0L, modificationDate = 0L)
+
+            val multiLineSize = MindMapLayoutEngine.measureNode(multiLineNode, density = 1f)
+            val fourLineSize = MindMapLayoutEngine.measureNode(fourLineNode, density = 1f)
+
+            multiLineSize.second shouldBeGreaterThan fourLineSize.second
+        }
+
+        "measureNode scales height and width when custom fontSize is applied" {
+            val normalNode = Node(parentNode = null, id = "n", numericId = 1, text = "Font Scaling Text", creationDate = 0L, modificationDate = 0L)
+            val largeFontNode = Node(parentNode = null, id = "l", numericId = 2, text = "Font Scaling Text", fontSize = 20, creationDate = 0L, modificationDate = 0L)
+
+            val normalSize = MindMapLayoutEngine.measureNode(normalNode, density = 1f)
+            val largeSize = MindMapLayoutEngine.measureNode(largeFontNode, density = 1f)
+
+            largeSize.first shouldBeGreaterThan normalSize.first
+            largeSize.second shouldBeGreaterThan normalSize.second
+        }
     }
 }

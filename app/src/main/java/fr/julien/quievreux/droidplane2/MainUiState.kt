@@ -33,10 +33,12 @@ data class MainUiState(
         val onAction: (() -> Unit)? = null,
         val eventId: Long = System.currentTimeMillis(),
     )
+
     data class ErrorAction(
         val actionLabel: Int,
         val action: () -> Unit,
     )
+
     data class SearchUiState(
         val isSearchActive: Boolean = false,
         val searchQuery: String = "",
@@ -48,41 +50,55 @@ data class MainUiState(
         val dialogType: DialogType = DialogType.None
     )
 
-    sealed class DialogType{
-        data object None:DialogType()
+    sealed class DialogType {
+        data object None : DialogType()
         data class EditNodeDescription(
             val node: Node,
             val oldValue: String,
-        ):DialogType()
+        ) : DialogType()
 
         data class AddChildNode(
             val parentNode: Node,
-        ):DialogType()
+        ) : DialogType()
 
         data class DeleteConfirmation(
             val node: Node,
             val descendantCount: Int,
             val onConfirm: () -> Unit,
             val onCancel: () -> Unit,
-        ):DialogType()
+        ) : DialogType()
 
-    data class ExitConfirmation(
-        val onConfirm: () -> Unit,
-        val onCancel: () -> Unit,
-    ):DialogType()
+        data class ExitConfirmation(
+            val onConfirm: () -> Unit,
+            val onCancel: () -> Unit,
+        ) : DialogType()
 
-    data class DiscardConfirmation(
-        val onConfirm: () -> Unit,
-        val onCancel: () -> Unit,
-    ):DialogType()
+        data class DiscardConfirmation(
+            val onConfirm: () -> Unit,
+            val onCancel: () -> Unit,
+        ) : DialogType()
 
-    data class StartupChooser(
-        val recentFiles: List<RecentFile>,
-        val onNewMindmap: () -> Unit,
-        val onOpenRecent: (RecentFile) -> Unit,
-        val onBrowse: () -> Unit,
-        val onOpenDemo: () -> Unit,
-        val onDismiss: () -> Unit,
-    ):DialogType()
+        data class StartupChooser(
+            val recentFiles: List<RecentFile>,
+            val onNewMindmap: () -> Unit,
+            val onOpenRecent: (RecentFile) -> Unit,
+            val onBrowse: () -> Unit,
+            val onOpenDemo: () -> Unit,
+            val onDismiss: () -> Unit,
+        ) : DialogType()
+
+        data class NodePropertiesInspector(
+            val node: Node,
+            val initialTab: InspectorTab = InspectorTab.CONTENT,
+        ) : DialogType()
+    }
 }
+
+enum class InspectorTab {
+    CONTENT,
+    ATTRIBUTES_LINKS,
+    STYLING_CLOUD,
+    EDGES_CONNECTORS,
+    ICONS_MEDIA,
+    SCRIPTS,
 }

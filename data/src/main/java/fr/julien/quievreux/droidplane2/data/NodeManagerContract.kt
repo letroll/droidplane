@@ -50,6 +50,14 @@ interface NodeManagerContract {
     suspend fun updateNodeText(nodeId: String, newText: String): Node?
 
     /**
+     * Updates an entire node with new properties (text, details, notes,
+     * attributes, visual styling, cloud, edge, connectors, etc.),
+     * updating internal indexes and propagating changes through ancestors.
+     * Returns true if node was found and updated, false otherwise.
+     */
+    suspend fun updateNode(updatedNode: Node): Boolean
+
+    /**
      * Creates and attaches a new child node to parentNode with the provided text.
      * Returns the numeric ID of the newly created node, or null if creation failed.
      */

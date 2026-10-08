@@ -7,6 +7,9 @@ sealed class ContextMenuAction {
     data class Edit(
         val node: Node,
     ) : ContextMenuAction()
+    data class Properties(
+        val node: Node,
+    ) : ContextMenuAction()
     data class NodeLink(
         val node: Node,
     ) : ContextMenuAction()

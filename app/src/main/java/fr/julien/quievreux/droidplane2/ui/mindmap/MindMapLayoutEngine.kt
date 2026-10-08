@@ -27,6 +27,9 @@ data class BranchConnector(
     val endX: Float,
     val endY: Float,
     val direction: BranchDirection,
+    val color: String? = null,
+    val style: String? = null,
+    val width: String? = null,
 )
 
 data class MindMapLayoutResult(
@@ -42,6 +45,14 @@ object MindMapLayoutEngine {
 
     const val DEFAULT_HORIZONTAL_SPACING_DP = 56f
     const val DEFAULT_VERTICAL_SPACING_DP = 16f
+    const val CLOUD_EXTRA_VERTICAL_MARGIN_DP = 32f
+    const val CLOUD_EXTRA_HORIZONTAL_MARGIN_DP = 24f
+
+    private fun hasCloudInSubtree(node: Node, collapsedNodeIds: Set<String>): Boolean {
+        if (node.cloud != null) return true
+        if (collapsedNodeIds.contains(node.id)) return false
+        return node.childNodes.any { hasCloudInSubtree(it, collapsedNodeIds) }
+    }
 
     fun computeLayout(
         rootNode: Node,
@@ -186,10 +197,13 @@ object MindMapLayoutEngine {
             val isCollapsed = collapsedNodeIds.contains(child.id)
             val isSelected = selectedNodeId == child.id
 
+            val childHasCloud = child.cloud != null || hasCloudInSubtree(child, collapsedNodeIds)
+            val extraHorizontal = if (childHasCloud) CLOUD_EXTRA_HORIZONTAL_MARGIN_DP * density else 0f
+
             val childX = if (direction == BranchDirection.RIGHT) {
-                parentLayout.x + (parentLayout.width / 2) + horizontalSpacing + (childSize.first / 2)
+                parentLayout.x + (parentLayout.width / 2) + horizontalSpacing + extraHorizontal + (childSize.first / 2)
             } else {
-                parentLayout.x - (parentLayout.width / 2) - horizontalSpacing - (childSize.first / 2)
+                parentLayout.x - (parentLayout.width / 2) - horizontalSpacing - extraHorizontal - (childSize.first / 2)
             }
 
             val childLayout = MindMapNodeLayout(
@@ -229,6 +243,9 @@ object MindMapLayoutEngine {
                     endX = endX,
                     endY = endY,
                     direction = direction,
+                    color = child.edge?.color,
+                    style = child.edge?.style,
+                    width = child.edge?.width,
                 )
             )
 
@@ -260,15 +277,17 @@ object MindMapLayoutEngine {
         fetchText: (Node) -> String?,
     ): Float {
         val selfHeight = measureNode(node, density, fetchText).second
+        val cloudMargin = if (node.cloud != null) CLOUD_EXTRA_VERTICAL_MARGIN_DP * density else 0f
+
         if (collapsedNodeIds.contains(node.id) || node.childNodes.isEmpty()) {
-            return selfHeight
+            return selfHeight + cloudMargin
         }
 
         val childHeights = node.childNodes.sumOf { child ->
             computeSubtreeHeight(child, collapsedNodeIds, density, verticalSpacing, fetchText).toDouble()
         }.toFloat() + (node.childNodes.size - 1) * verticalSpacing
 
-        return maxOf(selfHeight, childHeights)
+        return maxOf(selfHeight, childHeights) + cloudMargin
     }
 
     fun measureNode(
@@ -280,34 +299,46 @@ object MindMapLayoutEngine {
         val isRoot = node.parentNode == null
         val hasChildren = node.childNodes.isNotEmpty()
 
-        // Character width in DP
-        val charWidthDp = if (isRoot) 9.0f else 7.5f
-        val horizontalPaddingDp = 24f // 12.dp start + 12.dp end
-        val foldIndicatorDp = if (hasChildren && !isRoot) 28f else 0f // 20.dp icon + 8.dp margin
-        val verticalPaddingDp = 16f // 8.dp top + 8.dp bottom
-        val lineHeightDp = if (isRoot) 20f else 17f
-        val maxTextWidthDp = 240f
+        val fontSize = node.fontSize?.toFloat() ?: (if (isRoot) 15f else 13f)
+        val charWidthDp = fontSize * (if (node.isBold || isRoot) 0.65f else 0.58f)
+        val lineHeightDp = fontSize * 1.38f
+        val horizontalPaddingDp = 28f
+        val foldIndicatorDp = if (hasChildren && !isRoot) 28f else 0f
+        val verticalPaddingDp = 20f
+        val maxTextWidthDp = if (isRoot) 280f else 260f
 
         val rawLines = text.split("\n")
         var totalLines = 0
         var maxLineWidthDp = 0f
 
         rawLines.forEach { rawLine ->
-            val lineWidthDp = rawLine.length * charWidthDp
-            maxLineWidthDp = maxOf(maxLineWidthDp, minOf(lineWidthDp, maxTextWidthDp))
-            val wrappedLines = if (lineWidthDp > maxTextWidthDp) {
-                (lineWidthDp / maxTextWidthDp).toInt() + 1
+            if (rawLine.isBlank()) {
+                totalLines += 1
             } else {
-                1
+                val words = rawLine.split(" ")
+                var currentLineWidth = 0f
+                var lineCountForParagraph = 1
+
+                words.forEach { word ->
+                    val wordWidth = word.length * charWidthDp
+                    val spaceWidth = charWidthDp
+                    if (currentLineWidth + wordWidth <= maxTextWidthDp) {
+                        currentLineWidth += wordWidth + spaceWidth
+                    } else {
+                        lineCountForParagraph += 1
+                        currentLineWidth = wordWidth + spaceWidth
+                    }
+                    maxLineWidthDp = maxOf(maxLineWidthDp, minOf(currentLineWidth, maxTextWidthDp))
+                }
+                totalLines += lineCountForParagraph
             }
-            totalLines += wrappedLines
         }
 
-        val displayLines = totalLines.coerceIn(1, 4)
+        val displayLines = totalLines.coerceAtLeast(1)
 
         val totalWidthDp = (maxLineWidthDp + horizontalPaddingDp + foldIndicatorDp)
-            .coerceIn(60f, maxTextWidthDp + horizontalPaddingDp + foldIndicatorDp)
-        val totalHeightDp = (displayLines * lineHeightDp + verticalPaddingDp).coerceAtLeast(36f)
+            .coerceIn(70f, maxTextWidthDp + horizontalPaddingDp + foldIndicatorDp)
+        val totalHeightDp = (displayLines * lineHeightDp + verticalPaddingDp).coerceAtLeast(38f)
 
         return Pair(totalWidthDp * density, totalHeightDp * density)
     }

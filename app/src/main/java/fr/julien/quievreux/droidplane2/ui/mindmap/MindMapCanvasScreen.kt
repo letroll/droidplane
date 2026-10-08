@@ -38,6 +38,7 @@ fun MindMapCanvasScreen(
     treeVersion: Long = 0L,
     onNodeSelect: (Node) -> Unit,
     onNodeToggleCollapse: (Node) -> Unit,
+    onNodeDoubleClick: (Node) -> Unit = {},
     onNodeContextMenuClick: (ContextMenuAction) -> Unit = {},
     fetchText: (Node) -> String? = { it.text },
     modifier: Modifier = Modifier,
@@ -91,7 +92,51 @@ fun MindMapCanvasScreen(
                     translationY = panOffset.y
                 }
         ) {
-            // Draw branch connectors with coordinates offset from canvas center
+            // Compute cloud enclosures enclosing nodes and their subtrees
+            val centeredClouds = remember(layoutResult.nodes, centerX, centerY, density.density) {
+                val cloudsList = mutableListOf<CloudEnclosure>()
+                val padding = 12f * density.density
+
+                layoutResult.nodes.forEach { nodeLayout ->
+                    val cloud = nodeLayout.node.cloud
+                    if (cloud != null) {
+                        val descendantIds = mutableSetOf<String>()
+                        fun collectDescendants(n: Node) {
+                            descendantIds.add(n.id)
+                            n.childNodes.forEach { collectDescendants(it) }
+                        }
+                        collectDescendants(nodeLayout.node)
+
+                        val subtreeLayouts = layoutResult.nodes.filter { descendantIds.contains(it.node.id) }
+                        if (subtreeLayouts.isNotEmpty()) {
+                            val minX = subtreeLayouts.minOf { it.x - it.width / 2f }
+                            val maxX = subtreeLayouts.maxOf { it.x + it.width / 2f }
+                            val minY = subtreeLayouts.minOf { it.y - it.height / 2f }
+                            val maxY = subtreeLayouts.maxOf { it.y + it.height / 2f }
+
+                            cloudsList.add(
+                                CloudEnclosure(
+                                    node = nodeLayout.node,
+                                    cloud = cloud,
+                                    left = centerX + minX - padding,
+                                    top = centerY + minY - padding,
+                                    right = centerX + maxX + padding,
+                                    bottom = centerY + maxY + padding,
+                                )
+                            )
+                        }
+                    }
+                }
+                cloudsList
+            }
+
+            // 1. Draw Clouds Layer (behind branches and nodes)
+            MindMapCloudLayer(
+                clouds = centeredClouds,
+                modifier = Modifier.fillMaxSize(),
+            )
+
+            // 2. Draw branch connectors with coordinates offset from canvas center
             val centeredConnectors = remember(layoutResult.connectors, centerX, centerY) {
                 layoutResult.connectors.map { c ->
                     c.copy(
@@ -109,7 +154,7 @@ fun MindMapCanvasScreen(
                 modifier = Modifier.fillMaxSize(),
             )
 
-            // Render positioned nodes
+            // 3. Render positioned nodes
             layoutResult.nodes.forEach { nodeLayout ->
                 val nodeLeftPx = centerX + nodeLayout.x - (nodeLayout.width / 2f)
                 val nodeTopPx = centerY + nodeLayout.y - (nodeLayout.height / 2f)
@@ -124,6 +169,7 @@ fun MindMapCanvasScreen(
                     branchDirection = nodeLayout.branchDirection,
                     onNodeClick = { onNodeSelect(nodeLayout.node) },
                     onToggleCollapse = { onNodeToggleCollapse(nodeLayout.node) },
+                    onNodeDoubleClick = { onNodeDoubleClick(nodeLayout.node) },
                     onContextMenuAction = onNodeContextMenuClick,
                     fetchText = fetchText,
                     modifier = Modifier

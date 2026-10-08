@@ -28,6 +28,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontStyle
@@ -50,6 +51,7 @@ fun MindMapNodeCard(
     branchDirection: BranchDirection,
     onNodeClick: () -> Unit,
     onToggleCollapse: () -> Unit,
+    onNodeDoubleClick: (() -> Unit)? = null,
     onContextMenuAction: (ContextMenuAction) -> Unit = {},
     fetchText: (Node) -> String? = { it.text },
     modifier: Modifier = Modifier,
@@ -60,22 +62,34 @@ fun MindMapNodeCard(
     val isRoot = branchDirection == BranchDirection.ROOT
     val displayText = fetchText(node)?.ifEmpty { " " } ?: node.text.orEmpty().ifEmpty { " " }
 
-    val shape = if (isRoot) RoundedCornerShape(16.dp) else RoundedCornerShape(8.dp)
+    val shape = when (node.style) {
+        "bubble", "oval" -> androidx.compose.foundation.shape.CircleShape
+        "rectangle" -> RoundedCornerShape(2.dp)
+        "fork" -> RoundedCornerShape(topStart = 0.dp, bottomStart = 0.dp, topEnd = 8.dp, bottomEnd = 8.dp)
+        else -> if (isRoot) RoundedCornerShape(16.dp) else RoundedCornerShape(8.dp)
+    }
 
-    val containerColor = when {
+    val customBgColor: Color? = node.backgroundColor?.let { parseHexColor(it) }
+    val customTextColor: Color? = node.color?.let { parseHexColor(it) }
+    val cloudColor: Color? = node.cloud?.color?.let { parseHexColor(it) }
+
+    val containerColor: Color = when {
         isSelected -> MaterialTheme.colorScheme.primaryContainer
+        customBgColor != null -> customBgColor
         isRoot -> MaterialTheme.colorScheme.secondaryContainer
         else -> MaterialTheme.colorScheme.surface
     }
 
-    val contentColor = when {
+    val contentColor: Color = when {
         isSelected -> MaterialTheme.colorScheme.onPrimaryContainer
+        customTextColor != null -> customTextColor
         isRoot -> MaterialTheme.colorScheme.onSecondaryContainer
         else -> MaterialTheme.colorScheme.onSurface
     }
 
     val border = when {
         isSelected -> BorderStroke(2.dp, MaterialTheme.colorScheme.primary)
+        cloudColor != null -> BorderStroke(2.dp, cloudColor)
         isRoot -> BorderStroke(1.5.dp, MaterialTheme.colorScheme.secondary)
         else -> BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
     }
@@ -86,6 +100,7 @@ fun MindMapNodeCard(
                 .fillMaxSize()
                 .combinedClickable(
                     onClick = onNodeClick,
+                    onDoubleClick = onNodeDoubleClick,
                     onLongClick = { showMenu = true },
                 ),
             shape = shape,
@@ -101,18 +116,30 @@ fun MindMapNodeCard(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween,
             ) {
-                Text(
-                    text = displayText,
-                    style = MaterialTheme.typography.bodyMedium.copy(
-                        fontSize = if (isRoot) 15.sp else 13.sp,
-                        fontWeight = if (node.isBold || isRoot) FontWeight.Bold else FontWeight.Normal,
-                        fontStyle = if (node.isItalic) FontStyle.Italic else FontStyle.Normal,
-                        lineHeight = if (isRoot) 19.sp else 16.sp,
-                    ),
-                    maxLines = 4,
-                    overflow = TextOverflow.Ellipsis,
+                Row(
                     modifier = Modifier.weight(1f, fill = false),
-                )
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    if (node.cloud != null) {
+                        Text(
+                            text = "☁",
+                            fontSize = 12.sp,
+                            color = cloudColor ?: MaterialTheme.colorScheme.primary
+                        )
+                    }
+                    Text(
+                        text = displayText,
+                        style = MaterialTheme.typography.bodyMedium.copy(
+                            fontSize = node.fontSize?.sp ?: (if (isRoot) 15.sp else 13.sp),
+                            fontWeight = if (node.isBold || isRoot) FontWeight.Bold else FontWeight.Normal,
+                            fontStyle = if (node.isItalic) FontStyle.Italic else FontStyle.Normal,
+                            lineHeight = (node.fontSize?.let { (it * 1.35f).sp }) ?: (if (isRoot) 19.sp else 16.sp),
+                        ),
+                        maxLines = 100,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
 
                 if (hasChildren && !isRoot) {
                     FoldIndicator(
@@ -133,6 +160,13 @@ fun MindMapNodeCard(
                 onClick = {
                     showMenu = false
                     onContextMenuAction(ContextMenuAction.Edit(node))
+                },
+            )
+            DropdownMenuItem(
+                text = { Text(stringResource(R.string.node_properties)) },
+                onClick = {
+                    showMenu = false
+                    onContextMenuAction(ContextMenuAction.Properties(node))
                 },
             )
             DropdownMenuItem(
@@ -236,3 +270,18 @@ fun PreviewMindMapNodeCardRoot() {
         )
     }
 }
+
+private fun parseHexColor(hex: String): Color? {
+    return try {
+        val clean = hex.removePrefix("#")
+        val colorInt = when (clean.length) {
+            6 -> 0xFF000000.toInt() or clean.toInt(16)
+            8 -> clean.toLong(16).toInt()
+            else -> return null
+        }
+        Color(colorInt)
+    } catch (e: Exception) {
+        null
+    }
+}
+
