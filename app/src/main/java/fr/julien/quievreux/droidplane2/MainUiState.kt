@@ -47,27 +47,41 @@ data class MainUiState(
         val dialogType: DialogType = DialogType.None
     )
 
-    sealed class DialogType{
-        data object None:DialogType()
+    sealed class DialogType {
+        data object None : DialogType()
         data class EditNodeDescription(
             val node: Node,
             val oldValue: String,
-        ):DialogType()
+        ) : DialogType()
 
         data class AddChildNode(
             val parentNode: Node,
-        ):DialogType()
+        ) : DialogType()
 
         data class DeleteConfirmation(
             val node: Node,
             val descendantCount: Int,
             val onConfirm: () -> Unit,
             val onCancel: () -> Unit,
-        ):DialogType()
+        ) : DialogType()
 
-    data class ExitConfirmation(
-        val onConfirm: () -> Unit,
-        val onCancel: () -> Unit,
-    ):DialogType()
+        data class ExitConfirmation(
+            val onConfirm: () -> Unit,
+            val onCancel: () -> Unit,
+        ) : DialogType()
+
+        data class NodePropertiesInspector(
+            val node: Node,
+            val initialTab: InspectorTab = InspectorTab.CONTENT,
+        ) : DialogType()
+    }
 }
+
+enum class InspectorTab {
+    CONTENT,
+    ATTRIBUTES_LINKS,
+    STYLING_CLOUD,
+    EDGES_CONNECTORS,
+    ICONS_MEDIA,
+    SCRIPTS,
 }

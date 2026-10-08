@@ -28,6 +28,7 @@ import org.xmlpull.v1.XmlSerializer
 import java.io.File
 import java.io.FileOutputStream
 import java.io.InputStream
+import java.io.StringReader
 import kotlin.math.abs
 import kotlin.random.Random
 
@@ -220,11 +221,19 @@ class NodeManager(
 
                 xpp.isRichContent() -> parseRichContent(xpp, nodes)
 
-                xpp.name == Font.value -> parseFont(xpp, nodes)
+                xpp.name == Font.value || xpp.name == NodeTag.FONT.text -> parseFont(xpp, nodes)
 
-                xpp.isIcon() -> parseIcon(xpp, nodes)
+                xpp.isIcon() || xpp.name == NodeTag.ICON.text -> parseIcon(xpp, nodes)
 
-                xpp.name == ArrowLink.value -> parseArrowLink(xpp, nodes)
+                xpp.name == ArrowLink.value || xpp.name == NodeTag.ARROWLINK.text -> parseArrowLink(xpp, nodes)
+
+                xpp.name == NodeTag.ATTRIBUTE.text -> parseAttribute(xpp, nodes)
+
+                xpp.name == NodeTag.CLOUD.text -> parseCloud(xpp, nodes)
+
+                xpp.name == NodeTag.EDGE.text -> parseEdge(xpp, nodes)
+
+                xpp.name == NodeTag.HOOK.text -> parseHook(xpp, nodes)
 
                 else -> {
 //                logger.w("Received unknown node " + xpp.name)
@@ -274,13 +283,21 @@ class NodeManager(
             }
 
             // if this is a rich text node, get the HTML content instead
-            if (actualNode.text == null && actualNode.richTextContents.isNotEmpty()) {
-                val richTextContent = actualNode.richTextContents.first()
-                return Html.fromHtml(richTextContent).toString()
+            if (actualNode.text.isNullOrBlank()) {
+                val richContent = actualNode.richText ?: actualNode.richTextContents.firstOrNull()
+                if (richContent != null) {
+                    return Html.fromHtml(richContent).toString().trim()
+                }
             }
 
             return actualNode.text
         } ?: run {
+            if (node.text.isNullOrBlank()) {
+                val richContent = node.richText ?: node.richTextContents.firstOrNull()
+                if (richContent != null) {
+                    return Html.fromHtml(richContent).toString().trim()
+                }
+            }
             return node.text
         }
     }
@@ -521,34 +538,49 @@ class NodeManager(
             node.position?.let {
                 serializer.nodeAttribute(POSITION, it)
             }
-            if (node.richTextContents.isNotEmpty()) {
-                serializer.text("$CHARIOT_RETURN${getTabsForDepth(depth + 1)}")
-                serializer.startNodeTag(RICH_CONTENT)
-                serializer.nodeAttribute(TYPE, node.richContentType?.text.orEmpty())
-                node.richTextContents.forEach { richTextContent ->
-                    val cleanedText = richTextContent.replace('\u00A0', ' ').replace("&#160;", " ")
-                    serializer.cdsect(cleanedText)
-                }
-                serializer.text(CHARIOT_RETURN)
-                serializer.endNodeTag(RICH_CONTENT)
-                serializer.text(CHARIOT_RETURN)
+            node.color?.let { serializer.nodeAttribute(COLOR, it) }
+            node.backgroundColor?.let { serializer.nodeAttribute(BACKGROUND_COLOR, it) }
+            node.style?.let { serializer.nodeAttribute(STYLE, it) }
+            if (node.isFolded) {
+                serializer.nodeAttribute(FOLDED, "true")
             }
-
-            //TODO Add other attributes as needed (icon, link, format, etc.)
+            node.hgap?.let { serializer.nodeAttribute(HGAP, it.toString()) }
+            node.vgap?.let { serializer.nodeAttribute(VGAP, it.toString()) }
+            node.vshift?.let { serializer.nodeAttribute(VSHIFT, it.toString()) }
             node.link?.let { link -> serializer.nodeAttribute(LINK, link.toString()) }
 
-            // Serialize arrow links
-            if (node.arrowLinkDestinationIds.isNotEmpty()) {
-                node.arrowLinkDestinationIds.forEach { arrowLinkId ->
-                    serializer.text("$CHARIOT_RETURN${getTabsForDepth(depth + 1)}")
-                    serializer.startNodeTag(ARROWLINK)
-                    serializer.nodeAttribute(DESTINATION, arrowLinkId)
-                    // Add other arrowLink attributes as needed
-                    serializer.endNodeTag(ARROWLINK)
-                }
+            // 1. Edge to parent
+            node.edge?.let { edgeProps ->
+                serializer.text("$CHARIOT_RETURN${getTabsForDepth(depth + 1)}")
+                serializer.startNodeTag(NodeTag.EDGE)
+                edgeProps.color?.let { c -> serializer.nodeAttribute(COLOR, c) }
+                edgeProps.style?.let { s -> serializer.nodeAttribute(STYLE, s) }
+                edgeProps.width?.let { w -> serializer.nodeAttribute(WIDTH, w) }
+                serializer.endNodeTag(NodeTag.EDGE)
             }
 
-            // Serialize icons
+            // 2. Font specification
+            if (node.isItalic || node.isBold || node.fontName != null || node.fontSize != null) {
+                serializer.text("$CHARIOT_RETURN${getTabsForDepth(depth + 1)}")
+                serializer.startNodeTag(FONT)
+                if (node.isItalic) serializer.nodeAttribute(ITALIC, "true")
+                if (node.isBold) serializer.nodeAttribute(BOLD, "true")
+                node.fontName?.let { fn -> serializer.nodeAttribute(NAME, fn) }
+                node.fontSize?.let { fs -> serializer.nodeAttribute(SIZE, fs.toString()) }
+                serializer.endNodeTag(FONT)
+            }
+
+            // 3. Cloud grouping
+            node.cloud?.let { cloudProps ->
+                serializer.text("$CHARIOT_RETURN${getTabsForDepth(depth + 1)}")
+                serializer.startNodeTag(NodeTag.CLOUD)
+                cloudProps.color?.let { c -> serializer.nodeAttribute(COLOR, c) }
+                cloudProps.shape?.let { s -> serializer.nodeAttribute(SHAPE, s) }
+                cloudProps.width?.let { w -> serializer.nodeAttribute(WIDTH, w.toString()) }
+                serializer.endNodeTag(NodeTag.CLOUD)
+            }
+
+            // 4. Icons
             if (node.iconNames.isNotEmpty()) {
                 node.iconNames.forEach { iconName ->
                     serializer.text("$CHARIOT_RETURN${getTabsForDepth(depth + 1)}")
@@ -558,13 +590,96 @@ class NodeManager(
                 }
             }
 
-            // Serialize font styles
-            if (node.isItalic || node.isBold) {
+            // 5. Freeplane Rich Content Elements (NODE, DETAILS, NOTE)
+            node.richText?.let { richText ->
+                serializeRichContent(serializer, "NODE", richText, depth + 1)
+            } ?: run {
+                if (node.richTextContents.isNotEmpty() && (node.richContentType == null || node.richContentType?.text == "NODE")) {
+                    node.richTextContents.forEach { richTextContent ->
+                        serializeRichContent(serializer, "NODE", richTextContent, depth + 1)
+                    }
+                }
+            }
+
+            node.detailsText?.let { details ->
+                serializeRichContent(serializer, "DETAILS", details, depth + 1)
+            }
+
+            node.noteText?.let { note ->
+                serializeRichContent(serializer, "NOTE", note, depth + 1)
+            }
+
+            // 6. Attributes table
+            if (node.attributes.isNotEmpty()) {
+                node.attributes.forEach { attributeEntry ->
+                    serializer.text("$CHARIOT_RETURN${getTabsForDepth(depth + 1)}")
+                    serializer.startNodeTag(NodeTag.ATTRIBUTE)
+                    serializer.nodeAttribute(NAME, attributeEntry.name)
+                    serializer.nodeAttribute(VALUE, attributeEntry.value)
+                    attributeEntry.type?.let { t ->
+                        serializer.nodeAttribute(TYPE, t)
+                    }
+                    serializer.endNodeTag(NodeTag.ATTRIBUTE)
+                }
+            }
+
+            // 7. Arrow links / Connectors
+            if (node.connectors.isNotEmpty()) {
+                node.connectors.forEach { connector ->
+                    serializer.text("$CHARIOT_RETURN${getTabsForDepth(depth + 1)}")
+                    serializer.startNodeTag(ARROWLINK)
+                    serializer.nodeAttribute(DESTINATION, connector.destinationId)
+                    connector.color?.let { c -> serializer.nodeAttribute(COLOR, c) }
+                    connector.startArrow?.let { sa -> serializer.nodeAttribute(STARTARROW, sa) }
+                    connector.endArrow?.let { ea -> serializer.nodeAttribute(ENDARROW, ea) }
+                    connector.startInclination?.let { si -> serializer.nodeAttribute(STARTINCLINATION, si) }
+                    connector.endInclination?.let { ei -> serializer.nodeAttribute(ENDINCLINATION, ei) }
+                    connector.sourceLabel?.let { sl -> serializer.nodeAttribute(SOURCE_LABEL, sl) }
+                    connector.middleLabel?.let { ml -> serializer.nodeAttribute(MIDDLE_LABEL, ml) }
+                    connector.targetLabel?.let { tl -> serializer.nodeAttribute(TARGET_LABEL, tl) }
+                    if (connector.edgeLike) {
+                        serializer.nodeAttribute(EDGE_LIKE, "true")
+                    }
+                    serializer.endNodeTag(ARROWLINK)
+                }
+            } else if (node.arrowLinkDestinationIds.isNotEmpty()) {
+                node.arrowLinkDestinationIds.forEach { arrowLinkId ->
+                    serializer.text("$CHARIOT_RETURN${getTabsForDepth(depth + 1)}")
+                    serializer.startNodeTag(ARROWLINK)
+                    serializer.nodeAttribute(DESTINATION, arrowLinkId)
+                    serializer.endNodeTag(ARROWLINK)
+                }
+            }
+
+            // 8. Hooks (External Objects, LaTeX, Generic Hooks)
+            node.externalObject?.let { extObj ->
                 serializer.text("$CHARIOT_RETURN${getTabsForDepth(depth + 1)}")
-                serializer.startNodeTag(FONT)
-                if (node.isItalic) serializer.nodeAttribute(ITALIC, "true")
-                if (node.isBold) serializer.nodeAttribute(BOLD, "true")
-                serializer.endNodeTag(FONT)
+                serializer.startNodeTag(NodeTag.HOOK)
+                serializer.nodeAttribute(NAME, "ExternalObject")
+                serializer.nodeAttribute(URI, extObj.uri)
+                extObj.size?.let { s -> serializer.nodeAttribute(SIZE, s.toString()) }
+                serializer.endNodeTag(NodeTag.HOOK)
+            }
+
+            node.latexEquation?.let { eq ->
+                serializer.text("$CHARIOT_RETURN${getTabsForDepth(depth + 1)}")
+                serializer.startNodeTag(NodeTag.HOOK)
+                serializer.nodeAttribute(NAME, "plugins/latex/LatexNodeHook.properties")
+                serializer.nodeAttribute(EQUATION, eq)
+                serializer.endNodeTag(NodeTag.HOOK)
+            }
+
+            if (node.genericHooks.isNotEmpty()) {
+                node.genericHooks.forEach { hook ->
+                    serializer.text("$CHARIOT_RETURN${getTabsForDepth(depth + 1)}")
+                    serializer.startNodeTag(NodeTag.HOOK)
+                    serializer.nodeAttribute(NAME, hook.name)
+                    hook.attributes.forEach { (k, v) ->
+                        serializer.attribute(null, k, v)
+                    }
+                    hook.textContent?.let { text -> serializer.text(text) }
+                    serializer.endNodeTag(NodeTag.HOOK)
+                }
             }
 
             // Serialize child nodes recursively using the childrenByParentId map
@@ -598,6 +713,56 @@ class NodeManager(
         value: String,
     ) {
         attribute(null, nodeAttribute.text, value)
+    }
+
+    private fun serializeRichContent(
+        serializer: XmlSerializer,
+        type: String,
+        content: String,
+        depth: Int,
+    ) {
+        serializer.text("$CHARIOT_RETURN${getTabsForDepth(depth)}")
+        serializer.startNodeTag(NodeTag.RICH_CONTENT)
+        serializer.nodeAttribute(NodeAttribute.TYPE, type)
+        val formattedContent = if (content.contains("<html", ignoreCase = true)) {
+            content
+        } else {
+            "<html><head></head><body><p>$content</p></body></html>"
+        }
+        writeRawXmlToSerializer(serializer, formattedContent)
+        serializer.text("$CHARIOT_RETURN${getTabsForDepth(depth)}")
+        serializer.endNodeTag(NodeTag.RICH_CONTENT)
+    }
+
+    private fun writeRawXmlToSerializer(serializer: XmlSerializer, xmlString: String) {
+        try {
+            val factory = XmlPullParserFactory.newInstance()
+            val parser = factory.newPullParser()
+            parser.setInput(StringReader(xmlString))
+            var eventType = parser.eventType
+            while (eventType != XmlPullParser.END_DOCUMENT) {
+                when (eventType) {
+                    XmlPullParser.START_TAG -> {
+                        serializer.startTag(null, parser.name)
+                        for (i in 0 until parser.attributeCount) {
+                            serializer.attribute(null, parser.getAttributeName(i), parser.getAttributeValue(i))
+                        }
+                    }
+                    XmlPullParser.END_TAG -> {
+                        serializer.endTag(null, parser.name)
+                    }
+                    XmlPullParser.TEXT -> {
+                        serializer.text(parser.text)
+                    }
+                    XmlPullParser.CDSECT -> {
+                        serializer.cdsect(parser.text)
+                    }
+                }
+                eventType = parser.next()
+            }
+        } catch (e: Exception) {
+            serializer.text(xmlString)
+        }
     }
 
     /**
@@ -710,6 +875,47 @@ class NodeManager(
         }
 
         return updatedNode
+    }
+
+    override suspend fun updateNode(updatedNode: Node): Boolean {
+        val targetNode = getNodeByID(updatedNode.id) ?: return false
+        val time = System.currentTimeMillis()
+        val nodeWithTimestamp = updatedNode.copy(
+            modificationDate = time,
+        )
+
+        val updatedNodesMap = mutableMapOf<String, Node>()
+        updatedNodesMap[nodeWithTimestamp.id] = nodeWithTimestamp
+
+        val parent = nodeWithTimestamp.parentNode ?: targetNode.parentNode
+        if (parent != null) {
+            val currentParent = getNodeByID(parent.id) ?: parent
+            val childIdx = currentParent.childNodes.indexOfFirst { it.id == nodeWithTimestamp.id }
+            val newChildren = currentParent.childNodes.toMutableList()
+            if (childIdx != -1) {
+                newChildren[childIdx] = nodeWithTimestamp
+            } else {
+                newChildren.add(nodeWithTimestamp)
+            }
+            val updatedParent = currentParent.copy(
+                childNodes = newChildren,
+                modificationDate = time,
+            )
+            updatedNodesMap[updatedParent.id] = updatedParent
+            propagateUpdatedParentToRoot(updatedParent, updatedNodesMap)
+        } else if (nodeWithTimestamp.id == rootNode?.id) {
+            rootNode = nodeWithTimestamp
+        }
+
+        _allNodes.update { nodes ->
+            nodes.map { node ->
+                updatedNodesMap[node.id] ?: node
+            }
+        }
+
+        updatemMindmapIndexes(nodeUtils.loadAndIndexNodesByIds(rootNode))
+
+        return true
     }
 
     private fun updateDescendantParents(node: Node, updatedNodesMap: MutableMap<String, Node>): Node {

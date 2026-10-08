@@ -147,6 +147,13 @@ class NodeUtilsDefaultImpl : NodeUtils {
         val modificationDate = xpp.getNodeAttribute(MODIFIED)?.takeIf { it.isNotEmpty() }?.toLong()
 
         val position = xpp.getNodeAttribute(POSITION)?.takeIf { it.isNotEmpty() }
+        val color = xpp.getNodeAttribute(COLOR)
+        val backgroundColor = xpp.getNodeAttribute(BACKGROUND_COLOR)
+        val style = xpp.getNodeAttribute(STYLE)
+        val isFolded = xpp.getNodeAttribute(FOLDED)?.equals("true", ignoreCase = true) ?: false
+        val hgap = xpp.getNodeAttribute(HGAP)?.toIntOrNull()
+        val vgap = xpp.getNodeAttribute(VGAP)?.toIntOrNull()
+        val vshift = xpp.getNodeAttribute(VSHIFT)?.toIntOrNull()
 
         // get link
         val linkAttribute = xpp.getNodeAttribute(LINK)
@@ -171,6 +178,13 @@ class NodeUtilsDefaultImpl : NodeUtils {
             creationDate = creationDate,
             modificationDate = modificationDate,
             position = position,
+            color = color,
+            backgroundColor = backgroundColor,
+            style = style,
+            isFolded = isFolded,
+            hgap = hgap,
+            vgap = vgap,
+            vshift = vshift,
         )
         Result.success(newNode)
     } catch (exception: Exception) {

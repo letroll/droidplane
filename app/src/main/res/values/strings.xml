@@ -35,4 +35,75 @@
     <string name="undo">Undo</string>
     <string name="switch_to_mindmap_view">Mind Map View</string>
     <string name="switch_to_list_view">List View</string>
+
+    <!-- Node Properties Inspector -->
+    <string name="node_properties">Properties</string>
+    <string name="save_properties">Save Properties</string>
+    <string name="tab_content">Content</string>
+    <string name="tab_attributes">Attributes</string>
+    <string name="tab_styling">Styling</string>
+    <string name="tab_edges_connectors">Connectors</string>
+    <string name="tab_icons_media">Media</string>
+    <string name="tab_scripts">Scripts</string>
+
+    <!-- Content Tab -->
+    <string name="node_title">Title</string>
+    <string name="details">Details</string>
+    <string name="notes">Notes</string>
+    <string name="latex_formula">LaTeX Formula</string>
+    <string name="rich_text">Rich Text</string>
+    <string name="preview_mode">Preview</string>
+    <string name="source_mode">Source</string>
+
+    <!-- Attributes Tab -->
+    <string name="attributes">Attributes</string>
+    <string name="attribute_name">Name</string>
+    <string name="attribute_value">Value</string>
+    <string name="add_attribute">Add Attribute</string>
+    <string name="delete_attribute">Delete Attribute</string>
+    <string name="hyperlink">Hyperlink / Internal Link</string>
+
+    <!-- Styling Tab -->
+    <string name="styling">Styling</string>
+    <string name="text_color">Text Color</string>
+    <string name="background_color">Background Color</string>
+    <string name="node_shape">Shape</string>
+    <string name="shape_fork">Fork</string>
+    <string name="shape_bubble">Bubble</string>
+    <string name="shape_oval">Oval</string>
+    <string name="shape_rectangle">Rectangle</string>
+    <string name="font_size">Font Size</string>
+    <string name="bold">Bold</string>
+    <string name="italic">Italic</string>
+    <string name="cloud_grouping">Cloud Grouping</string>
+    <string name="cloud_enabled">Enable Cloud</string>
+    <string name="cloud_color">Cloud Color</string>
+    <string name="cloud_shape">Cloud Shape</string>
+    <string name="move_cloud_to_parent">Extend Cloud to Parent</string>
+    <string name="absorb_child_clouds">Enclose in Common Cloud</string>
+    <string name="enclosed_in_parent_cloud">Enclosed in parent cloud (%1$s)</string>
+
+    <!-- Edges & Connectors Tab -->
+    <string name="edge_styling">Branch Edge</string>
+    <string name="edge_style">Line Style</string>
+    <string name="edge_width">Line Width</string>
+    <string name="edge_color">Edge Color</string>
+    <string name="connectors">Connectors (Arrow Links)</string>
+    <string name="add_connector">Add Connector</string>
+    <string name="destination_node">Destination Node ID</string>
+    <string name="connector_color">Connector Color</string>
+    <string name="source_label">Source Label</string>
+    <string name="middle_label">Middle Label</string>
+    <string name="target_label">Target Label</string>
+
+    <!-- Icons & Media Tab -->
+    <string name="icons">Icons</string>
+    <string name="external_object">External Image / Media</string>
+    <string name="image_uri">URI</string>
+    <string name="image_scale">Scale Factor</string>
+
+    <!-- Scripts Tab -->
+    <string name="scripts_hooks">Script Hooks &amp; Add-ons</string>
+    <string name="script_content">Script Content</string>
+    <string name="no_scripts">No embedded script hooks found on this node.</string>
 </resources>

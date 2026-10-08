@@ -80,10 +80,58 @@
 <node TEXT="External Links (URLs) are opened with the default Android app to open such links." ID="ID_1317751350" CREATED="1545755498137" MODIFIED="1545755520971" LINK="http://benediktkoeppel.ch"/>
 </node>
 </node>
-<node TEXT="Editing" POSITION="bottom_or_right" ID="ID_1832587474" CREATED="1363243888925" MODIFIED="1363254070139">
-<icon BUILTIN="full-3"/>
-<node TEXT="Editing is currently not possible. But it is on the list of future features." ID="ID_400456261" CREATED="1363243890193" MODIFIED="1363523488295">
-<arrowlink SHAPE="CUBIC_CURVE" COLOR="#000000" WIDTH="2" TRANSPARENCY="50" FONT_SIZE="9" FONT_FAMILY="SansSerif" DESTINATION="ID_624973113" STARTINCLINATION="253.49999 pt;0 pt;" ENDINCLINATION="253.49999 pt;0 pt;" STARTARROW="NONE" ENDARROW="DEFAULT"/>
+<node TEXT="Editing &amp; Properties" POSITION="bottom_or_right" ID="ID_1832587474" CREATED="1363243888925" MODIFIED="1363254070139">
+<icon BUILTIN="pencil"/>
+<node TEXT="Tap ... on any node and select 'Properties' to open the Inspector" ID="ID_EDIT_HELP_1"/>
+<node TEXT="Node Shapes (STYLE)" ID="ID_SHAPES_DEMO">
+  <node TEXT="Bubble Shape" ID="ID_SHAPE_BUBBLE" STYLE="bubble" COLOR="#003366" BACKGROUND_COLOR="#E1F5FE"/>
+  <node TEXT="Rectangle Shape" ID="ID_SHAPE_RECT" STYLE="rectangle" COLOR="#D32F2F" BACKGROUND_COLOR="#FFF9C4"/>
+  <node TEXT="Fork Shape" ID="ID_SHAPE_FORK" STYLE="fork" COLOR="#388E3C" BACKGROUND_COLOR="#F1F8E9"/>
+  <node TEXT="Oval Shape" ID="ID_SHAPE_OVAL" STYLE="oval" COLOR="#7B1FA2" BACKGROUND_COLOR="#F3E5F5"/>
+</node>
+<node TEXT="Visual Colors &amp; Fonts" ID="ID_COLORS_DEMO" COLOR="#FFFFFF" BACKGROUND_COLOR="#1976D2">
+  <font SIZE="14" BOLD="true"/>
+  <node TEXT="Custom Font Size &amp; Italic" ID="ID_FONT_DEMO" COLOR="#E65100">
+    <font SIZE="16" ITALIC="true"/>
+  </node>
+</node>
+<node TEXT="Cloud Enclosures" ID="ID_CLOUD_DEMO">
+  <cloud COLOR="#FFE0B2" SHAPE="ROUND_RECT" WIDTH="2"/>
+  <node TEXT="Items inside RoundRect Cloud" ID="ID_CLOUD_ITEM_1"/>
+  <node TEXT="Sub-cloud in Arc Shape" ID="ID_CLOUD_ITEM_2">
+    <cloud COLOR="#C8E6C9" SHAPE="ARC" WIDTH="2"/>
+  </node>
+</node>
+<node TEXT="Branch Edge Styles" ID="ID_EDGES_DEMO">
+  <node TEXT="Linear Straight Edge" ID="ID_EDGE_LINEAR">
+    <edge COLOR="#1976D2" STYLE="linear" WIDTH="3"/>
+  </node>
+  <node TEXT="Bezier Curved Edge" ID="ID_EDGE_BEZIER">
+    <edge COLOR="#7B1FA2" STYLE="bezier" WIDTH="2"/>
+  </node>
+</node>
+<node TEXT="Details &amp; Notes" ID="ID_DETAILS_NOTES_DEMO">
+  <richcontent TYPE="DETAILS">
+    <html><body><p>This is a secondary <b>expandable detail</b> beneath the node title.</p></body></html>
+  </richcontent>
+  <richcontent TYPE="NOTE">
+    <html><body><p>This node contains an <i>extended note annotation</i>.</p></body></html>
+  </richcontent>
+</node>
+<node TEXT="Key-Value Attributes" ID="ID_ATTRS_DEMO">
+  <attribute NAME="Priority" VALUE="High"/>
+  <attribute NAME="Status" VALUE="Supported"/>
+  <attribute NAME="Version" VALUE="2.0"/>
+</node>
+<node TEXT="Icons &amp; Connectors" ID="ID_ICONS_CONN_DEMO">
+  <icon BUILTIN="yes"/>
+  <icon BUILTIN="idea"/>
+  <icon BUILTIN="flag-green"/>
+  <arrowlink DESTINATION="ID_SHAPES_DEMO" COLOR="#D32F2F" MIDDLE_LABEL="demonstrates"/>
+</node>
+<node TEXT="LaTeX Formulas &amp; Media" ID="ID_LATEX_MEDIA_DEMO">
+  <hook NAME="plugins/latex/LatexNodeHook.properties" EQUATION="\sum_{i=1}^{n} x_i^2 = \sigma"/>
+  <hook NAME="ExternalObject" URI="https://www.freeplane.org/wiki/images/thumb/8/87/Freeplane-icon-32x32.png" SIZE="1.0"/>
 </node>
 </node>
 <node TEXT="Features" POSITION="bottom_or_right" ID="ID_1125688217" CREATED="1545841377137" MODIFIED="1545841381600">

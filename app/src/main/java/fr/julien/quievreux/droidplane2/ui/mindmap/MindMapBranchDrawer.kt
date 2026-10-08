@@ -23,24 +23,48 @@ fun MindMapBranchLayer(
     modifier: Modifier = Modifier,
 ) {
     Canvas(modifier = modifier) {
-        val strokeWidth = strokeWidthDp.toPx()
-        val stroke = Stroke(width = strokeWidth, cap = StrokeCap.Round)
+        val defaultStrokeWidth = strokeWidthDp.toPx()
 
         connectors.forEach { connector ->
+            // Skip hidden edges
+            if (connector.style == "hide_edge") return@forEach
+
+            val edgeColor = connector.color?.let { parseHexColor(it) } ?: color
+            val edgeStrokeWidth = connector.width?.toFloatOrNull()?.let { it * density } ?: defaultStrokeWidth
+            val stroke = Stroke(width = edgeStrokeWidth, cap = StrokeCap.Round)
+
             val path = Path().apply {
                 moveTo(connector.startX, connector.startY)
-                val midX = connector.startX + (connector.endX - connector.startX) * 0.5f
-                cubicTo(
-                    x1 = midX,
-                    y1 = connector.startY,
-                    x2 = midX,
-                    y2 = connector.endY,
-                    x3 = connector.endX,
-                    y3 = connector.endY,
-                )
+                if (connector.style == "linear" || connector.style == "sharp-linear") {
+                    lineTo(connector.endX, connector.endY)
+                } else {
+                    val midX = connector.startX + (connector.endX - connector.startX) * 0.5f
+                    cubicTo(
+                        x1 = midX,
+                        y1 = connector.startY,
+                        x2 = midX,
+                        y2 = connector.endY,
+                        x3 = connector.endX,
+                        y3 = connector.endY,
+                    )
+                }
             }
-            drawPath(path = path, color = color, style = stroke)
+            drawPath(path = path, color = edgeColor, style = stroke)
         }
+    }
+}
+
+private fun parseHexColor(hex: String): Color? {
+    return try {
+        val clean = hex.removePrefix("#")
+        val colorInt = when (clean.length) {
+            6 -> 0xFF000000.toInt() or clean.toInt(16)
+            8 -> clean.toLong(16).toInt()
+            else -> return null
+        }
+        Color(colorInt)
+    } catch (e: Exception) {
+        null
     }
 }
 
@@ -57,6 +81,8 @@ fun PreviewMindMapBranchLayer() {
                 endX = 250f,
                 endY = 40f,
                 direction = BranchDirection.RIGHT,
+                style = "bezier",
+                color = "#0033AA"
             ),
             BranchConnector(
                 parentId = "root",
@@ -66,6 +92,8 @@ fun PreviewMindMapBranchLayer() {
                 endX = 250f,
                 endY = 160f,
                 direction = BranchDirection.RIGHT,
+                style = "linear",
+                color = "#D32F2F"
             ),
             BranchConnector(
                 parentId = "root",

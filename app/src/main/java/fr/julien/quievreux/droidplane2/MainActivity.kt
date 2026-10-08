@@ -56,6 +56,7 @@ import fr.julien.quievreux.droidplane2.helper.FileRegister
 import fr.julien.quievreux.droidplane2.model.ContentNodeType.Classic
 import fr.julien.quievreux.droidplane2.model.ContentNodeType.RelativeFile
 import fr.julien.quievreux.droidplane2.model.ContentNodeType.RichText
+import fr.julien.quievreux.droidplane2.model.ContextMenuAction
 import fr.julien.quievreux.droidplane2.model.DisplayMode
 import fr.julien.quievreux.droidplane2.ui.components.AppTopBar
 import fr.julien.quievreux.droidplane2.ui.components.AppTopBarAction.Backpress
@@ -204,6 +205,21 @@ class MainActivity : FragmentActivity(), FileRegister {
                             confirmation = dialog,
                         )
                     }
+                    is DialogType.NodePropertiesInspector -> {
+                        fr.julien.quievreux.droidplane2.ui.inspector.NodePropertiesInspector(
+                            node = dialog.node,
+                            initialTab = dialog.initialTab,
+                            onSave = { updatedNode ->
+                                viewModel.onSaveNodeProperties(updatedNode)
+                            },
+                            onDismiss = {
+                                viewModel.onDismissNodeInspector()
+                            },
+                            onMoveCloudToParent = { targetNode ->
+                                viewModel.onMoveCloudToParent(targetNode)
+                            }
+                        )
+                    }
                 }
 
                 Scaffold(
@@ -298,6 +314,9 @@ class MainActivity : FragmentActivity(), FileRegister {
                                             onNodeClick = viewModel::onNodeClick,
                                             onNodeContextMenuClick = viewModel::onNodeContextMenuClick,
                                             currentlyDisplayedNodeId = state.value.nodeCurrentlyDisplayed?.id,
+                                            onNodeDoubleClick = { clickedNode ->
+                                                viewModel.onNodeContextMenuClick(ContextMenuAction.Edit(clickedNode))
+                                            },
                                         )
                                     }
                                 }
@@ -313,6 +332,9 @@ class MainActivity : FragmentActivity(), FileRegister {
                                         treeVersion = state.value.treeVersion,
                                         onNodeSelect = viewModel::selectNode,
                                         onNodeToggleCollapse = viewModel::toggleNodeCollapse,
+                                        onNodeDoubleClick = { clickedNode ->
+                                            viewModel.onNodeContextMenuClick(ContextMenuAction.Edit(clickedNode))
+                                        },
                                         onNodeContextMenuClick = viewModel::onNodeContextMenuClick,
                                         fetchText = viewModel::getNodeText,
                                         modifier = Modifier

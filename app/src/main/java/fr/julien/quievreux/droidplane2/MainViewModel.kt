@@ -594,6 +594,82 @@ nodeFindList:${nodeManager.getSearchResult().map { getNodeText(it) }.joinToStrin
         updateNodeText(node, newText)
     }
 
+    fun onOpenNodeInspector(node: Node, initialTab: InspectorTab = InspectorTab.CONTENT) {
+        val freshNode = nodeManager.getNodeByID(node.id) ?: node
+        setDialogState(
+            DialogType.NodePropertiesInspector(
+                node = freshNode,
+                initialTab = initialTab,
+            )
+        )
+    }
+
+    fun onSaveNodeProperties(updatedNode: Node) {
+        viewModelScope.launch(Dispatchers.IO) {
+            setMindmapIsLoading(true)
+            val success = nodeManager.updateNode(updatedNode)
+            if (success) {
+                hasUnsavedChanges = true
+                val currentScreenNode = _uiState.value.nodeCurrentlyDisplayed
+                if (currentScreenNode != null) {
+                    val refreshedNode = nodeManager.getNodeByID(currentScreenNode.id)
+                    if (refreshedNode != null) {
+                        showNode(refreshedNode)
+                    }
+                }
+                updateUiState { currentState ->
+                    currentState.copy(
+                        treeVersion = currentState.treeVersion + 1,
+                        dialogUiState = DialogUiState(dialogType = DialogType.None),
+                    )
+                }
+            } else {
+                setDialogState(DialogType.None)
+            }
+            setMindmapIsLoading(false)
+        }
+    }
+
+    fun onDismissNodeInspector() {
+        setDialogState(DialogType.None)
+    }
+
+    fun onMoveCloudToParent(node: Node) {
+        val parentId = node.parentNode?.id ?: return
+        val cloud = node.cloud ?: return
+        viewModelScope.launch(Dispatchers.IO) {
+            setMindmapIsLoading(true)
+            val currentChild = nodeManager.getNodeByID(node.id) ?: node
+            nodeManager.updateNode(currentChild.copy(cloud = null))
+
+            val currentParent = nodeManager.getNodeByID(parentId)
+            if (currentParent != null) {
+                val updatedParent = currentParent.copy(cloud = cloud)
+                nodeManager.updateNode(updatedParent)
+                hasUnsavedChanges = true
+                val currentScreenNode = _uiState.value.nodeCurrentlyDisplayed
+                if (currentScreenNode != null) {
+                    val refreshedNode = nodeManager.getNodeByID(currentScreenNode.id)
+                    if (refreshedNode != null) {
+                        showNode(refreshedNode)
+                    }
+                }
+                updateUiState { currentState ->
+                    currentState.copy(
+                        treeVersion = currentState.treeVersion + 1,
+                        dialogUiState = DialogUiState(
+                            dialogType = DialogType.NodePropertiesInspector(
+                                node = updatedParent,
+                                initialTab = InspectorTab.STYLING_CLOUD,
+                            )
+                        )
+                    )
+                }
+            }
+            setMindmapIsLoading(false)
+        }
+    }
+
     fun onNodeContextMenuClick(contextMenuAction: ContextMenuAction) {
         when (contextMenuAction) {
             is Edit -> {
@@ -605,6 +681,10 @@ nodeFindList:${nodeManager.getSearchResult().map { getNodeText(it) }.joinToStrin
                         )
                     )
                 }
+            }
+
+            is ContextMenuAction.Properties -> {
+                onOpenNodeInspector(contextMenuAction.node)
             }
 
             is NodeLink -> {
