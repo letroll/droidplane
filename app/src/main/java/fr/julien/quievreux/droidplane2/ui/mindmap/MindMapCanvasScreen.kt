@@ -154,7 +154,41 @@ fun MindMapCanvasScreen(
                 modifier = Modifier.fillMaxSize(),
             )
 
-            // 3. Render positioned nodes
+            // 3. Compute and draw cross-node directional arrow link connectors
+            val centeredArrowLinks = remember(layoutResult.nodes, centerX, centerY) {
+                val links = mutableListOf<ArrowLinkConnector>()
+                val nodeLayoutsById = layoutResult.nodes.associateBy { it.node.id }
+
+                layoutResult.nodes.forEach { srcLayout ->
+                    srcLayout.node.connectors.forEach { connector ->
+                        val destLayout = nodeLayoutsById[connector.destinationId]
+                        if (destLayout != null) {
+                            links.add(
+                                ArrowLinkConnector(
+                                    sourceId = srcLayout.node.id,
+                                    destinationId = connector.destinationId,
+                                    startX = centerX + srcLayout.x,
+                                    startY = centerY + srcLayout.y,
+                                    endX = centerX + destLayout.x,
+                                    endY = centerY + destLayout.y,
+                                    color = connector.color,
+                                    middleLabel = connector.middleLabel,
+                                    startArrow = connector.startArrow != null && connector.startArrow != "None",
+                                    endArrow = connector.endArrow != "None",
+                                )
+                            )
+                        }
+                    }
+                }
+                links
+            }
+
+            MindMapArrowLinkLayer(
+                arrowLinks = centeredArrowLinks,
+                modifier = Modifier.fillMaxSize(),
+            )
+
+            // 4. Render positioned nodes
             layoutResult.nodes.forEach { nodeLayout ->
                 val nodeLeftPx = centerX + nodeLayout.x - (nodeLayout.width / 2f)
                 val nodeTopPx = centerY + nodeLayout.y - (nodeLayout.height / 2f)

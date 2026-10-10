@@ -37,6 +37,11 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import compose.icons.FontAwesomeIcons
+import compose.icons.fontawesomeicons.Solid
+import compose.icons.fontawesomeicons.solid.Link
+import fr.julien.quievreux.droidplane2.model.getNodeFontIconsFromName
+import fr.julien.quievreux.droidplane2.model.getNodeIconsResIdFromName
 import fr.julien.quievreux.droidplane2.R
 import fr.julien.quievreux.droidplane2.data.model.Node
 import fr.julien.quievreux.droidplane2.model.ContextMenuAction
@@ -63,7 +68,7 @@ fun MindMapNodeCard(
     val displayText = fetchText(node)?.ifEmpty { " " } ?: node.text.orEmpty().ifEmpty { " " }
 
     val shape = when (node.style) {
-        "bubble", "oval" -> androidx.compose.foundation.shape.CircleShape
+        "bubble", "oval" -> CircleShape
         "rectangle" -> RoundedCornerShape(2.dp)
         "fork" -> RoundedCornerShape(topStart = 0.dp, bottomStart = 0.dp, topEnd = 8.dp, bottomEnd = 8.dp)
         else -> if (isRoot) RoundedCornerShape(16.dp) else RoundedCornerShape(8.dp)
@@ -128,6 +133,56 @@ fun MindMapNodeCard(
                             color = cloudColor ?: MaterialTheme.colorScheme.primary
                         )
                     }
+
+                    // Display assigned icons
+                    node.iconNames.forEach { iconName ->
+                        val imageVec = getNodeFontIconsFromName(iconName)
+                        if (imageVec != null) {
+                            Icon(
+                                imageVector = imageVec,
+                                contentDescription = iconName,
+                                tint = contentColor,
+                                modifier = Modifier.size(16.dp)
+                            )
+                        } else {
+                            val resId = getNodeIconsResIdFromName(iconName)
+                            if (resId != null && resId != 0 && resId != R.drawable.ic_launcher) {
+                                Icon(
+                                    painter = painterResource(resId),
+                                    contentDescription = iconName,
+                                    tint = contentColor,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                            }
+                        }
+                    }
+
+                    // Display link indicator badge
+                    if (node.link != null) {
+                        Icon(
+                            imageVector = FontAwesomeIcons.Solid.Link,
+                            contentDescription = stringResource(R.string.hyperlink),
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(14.dp)
+                        )
+                    }
+
+                    // Display note indicator
+                    if (!node.noteText.isNullOrBlank()) {
+                        Text(
+                            text = "📝",
+                            fontSize = 12.sp,
+                        )
+                    }
+
+                    // Display details indicator
+                    if (!node.detailsText.isNullOrBlank()) {
+                        Text(
+                            text = "💬",
+                            fontSize = 12.sp,
+                        )
+                    }
+
                     Text(
                         text = displayText,
                         style = MaterialTheme.typography.bodyMedium.copy(
@@ -162,6 +217,15 @@ fun MindMapNodeCard(
                     onContextMenuAction(ContextMenuAction.Edit(node))
                 },
             )
+            if (node.link != null) {
+                DropdownMenuItem(
+                    text = { Text(stringResource(R.string.open_link)) },
+                    onClick = {
+                        showMenu = false
+                        onContextMenuAction(ContextMenuAction.OpenLink(node))
+                    },
+                )
+            }
             DropdownMenuItem(
                 text = { Text(stringResource(R.string.node_properties)) },
                 onClick = {

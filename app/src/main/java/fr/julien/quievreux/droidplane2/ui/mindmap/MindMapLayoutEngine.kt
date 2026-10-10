@@ -51,7 +51,7 @@ object MindMapLayoutEngine {
     private fun hasCloudInSubtree(node: Node, collapsedNodeIds: Set<String>): Boolean {
         if (node.cloud != null) return true
         if (collapsedNodeIds.contains(node.id)) return false
-        return node.childNodes.any { hasCloudInSubtree(it, collapsedNodeIds) }
+        return node.childNodes.toList().any { hasCloudInSubtree(it, collapsedNodeIds) }
     }
 
     fun computeLayout(
@@ -149,7 +149,7 @@ object MindMapLayoutEngine {
         val right = mutableListOf<Node>()
         val unassigned = mutableListOf<Node>()
 
-        children.forEach { child ->
+        children.toList().forEach { child ->
             when (child.position?.lowercase()) {
                 "left", "top_or_left" -> left.add(child)
                 "right", "bottom_or_right" -> right.add(child)
@@ -252,7 +252,7 @@ object MindMapLayoutEngine {
             if (!isCollapsed && child.childNodes.isNotEmpty()) {
                 layoutBranches(
                     parentLayout = childLayout,
-                    children = child.childNodes,
+                    children = child.childNodes.toList(),
                     direction = direction,
                     collapsedNodeIds = collapsedNodeIds,
                     selectedNodeId = selectedNodeId,
@@ -283,9 +283,10 @@ object MindMapLayoutEngine {
             return selfHeight + cloudMargin
         }
 
-        val childHeights = node.childNodes.sumOf { child ->
+        val children = node.childNodes.toList()
+        val childHeights = children.sumOf { child ->
             computeSubtreeHeight(child, collapsedNodeIds, density, verticalSpacing, fetchText).toDouble()
-        }.toFloat() + (node.childNodes.size - 1) * verticalSpacing
+        }.toFloat() + (children.size - 1) * verticalSpacing
 
         return maxOf(selfHeight, childHeights) + cloudMargin
     }
@@ -336,8 +337,14 @@ object MindMapLayoutEngine {
 
         val displayLines = totalLines.coerceAtLeast(1)
 
-        val totalWidthDp = (maxLineWidthDp + horizontalPaddingDp + foldIndicatorDp)
-            .coerceIn(70f, maxTextWidthDp + horizontalPaddingDp + foldIndicatorDp)
+        val badgesWidthDp = (if (node.cloud != null) 16f else 0f) +
+            (node.iconNames.size * 18f) +
+            (if (node.link != null) 16f else 0f) +
+            (if (!node.noteText.isNullOrBlank()) 16f else 0f) +
+            (if (!node.detailsText.isNullOrBlank()) 16f else 0f)
+
+        val totalWidthDp = (maxLineWidthDp + horizontalPaddingDp + foldIndicatorDp + badgesWidthDp)
+            .coerceIn(70f, maxTextWidthDp + horizontalPaddingDp + foldIndicatorDp + badgesWidthDp)
         val totalHeightDp = (displayLines * lineHeightDp + verticalPaddingDp).coerceAtLeast(38f)
 
         return Pair(totalWidthDp * density, totalHeightDp * density)

@@ -94,6 +94,28 @@ class ContentTabViewModelTest : KStringSpec() {
                 storedChild!!.cloud shouldBe null
             }
         }
+
+        "saving rich text node updates richText content and state" {
+            val nodeManager = realNodeManager()
+            val viewModel = MainViewModel(logger = mockk(relaxed = true), injectedNodeManager = nodeManager)
+            val root = nodeManager.rootNode!!
+            viewModel.setInitialStateForTest(root)
+
+            val child = nodeManager.getNodeByID(root.id)!!.childNodes[0]
+            val updatedChild = child.copy(
+                richText = "<html><body><p><b>Bold Title</b></p></body></html>",
+                text = "Bold Title"
+            )
+
+            viewModel.onSaveNodeProperties(updatedChild)
+
+            eventually {
+                val stored = nodeManager.getNodeByID(child.id)
+                stored shouldNotBe null
+                stored!!.richText shouldBe "<html><body><p><b>Bold Title</b></p></body></html>"
+                stored.text shouldBe "Bold Title"
+            }
+        }
     }
 
     private suspend fun eventually(

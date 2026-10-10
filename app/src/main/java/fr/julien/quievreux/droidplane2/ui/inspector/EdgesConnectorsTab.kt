@@ -20,6 +20,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.Button
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -175,49 +177,164 @@ fun EdgesConnectorsTab(
             )
         } else {
             node.connectors.forEachIndexed { index, connector ->
-                Row(
+                Card(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(vertical = 4.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalAlignment = Alignment.CenterVertically
+                        .padding(vertical = 6.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
                 ) {
-                    OutlinedTextField(
-                        value = connector.destinationId,
-                        onValueChange = { newDestId ->
-                            val updated = node.connectors.toMutableList()
-                            updated[index] = connector.copy(destinationId = newDestId)
-                            onNodeChanged(node.copy(connectors = updated))
-                        },
-                        label = { Text(stringResource(R.string.destination_node)) },
-                        modifier = Modifier.weight(1.2f),
-                        singleLine = true
-                    )
-
-                    OutlinedTextField(
-                        value = connector.middleLabel.orEmpty(),
-                        onValueChange = { newLabel ->
-                            val updated = node.connectors.toMutableList()
-                            updated[index] = connector.copy(middleLabel = newLabel.ifBlank { null })
-                            onNodeChanged(node.copy(connectors = updated))
-                        },
-                        label = { Text(stringResource(R.string.middle_label)) },
-                        modifier = Modifier.weight(1f),
-                        singleLine = true
-                    )
-
-                    IconButton(
-                        onClick = {
-                            val updated = node.connectors.toMutableList()
-                            updated.removeAt(index)
-                            onNodeChanged(node.copy(connectors = updated))
-                        }
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(12.dp)
                     ) {
-                        Icon(
-                            Icons.Filled.Delete,
-                            contentDescription = "Delete connector",
-                            tint = MaterialTheme.colorScheme.error
+                        // Destination ID & Delete
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            OutlinedTextField(
+                                value = connector.destinationId,
+                                onValueChange = { newDestId ->
+                                    val updated = node.connectors.toMutableList()
+                                    updated[index] = connector.copy(destinationId = newDestId)
+                                    onNodeChanged(node.copy(connectors = updated))
+                                },
+                                label = { Text(stringResource(R.string.destination_node)) },
+                                modifier = Modifier.weight(1f),
+                                singleLine = true
+                            )
+                            IconButton(
+                                onClick = {
+                                    val updated = node.connectors.toMutableList()
+                                    updated.removeAt(index)
+                                    onNodeChanged(node.copy(connectors = updated))
+                                }
+                            ) {
+                                Icon(
+                                    Icons.Filled.Delete,
+                                    contentDescription = "Delete connector",
+                                    tint = MaterialTheme.colorScheme.error
+                                )
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(8.dp))
+
+                        // Connector Color
+                        Text(
+                            text = stringResource(R.string.connector_color),
+                            style = MaterialTheme.typography.titleSmall
                         )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            EDGE_PALETTE_COLORS.forEach { (hex, color) ->
+                                val isSelected = connector.color.equals(hex, ignoreCase = true)
+                                Box(
+                                    modifier = Modifier
+                                        .size(24.dp)
+                                        .clip(CircleShape)
+                                        .background(color)
+                                        .border(
+                                            width = if (isSelected) 3.dp else 1.dp,
+                                            color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline,
+                                            shape = CircleShape
+                                        )
+                                        .clickable {
+                                            val updated = node.connectors.toMutableList()
+                                            val newColor = if (isSelected) null else hex
+                                            updated[index] = connector.copy(color = newColor)
+                                            onNodeChanged(node.copy(connectors = updated))
+                                        }
+                                )
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(10.dp))
+
+                        // Arrowheads
+                        Text(
+                            text = "Arrowheads",
+                            style = MaterialTheme.typography.titleSmall
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            val startActive = connector.startArrow != null && connector.startArrow != "None"
+                            FilterChip(
+                                selected = startActive,
+                                onClick = {
+                                    val updated = node.connectors.toMutableList()
+                                    val newStart = if (startActive) null else "Default"
+                                    updated[index] = connector.copy(startArrow = newStart)
+                                    onNodeChanged(node.copy(connectors = updated))
+                                },
+                                label = { Text("Start Arrow") }
+                            )
+
+                            val endActive = connector.endArrow != null && connector.endArrow != "None"
+                            FilterChip(
+                                selected = endActive,
+                                onClick = {
+                                    val updated = node.connectors.toMutableList()
+                                    val newEnd = if (endActive) null else "Default"
+                                    updated[index] = connector.copy(endArrow = newEnd)
+                                    onNodeChanged(node.copy(connectors = updated))
+                                },
+                                label = { Text("End Arrow") }
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.height(10.dp))
+
+                        // Labels: Source, Middle, Target
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            OutlinedTextField(
+                                value = connector.sourceLabel.orEmpty(),
+                                onValueChange = { newLabel ->
+                                    val updated = node.connectors.toMutableList()
+                                    updated[index] = connector.copy(sourceLabel = newLabel.ifBlank { null })
+                                    onNodeChanged(node.copy(connectors = updated))
+                                },
+                                label = { Text(stringResource(R.string.source_label)) },
+                                modifier = Modifier.weight(1f),
+                                singleLine = true
+                            )
+
+                            OutlinedTextField(
+                                value = connector.middleLabel.orEmpty(),
+                                onValueChange = { newLabel ->
+                                    val updated = node.connectors.toMutableList()
+                                    updated[index] = connector.copy(middleLabel = newLabel.ifBlank { null })
+                                    onNodeChanged(node.copy(connectors = updated))
+                                },
+                                label = { Text(stringResource(R.string.middle_label)) },
+                                modifier = Modifier.weight(1f),
+                                singleLine = true
+                            )
+
+                            OutlinedTextField(
+                                value = connector.targetLabel.orEmpty(),
+                                onValueChange = { newLabel ->
+                                    val updated = node.connectors.toMutableList()
+                                    updated[index] = connector.copy(targetLabel = newLabel.ifBlank { null })
+                                    onNodeChanged(node.copy(connectors = updated))
+                                },
+                                label = { Text(stringResource(R.string.target_label)) },
+                                modifier = Modifier.weight(1f),
+                                singleLine = true
+                            )
+                        }
                     }
                 }
             }

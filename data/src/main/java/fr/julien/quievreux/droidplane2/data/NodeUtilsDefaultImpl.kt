@@ -132,7 +132,7 @@ class NodeUtilsDefaultImpl : NodeUtils {
         val id = xpp.getNodeAttribute(ID).orEmpty()
         val numericId = try {
             if (id.isNotEmpty()) {
-                id.replace("\\D+".toRegex(), "").toInt()
+                id.replace("\\D+".toRegex(), "").toIntOrNull()?:-1
             } else {
                 -1
             }

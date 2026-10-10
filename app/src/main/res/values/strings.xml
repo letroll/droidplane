@@ -62,6 +62,7 @@
     <string name="notes">Notes</string>
     <string name="latex_formula">LaTeX Formula</string>
     <string name="rich_text">Rich Text</string>
+    <string name="plain_text">Plain Text</string>
     <string name="preview_mode">Preview</string>
     <string name="source_mode">Source</string>
 

@@ -8,7 +8,7 @@
       "enabled": true,
       "priority": 10,
       "registered_commands": {
-        "gemini": [
+        "agy": [
           "speckit.git.feature",
           "speckit.git.validate",
           "speckit.git.remote",
@@ -26,7 +26,7 @@
       "enabled": true,
       "priority": 10,
       "registered_commands": {
-        "gemini": [
+        "agy": [
           "speckit.bug.assess",
           "speckit.bug.fix",
           "speckit.bug.test"
@@ -42,7 +42,7 @@
       "enabled": true,
       "priority": 10,
       "registered_commands": {
-        "gemini": [
+        "agy": [
           "speckit.assess.intake",
           "speckit.assess.research",
           "speckit.assess.define",

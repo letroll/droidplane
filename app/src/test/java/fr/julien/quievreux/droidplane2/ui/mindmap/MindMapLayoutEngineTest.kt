@@ -246,5 +246,25 @@ class MindMapLayoutEngineTest : KStringSpec() {
             largeSize.first shouldBeGreaterThan normalSize.first
             largeSize.second shouldBeGreaterThan normalSize.second
         }
+
+        "measureNode expands width when badges such as icons or notes are attached" {
+            val plainNode = Node(parentNode = null, id = "p", numericId = 1, text = "Topic", creationDate = 0L, modificationDate = 0L)
+            val badgedNode = Node(
+                parentNode = null,
+                id = "b",
+                numericId = 2,
+                text = "Topic",
+                iconNames = mutableListOf("idea", "yes"),
+                noteText = "Note text",
+                detailsText = "Details",
+                creationDate = 0L,
+                modificationDate = 0L,
+            )
+
+            val plainSize = MindMapLayoutEngine.measureNode(plainNode, density = 1f)
+            val badgedSize = MindMapLayoutEngine.measureNode(badgedNode, density = 1f)
+
+            badgedSize.first shouldBeGreaterThan plainSize.first
+        }
     }
 }

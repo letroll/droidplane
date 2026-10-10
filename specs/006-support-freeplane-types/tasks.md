@@ -235,3 +235,12 @@
 - Add User Story 5: External objects and formulas (`T044` - `T047`).
 - Add User Story 6: High-fidelity preservation and scripts (`T048` - `T052`).
 - Polish & Validation (`T053` - `T055`).
+
+## Phase 10: Convergence
+
+- [x] T056 Enable rich node text editing and toggle in `app/src/main/java/fr/julien/quievreux/droidplane2/ui/inspector/ContentTab.kt` using `HybridRichContentEditor` per FR-004 (partial)
+- [x] T057 Display assigned Freeplane icons (`node.iconNames`) alongside node title in `app/src/main/java/fr/julien/quievreux/droidplane2/ui/mindmap/MindMapNodeCard.kt` per US2/AC3 (missing)
+- [x] T058 Add visual indicators for secondary details (`node.detailsText`) and note annotations (`node.noteText`) in `app/src/main/java/fr/julien/quievreux/droidplane2/ui/mindmap/MindMapNodeCard.kt` per US1/AC2, US1/AC3 (partial)
+- [x] T059 Add hyperlink visual badge and wire `ContextMenuAction.OpenLink` in `app/src/main/java/fr/julien/quievreux/droidplane2/ui/mindmap/MindMapNodeCard.kt` per US2/AC4 (partial)
+- [x] T060 Add controls for connector color, arrow directions (`startArrow`, `endArrow`), and source/target labels in `app/src/main/java/fr/julien/quievreux/droidplane2/ui/inspector/EdgesConnectorsTab.kt` per FR-011 (partial)
+- [x] T061 Render cross-node directional connector arrows (`node.connectors`) with labels and arrowheads in `app/src/main/java/fr/julien/quievreux/droidplane2/ui/mindmap/MindMapCanvasScreen.kt` and `MindMapBranchDrawer.kt` per US4/AC2, US4/AC3 (missing)
