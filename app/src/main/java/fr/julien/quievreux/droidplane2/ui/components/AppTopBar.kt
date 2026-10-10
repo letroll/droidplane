@@ -229,24 +229,27 @@ fun AppTopBar(
                 expanded = showMenu,
                 onDismissRequest = { showMenu = false }
             ) {
-                DropdownMenuItem(
-                    onClick = {
-                        showMenu = false
-                        onBarAction(Up)
-                    },
-                    text = {
-                        Text(stringResource(R.string.up))
-                    },
-                )
-                DropdownMenuItem(
-                    onClick = {
-                        showMenu = false
-                        onBarAction(Top)
-                    },
-                    text = {
-                        Text(stringResource(R.string.gototop))
-                    },
-                )
+                // Up and Top only in List mode
+                if (displayMode == DisplayMode.LIST) {
+                    DropdownMenuItem(
+                        onClick = {
+                            showMenu = false
+                            onBarAction(Up)
+                        },
+                        text = {
+                            Text(stringResource(R.string.up))
+                        },
+                    )
+                    DropdownMenuItem(
+                        onClick = {
+                            showMenu = false
+                            onBarAction(Top)
+                        },
+                        text = {
+                            Text(stringResource(R.string.gototop))
+                        },
+                    )
+                }
                 DropdownMenuItem(
                     onClick = {
                         showMenu = false
