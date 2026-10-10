@@ -211,10 +211,10 @@ fun MindMapNodeCard(
             onDismissRequest = { showMenu = false },
         ) {
             DropdownMenuItem(
-                text = { Text(stringResource(R.string.edit)) },
+                text = { Text(stringResource(R.string.node_properties)) },
                 onClick = {
                     showMenu = false
-                    onContextMenuAction(ContextMenuAction.Edit(node))
+                    onContextMenuAction(ContextMenuAction.Properties(node))
                 },
             )
             if (node.link != null) {
@@ -247,13 +247,15 @@ fun MindMapNodeCard(
                     onContextMenuAction(ContextMenuAction.CopyText(node.text.orEmpty()))
                 },
             )
-            DropdownMenuItem(
-                text = { Text(stringResource(R.string.delete)) },
-                onClick = {
-                    showMenu = false
-                    onContextMenuAction(ContextMenuAction.DeleteNode(node))
-                },
-            )
+            if (!isRoot) {
+                DropdownMenuItem(
+                    text = { Text(stringResource(R.string.delete)) },
+                    onClick = {
+                        showMenu = false
+                        onContextMenuAction(ContextMenuAction.DeleteNode(node))
+                    },
+                )
+            }
         }
     }
 }

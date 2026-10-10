@@ -242,3 +242,30 @@ With multiple developers:
 
 - [X] T047 [US2] Add accessibility semantics to DeleteConfirmationDialog for TalkBack/VoiceOver (app/src/main/java/fr/julien/quievreux/droidplane2/ui/view/DeleteConfirmationDialog.kt)
 
+## Phase 8: Convergence
+
+- [X] T048 Configure Java 21 toolchain and target JVM 21 across module build scripts per Constitution Technical Constraints (contradicts)
+- [X] T049 Implement Compose UI tests for DeleteConfirmationDialog and NodeList per Constitution III, US2, and US3 (missing)
+- [X] T050 Enhance link cleanup in NodeManager.deleteNode() to remove dangling connectors and update _allNodes hierarchy per FR-008 and Constitution IV (partial)
+- [X] T051 Wire ExitConfirmationDialog in MainActivity on exit with unsaved changes per FR-004 and T043 (partial)
+- [X] T052 Add unit tests for link/connector cleanup, root node deletion protection, and deletion benchmark in NodeManagerTest per Constitution III, T004, T041, and SC-001 (missing)
+- [X] T053 Clear active selection (selectedNodeId = null) after node deletion in MainViewModel.confirmDelete() per FR-007 and US1/AC2 (contradicts)
+- [X] T054 Hide Delete context menu option for root node in MindMapNodeCard per FR-003, SC-003, and US3 (partial)
+- [X] T055 Replace Minus icon with Trash/Delete icon in NodeList.GetLeadingIcon() per US3/AC1, T026, and T045 (partial)
+
+## Phase 9: Convergence - Remaining Gaps
+
+### CRITICAL - Constitution III: Test-Driven Verification (NON-NEGOTIABLE)
+
+- [X] T056 [US2] Create Compose UI test for DeleteConfirmationDialog rendering, actions, and accessibility in app/src/androidTest/java/fr/julien/quievreux/droidplane2/ui/components/DeleteConfirmationDialogTest.kt per Constitution III, FR-005, US2/AC1-3
+- [X] T057 [US3] Create Compose UI test for NodeList context menu Delete option visibility, keyboard navigation, and accessibility in app/src/androidTest/java/fr/julien/quievreux/droidplane2/ui/components/NodeListTest.kt per Constitution III, US3/AC1-3, FR-003
+
+### HIGH - Accessibility (US3 - P3)
+
+- [X] T058 [US2] Add accessibility semantics to DeleteConfirmationDialog (role, stateDescription, contentDescription for buttons) in app/src/main/java/fr/julien/quievreux/droidplane2/ui/view/DeleteConfirmationDialog.kt per US3/AC3, FR-005, T022, T047
+- [X] T059 [US3] Add accessibility contentDescription for all context menu items in NodeList.GetLeadingIcon() (not just DeleteNode) in app/src/main/java/fr/julien/quievreux/droidplane2/ui/components/NodeList.kt per US3/AC3, T028, T046
+
+### MEDIUM - Test Coverage & Polish
+
+- [X] T060 [US1] Add unit test for unsaved changes tracking and exit confirmation flow in MainViewModelTest.kt per FR-004, Constitution III
+- [X] T061 [US2] Add unit test for confirmation dialog state transitions (show → cancel, show → confirm → delete) in MainViewModelTest.kt per FR-005, Constitution III, T016

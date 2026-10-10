@@ -42,7 +42,6 @@ import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.lifecycleScope
 import fr.julien.quievreux.droidplane2.MainUiState.DialogType
 import fr.julien.quievreux.droidplane2.MainUiState.DialogType.AddChildNode
-import fr.julien.quievreux.droidplane2.MainUiState.DialogType.EditNodeDescription
 import fr.julien.quievreux.droidplane2.MainUiState.DialogType.None
 import fr.julien.quievreux.droidplane2.ui.view.DeleteConfirmationDialog
 import fr.julien.quievreux.droidplane2.ui.view.DiscardConfirmationDialog
@@ -173,13 +172,21 @@ class MainActivity : FragmentActivity(), FileRegister {
             ContrastAwareReplyTheme {
                 val state = viewModel.uiState.collectAsState()
                 // Handle exit confirmation for unsaved changes
-                val exitConfirmation = remember { mutableStateOf(false) }
-                val hasUnsavedChanges = state.value.dialogUiState.dialogType is DialogType.DeleteConfirmation || viewModel.hasUnsavedChangesState
+                val hasUnsavedChanges = viewModel.hasUnsavedChangesState
                 if (state.value.leaving) {
-                    if (hasUnsavedChanges && !exitConfirmation.value) {
-                        exitConfirmation.value = true
-                    } else {
-                        finish()
+                    if (hasUnsavedChanges && state.value.dialogUiState.dialogType is DialogType.None) {
+                        viewModel.setDialogState(
+                            DialogType.ExitConfirmation(
+                                onConfirm = {
+                                    viewModel.resetLeaving()
+                                    finish()
+                                },
+                                onCancel = {
+                                    viewModel.resetLeaving()
+                                    viewModel.setDialogState(DialogType.None)
+                                }
+                            )
+                        )
                     }
                 }
                 val nodeFindList = viewModel.getSearchResultFlow().collectAsState()
@@ -221,17 +228,6 @@ class MainActivity : FragmentActivity(), FileRegister {
 
                 when (val dialog = state.value.dialogUiState.dialogType) {
                     None -> {}
-                    is EditNodeDescription -> {
-                        CustomDialog(
-                            titre = stringResource(R.string.edit),
-                            value = dialog.oldValue,
-                            onDismiss = {
-                                viewModel.setDialogState(None)
-                            }
-                        ) { newValue ->
-                            viewModel.updateNodeText(dialog.node, newValue)
-                        }
-                    }
                     is AddChildNode -> {
                         CustomDialog(
                             titre = stringResource(R.string.add_child),
@@ -383,7 +379,7 @@ class MainActivity : FragmentActivity(), FileRegister {
                                             onNodeContextMenuClick = viewModel::onNodeContextMenuClick,
                                             currentlyDisplayedNodeId = state.value.nodeCurrentlyDisplayed?.id,
                                             onNodeDoubleClick = { clickedNode ->
-                                                viewModel.onNodeContextMenuClick(ContextMenuAction.Edit(clickedNode))
+                                                viewModel.onNodeContextMenuClick(ContextMenuAction.Properties(clickedNode))
                                             },
                                         )
                                     }
@@ -401,7 +397,7 @@ class MainActivity : FragmentActivity(), FileRegister {
                                         onNodeSelect = viewModel::selectNode,
                                         onNodeToggleCollapse = viewModel::toggleNodeCollapse,
                                         onNodeDoubleClick = { clickedNode ->
-                                            viewModel.onNodeContextMenuClick(ContextMenuAction.Edit(clickedNode))
+                                            viewModel.onNodeContextMenuClick(ContextMenuAction.Properties(clickedNode))
                                         },
                                         onNodeContextMenuClick = viewModel::onNodeContextMenuClick,
                                         fetchText = viewModel::getNodeText,

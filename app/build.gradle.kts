@@ -31,14 +31,14 @@ android {
         }
     }
     compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_17
-        targetCompatibility = JavaVersion.VERSION_17
+        sourceCompatibility = JavaVersion.VERSION_21
+        targetCompatibility = JavaVersion.VERSION_21
     }
     namespace = "fr.julien.quievreux.droidplane2"
     compileSdk = libs.versions.targetSdkVersion.get().toInt()
 
     kotlinOptions {
-        jvmTarget = "17"
+        jvmTarget = "21"
     }
 
     testOptions {
@@ -46,6 +46,10 @@ android {
             it.useJUnitPlatform()
         }
     }
+}
+
+kotlin {
+    jvmToolchain(21)
 }
 
 dependencies {
@@ -94,5 +98,6 @@ dependencies {
 
     // UI Tests
     androidTestImplementation(libs.androidx.ui.test.junit4)
+    androidTestImplementation(libs.androidx.ui.test)
     debugImplementation(libs.androidx.ui.test.manifest)
 }

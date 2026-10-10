@@ -3,13 +3,10 @@ package fr.julien.quievreux.droidplane2.ui.view
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -17,11 +14,10 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
- 
-import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import fr.julien.quievreux.droidplane2.data.model.Node
 import fr.julien.quievreux.droidplane2.MainUiState.DialogType.DeleteConfirmation
 import fr.julien.quievreux.droidplane2.ui.theme.ContrastAwareReplyTheme
@@ -40,6 +36,10 @@ fun DeleteConfirmationDialog(
         descendantCount == 1 -> "1 descendant"
         else -> "$descendantCount descendants"
     }
+
+    val dialogMessage = "Delete \"${node.text.orEmpty()}\" and $descendantText? This action cannot be undone."
+    val deleteButtonContentDescription = "Delete ${node.text.orEmpty()} and $descendantText"
+    val cancelButtonContentDescription = "Cancel deletion"
 
     AlertDialog(
         onDismissRequest = onCancel,
@@ -71,7 +71,7 @@ fun DeleteConfirmationDialog(
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 Text(
-                    text = "Delete \"${node.text.orEmpty()}\" and $descendantText? This action cannot be undone.",
+                    text = dialogMessage,
                     style = androidx.compose.material3.MaterialTheme.typography.bodyMedium,
                     textAlign = androidx.compose.ui.text.style.TextAlign.Center,
                 )
@@ -83,13 +83,25 @@ fun DeleteConfirmationDialog(
                 colors = androidx.compose.material3.ButtonDefaults.buttonColors(
                     containerColor = androidx.compose.material3.MaterialTheme.colorScheme.error,
                     contentColor = androidx.compose.material3.MaterialTheme.colorScheme.onError
-                )
+                ),
+                modifier = Modifier
+                    .semantics {
+                        contentDescription = deleteButtonContentDescription
+                        // Role and stateDescription not available in this Compose version
+                    }
             ) {
                 Text(text = "Delete", fontWeight = FontWeight.Bold)
             }
         },
         dismissButton = {
-            Button(onClick = onCancel) {
+            Button(
+                onClick = onCancel,
+                modifier = Modifier
+                    .semantics {
+                        contentDescription = cancelButtonContentDescription
+                        // Role not available in this Compose version
+                    }
+            ) {
                 Text(text = "Cancel")
             }
         }

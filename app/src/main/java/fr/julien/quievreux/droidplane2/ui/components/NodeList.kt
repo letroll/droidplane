@@ -59,11 +59,11 @@ import compose.icons.fontawesomeicons.regular.Edit
 import compose.icons.fontawesomeicons.solid.Link
 import compose.icons.fontawesomeicons.solid.Minus
 import compose.icons.fontawesomeicons.solid.Plus
+import compose.icons.fontawesomeicons.solid.Trash
 import fr.julien.quievreux.droidplane2.R
 import fr.julien.quievreux.droidplane2.helper.DateUtils
 import fr.julien.quievreux.droidplane2.model.ContextMenuAction
 import fr.julien.quievreux.droidplane2.model.ContextMenuAction.CopyText
-import fr.julien.quievreux.droidplane2.model.ContextMenuAction.Edit
 import fr.julien.quievreux.droidplane2.model.ContextMenuAction.NodeLink
 import fr.julien.quievreux.droidplane2.model.ContextMenuAction.AddChildNode
 import fr.julien.quievreux.droidplane2.model.ContextMenuAction.DeleteNode
@@ -185,10 +185,6 @@ fun NodeItem(
             )
         ),
         ContextMenuDropDownItem(
-            text = stringResource(id = R.string.edit),
-            action = Edit(node)
-        ),
-        ContextMenuDropDownItem(
             text = stringResource(id = R.string.node_properties),
             action = ContextMenuAction.Properties(node = node)
         ),
@@ -196,12 +192,17 @@ fun NodeItem(
             text = stringResource(id = R.string.add_child_node),
             action = AddChildNode(parentNode = node)
         ),
-        ContextMenuDropDownItem(
-            text = stringResource(id = R.string.delete),
-            action = DeleteNode(node = node)
-        ),
-
     )
+
+    // Only show Delete for non-root nodes
+    if (node.parentNode != null) {
+        contextMenuDropDownItems.add(
+            ContextMenuDropDownItem(
+                text = stringResource(id = R.string.delete),
+                action = DeleteNode(node = node)
+            )
+        )
+    }
 
     // Add "Open link" action if node has a link
     node.link?.let { link ->
@@ -381,7 +382,7 @@ fun NodeItem(
                         item.action?.let { action ->
                             when (action) {
                                 is CopyText -> updateClipBoard(action.text)
-                                is Edit, is NodeLink, is AddChildNode, is ContextMenuAction.OpenLink, is DeleteNode, is ContextMenuAction.Properties -> onNodeContextMenuClick(action)
+                                is NodeLink, is AddChildNode, is ContextMenuAction.OpenLink, is DeleteNode, is ContextMenuAction.Properties -> onNodeContextMenuClick(action)
                             }
                         }
                         isContextMenuVisble = false
@@ -403,17 +404,20 @@ fun NodeItem(
     Icon(
         imageVector = when (action) {
             is CopyText -> FontAwesomeIcons.Regular.Clipboard
-            is Edit -> FontAwesomeIcons.Regular.Edit
             is ContextMenuAction.Properties -> FontAwesomeIcons.Regular.Edit
             is NodeLink -> FontAwesomeIcons.Solid.Link
             is AddChildNode -> FontAwesomeIcons.Solid.Plus
-            is DeleteNode -> FontAwesomeIcons.Solid.Minus
+            is DeleteNode -> FontAwesomeIcons.Solid.Trash
             is ContextMenuAction.OpenLink -> FontAwesomeIcons.Solid.Link
         },
         tint = MaterialTheme.colorScheme.primary,
         contentDescription = when (action) {
+            is CopyText -> "Copy node text"
+            is ContextMenuAction.Properties -> "Node properties"
+            is NodeLink -> "Follow link to ${(action as NodeLink).node.text.orEmpty()}"
+            is AddChildNode -> "Add child node"
             is DeleteNode -> "Delete node ${(action as DeleteNode).node.text.orEmpty()}"
-            else -> null
+            is ContextMenuAction.OpenLink -> "Open link"
         },
         modifier = Modifier.size(24.dp),
     )

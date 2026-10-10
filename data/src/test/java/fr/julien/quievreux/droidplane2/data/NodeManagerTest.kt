@@ -689,6 +689,68 @@ class NodeManagerTest : KStringSpec() {
             nodeManager.getNodeByID("ID_1") shouldBe newRoot
             nodeManager.getNodeByNumericId(1) shouldBe newRoot
         }
+
+        "deleteNode on root node must return false and preserve root" {
+            val nodeManager = loadedNodeManager()
+            val root = nodeManager.rootNode!!
+            
+            val result = nodeManager.deleteNode(root.id)
+            result shouldBe false
+            nodeManager.rootNode shouldBe root
+            nodeManager.getNodeByID(root.id) shouldBe root
+        }
+
+        "deleteNode cleans up connectors and arrow link destination references to deleted node" {
+            val nodeManager = loadedNodeManager()
+            val root = nodeManager.rootNode!!
+            val target = root.childNodes.first()
+            val sibling = root.childNodes.last()
+
+            // Add connector from sibling to target
+            sibling.connectors.add(
+                fr.julien.quievreux.droidplane2.data.model.ConnectorLink(
+                    destinationId = target.id,
+                    color = "#FF0000"
+                )
+            )
+            sibling.arrowLinkDestinationIds.add(target.id)
+
+            // Delete target
+            val deleted = nodeManager.deleteNode(target.id)
+            deleted shouldBe true
+
+            val siblingAfter = nodeManager.getNodeByID(sibling.id)!!
+            val nodeInAllNodes = nodeManager.allNodes.first().first { it.id == sibling.id }
+            siblingAfter.connectors.any { it.destinationId == target.id } shouldBe false
+            siblingAfter.arrowLinkDestinationIds.contains(target.id) shouldBe false
+            nodeInAllNodes.connectors.any { it.destinationId == target.id } shouldBe false
+        }
+
+        "deleteNode completes in under 100ms for subtree with 100+ nodes per SC-001" {
+            val nodeManager = initNodeManager()
+            val root = nodeManager.createNewMindmap("Benchmark Root")
+            val parentId = nodeManager.addNodeToMindmap("Subtree Parent", root)!!
+            val parentNode = nodeManager.getNodeByNumericId(parentId)!!
+
+            // Create 100+ descendants
+            var currentParent = parentNode
+            for (i in 1..105) {
+                val childId = nodeManager.addNodeToMindmap("Descendant $i", currentParent)!!
+                if (i % 10 == 0) {
+                    currentParent = nodeManager.getNodeByNumericId(childId)!!
+                }
+            }
+            nodeManager.allNodes.first().size shouldBeGreaterThan 105
+
+            val startTime = System.currentTimeMillis()
+            val deleted = nodeManager.deleteNode(parentNode.id)
+            val elapsed = System.currentTimeMillis() - startTime
+
+            deleted shouldBe true
+            (elapsed < 100L) shouldBe true
+            nodeManager.getNodeByID(parentNode.id) shouldBe null
+            nodeManager.rootNode!!.childNodes.none { it.id == parentNode.id } shouldBe true
+        }
     }
 
     /** Loads test_map.mm and fails loudly if anything goes wrong. */

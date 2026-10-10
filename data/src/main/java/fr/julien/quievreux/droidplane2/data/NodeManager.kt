@@ -1067,26 +1067,46 @@ class NodeManager(
         }
 
         val remainingNodes = _allNodes.value
+        val modifiedNodesMap = mutableMapOf<String, Node>()
         for (node in remainingNodes) {
             try {
-                // Remove deleted node IDs from arrow link destination lists
+                // Remove deleted node references from connectors and arrow link lists
+                val updatedConnectors = node.connectors.filter { it.destinationId !in idsToDelete }.toMutableList()
                 val updatedDestIds = node.arrowLinkDestinationIds.filter { it !in idsToDelete }.toMutableList()
                 val updatedDestNodes = node.arrowLinkDestinationNodes.filter { it.id !in idsToDelete }.toMutableList()
                 val updatedIncomingNodes = node.arrowLinkIncomingNodes.filter { it.id !in idsToDelete }.toMutableList()
-                if (updatedDestIds != node.arrowLinkDestinationIds ||
+                if (updatedConnectors.size != node.connectors.size ||
+                    updatedDestIds != node.arrowLinkDestinationIds ||
                     updatedDestNodes != node.arrowLinkDestinationNodes ||
                     updatedIncomingNodes != node.arrowLinkIncomingNodes) {
                     val updatedNode = node.copy(
+                        connectors = updatedConnectors,
                         arrowLinkDestinationIds = updatedDestIds,
                         arrowLinkDestinationNodes = updatedDestNodes,
                         arrowLinkIncomingNodes = updatedIncomingNodes
                     )
+                    modifiedNodesMap[updatedNode.id] = updatedNode
                     updateNodeInMindMapIndexes(updatedNode)
                 }
             } catch (e: Exception) {
-                println("deleteNode: error cleaning arrow links for node ${node.id}: ${e.message}")
-                e.printStackTrace()
+                logger.e("deleteNode: error cleaning arrow links for node ${node.id}: ${e.message}")
             }
+        }
+
+        if (modifiedNodesMap.isNotEmpty()) {
+            _allNodes.update { nodes ->
+                nodes.map { modifiedNodesMap[it.id] ?: it }
+            }
+            rootNode?.let { root ->
+                fun updateTree(n: Node): Node {
+                    val mod = modifiedNodesMap[n.id] ?: n
+                    val newChildren = mod.childNodes.map { updateTree(it) }.toMutableList()
+                    return mod.copy(childNodes = newChildren)
+                }
+                rootNode = updateTree(root)
+            }
+            updatemMindmapIndexes(nodeUtils.loadAndIndexNodesByIds(rootNode))
+            nodeUtils.fillArrowLinks(getNodeByIdIndex())
         }
 
         return true

@@ -93,6 +93,10 @@ data class Node(
         if (iconNames != other.iconNames) return false
         if (modificationDate != other.modificationDate) return false
 
+        if (link != other.link) return false
+        if (connectors != other.connectors) return false
+        if (arrowLinkDestinationIds != other.arrowLinkDestinationIds) return false
+
         // Compare child nodes by size and modification dates to avoid recursion
         if (childNodes.size != other.childNodes.size) return false
         for (i in childNodes.indices) {
@@ -112,6 +116,8 @@ data class Node(
         result = 31 * result + (detailsText?.hashCode() ?: 0)
         result = 31 * result + (noteText?.hashCode() ?: 0)
         result = 31 * result + attributes.hashCode()
+        result = 31 * result + connectors.hashCode()
+        result = 31 * result + arrowLinkDestinationIds.hashCode()
         return result
     }
 

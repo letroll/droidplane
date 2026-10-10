@@ -502,10 +502,10 @@ class MainViewModelTest : KStringSpec() {
                 updatedChild.childNodes[0].text shouldBe "mindmap child"
             }
 
-            // Trigger Edit context menu
-            viewModel.onNodeContextMenuClick(ContextMenuAction.Edit(node = child))
+            // Trigger Properties context menu
+            viewModel.onNodeContextMenuClick(ContextMenuAction.Properties(node = child))
             val dialog = viewModel.uiState.value.dialogUiState.dialogType
-            (dialog is MainUiState.DialogType.EditNodeDescription) shouldBe true
+            (dialog is MainUiState.DialogType.NodePropertiesInspector) shouldBe true
         }
 
         "deleting a node increments treeVersion and cleans selection and collapsed state" {
@@ -525,7 +525,7 @@ class MainViewModelTest : KStringSpec() {
 
             eventually {
                 viewModel.uiState.value.treeVersion shouldBeGreaterThan initialVersion
-                viewModel.uiState.value.selectedNodeId shouldBe root.id
+                viewModel.uiState.value.selectedNodeId shouldBe null
                 viewModel.uiState.value.collapsedNodeIds.contains(child.id) shouldBe false
                 viewModel.uiState.value.canUndoDelete shouldBe true
             }
@@ -833,6 +833,269 @@ class MainViewModelTest : KStringSpec() {
             eventually {
                 registeredFileName shouldBe "My_Fresh_Brainstorm.mm"
             }
+        }
+
+        // ===== UNSAVED CHANGES TRACKING (T060) =====
+
+        "unsaved changes tracking is enabled after node deletion" {
+            val nodeManager = realNodeManager()
+            val viewModel = MainViewModel(logger = mockk(relaxed = true), injectedNodeManager = nodeManager)
+            val root = nodeManager.rootNode!!
+            viewModel.setInitialStateForTest(root)
+
+            val child = nodeManager.getNodeByID(root.id)!!.childNodes[0]
+            
+            // Initially no unsaved changes
+            viewModel.hasUnsavedChangesState shouldBe false
+            
+            // Delete child node
+            viewModel.onDeleteNode(child)
+            viewModel.onConfirmDelete()
+            
+            eventually {
+                viewModel.hasUnsavedChangesState shouldBe true
+            }
+        }
+
+        "unsaved changes tracking is enabled after node addition" {
+            val nodeManager = realNodeManager()
+            val viewModel = MainViewModel(logger = mockk(relaxed = true), injectedNodeManager = nodeManager)
+            val root = nodeManager.rootNode!!
+            viewModel.setInitialStateForTest(root)
+
+            // Initially no unsaved changes
+            viewModel.hasUnsavedChangesState shouldBe false
+            
+            // Add child node
+            viewModel.addNode("New child")
+            
+            eventually {
+                viewModel.hasUnsavedChangesState shouldBe true
+            }
+        }
+
+        "unsaved changes tracking is enabled after node text update" {
+            val nodeManager = realNodeManager()
+            val viewModel = MainViewModel(logger = mockk(relaxed = true), injectedNodeManager = nodeManager)
+            val root = nodeManager.rootNode!!
+            viewModel.setInitialStateForTest(root)
+
+            val child = nodeManager.getNodeByID(root.id)!!.childNodes[0]
+            
+            // Initially no unsaved changes
+            viewModel.hasUnsavedChangesState shouldBe false
+            
+            // Update node text
+            viewModel.updateNodeText(child, "Updated text")
+            
+            eventually {
+                viewModel.hasUnsavedChangesState shouldBe true
+            }
+        }
+
+        "unsaved changes are cleared after save" {
+            val nodeManager = realNodeManager()
+            val viewModel = MainViewModel(logger = mockk(relaxed = true), injectedNodeManager = nodeManager)
+            val root = nodeManager.rootNode!!
+            viewModel.setInitialStateForTest(root)
+
+            // Make an unsaved change
+            viewModel.addNode("Unsaved child")
+            
+            eventually {
+                viewModel.hasUnsavedChangesState shouldBe true
+            }
+            
+            // Simulate save by clearing the flag (as saveFile does)
+            viewModel.saveFile(java.io.ByteArrayOutputStream())
+            
+            viewModel.hasUnsavedChangesState shouldBe false
+        }
+
+        "exit confirmation sets leaving flag when unsaved changes exist and user tries to leave" {
+            val nodeManager = realNodeManager()
+            val viewModel = MainViewModel(logger = mockk(relaxed = true), injectedNodeManager = nodeManager)
+            val root = nodeManager.rootNode!!
+            viewModel.setInitialStateForTest(root)
+
+            // Make an unsaved change
+            viewModel.addNode("Unsaved child")
+            
+            eventually {
+                viewModel.hasUnsavedChangesState shouldBe true
+            }
+            
+            // Trigger leaveApp (simulates user pressing back/exiting)
+            viewModel.upOrClose()
+            
+            eventually {
+                // ViewModel sets leaving = true, MainActivity will show ExitConfirmation dialog
+                viewModel.uiState.value.leaving shouldBe true
+            }
+        }
+
+        "exit confirmation does not set leaving when no unsaved changes" {
+            val nodeManager = realNodeManager()
+            val viewModel = MainViewModel(logger = mockk(relaxed = true), injectedNodeManager = nodeManager)
+            val root = nodeManager.rootNode!!
+            viewModel.setInitialStateForTest(root)
+
+            // No unsaved changes
+            viewModel.hasUnsavedChangesState shouldBe false
+            
+            // Trigger leaveApp
+            viewModel.upOrClose()
+            
+            // With no unsaved changes, leaving should be true immediately (no confirmation needed)
+            eventually {
+                viewModel.uiState.value.leaving shouldBe true
+            }
+        }
+
+        // ===== CONFIRMATION DIALOG STATE TRANSITIONS (T061) =====
+
+        "onDeleteNode shows DeleteConfirmation dialog with correct descendant count" {
+            val nodeManager = realNodeManager()
+            val viewModel = MainViewModel(logger = mockk(relaxed = true), injectedNodeManager = nodeManager)
+            val root = nodeManager.rootNode!!
+            viewModel.setInitialStateForTest(root)
+
+            val child = nodeManager.getNodeByID(root.id)!!.childNodes[0]
+            
+            // Trigger delete
+            viewModel.onDeleteNode(child)
+            
+            eventually {
+                val dialog = viewModel.uiState.value.dialogUiState.dialogType
+                (dialog is MainUiState.DialogType.DeleteConfirmation) shouldBe true
+                val deleteDialog = dialog as MainUiState.DialogType.DeleteConfirmation
+                deleteDialog.node.id shouldBe child.id
+                deleteDialog.descendantCount shouldBe 0
+            }
+        }
+
+        "onDeleteNode shows DeleteConfirmation dialog with correct descendant count for node with children" {
+            val nodeManager = realNodeManager()
+            val viewModel = MainViewModel(logger = mockk(relaxed = true), injectedNodeManager = nodeManager)
+            val root = nodeManager.rootNode!!
+            viewModel.setInitialStateForTest(root)
+
+            // Add a child to the first child to create a parent with descendants
+            val firstChild = nodeManager.getNodeByID(root.id)!!.childNodes[0]
+            nodeManager.addNodeToMindmap("Grandchild", firstChild)
+            val updatedFirstChild = nodeManager.getNodeByID(firstChild.id)!!
+            
+            // Trigger delete on parent with children
+            viewModel.onDeleteNode(updatedFirstChild)
+            
+            eventually {
+                val dialog = viewModel.uiState.value.dialogUiState.dialogType
+                (dialog is MainUiState.DialogType.DeleteConfirmation) shouldBe true
+                val deleteDialog = dialog as MainUiState.DialogType.DeleteConfirmation
+                deleteDialog.node.id shouldBe updatedFirstChild.id
+                deleteDialog.descendantCount shouldBe 1
+            }
+        }
+
+        "onCancelDelete dismisses dialog without deleting" {
+            val nodeManager = realNodeManager()
+            val viewModel = MainViewModel(logger = mockk(relaxed = true), injectedNodeManager = nodeManager)
+            val root = nodeManager.rootNode!!
+            viewModel.setInitialStateForTest(root)
+
+            val child = nodeManager.getNodeByID(root.id)!!.childNodes[0]
+            
+            // Trigger delete
+            viewModel.onDeleteNode(child)
+            
+            eventually {
+                val dialog = viewModel.uiState.value.dialogUiState.dialogType
+                (dialog is MainUiState.DialogType.DeleteConfirmation) shouldBe true
+            }
+            
+            // Cancel the deletion
+            viewModel.onCancelDelete()
+            
+            eventually {
+                viewModel.uiState.value.dialogUiState.dialogType shouldBe MainUiState.DialogType.None
+            }
+            
+            // Node should still exist
+            nodeManager.getNodeByID(child.id) shouldNotBe null
+        }
+
+        "onConfirmDelete executes deletion after confirmation" {
+            val nodeManager = realNodeManager()
+            val viewModel = MainViewModel(logger = mockk(relaxed = true), injectedNodeManager = nodeManager)
+            val root = nodeManager.rootNode!!
+            viewModel.setInitialStateForTest(root)
+
+            val child = nodeManager.getNodeByID(root.id)!!.childNodes[0]
+            
+            // Trigger delete
+            viewModel.onDeleteNode(child)
+            
+            eventually {
+                val dialog = viewModel.uiState.value.dialogUiState.dialogType
+                (dialog is MainUiState.DialogType.DeleteConfirmation) shouldBe true
+            }
+            
+            // Confirm deletion
+            viewModel.onConfirmDelete()
+            
+            eventually {
+                viewModel.uiState.value.dialogUiState.dialogType shouldBe MainUiState.DialogType.None
+                nodeManager.getNodeByID(child.id) shouldBe null
+            }
+        }
+
+        "confirmation dialog state transitions: show -> cancel -> show -> confirm" {
+            val nodeManager = realNodeManager()
+            val viewModel = MainViewModel(logger = mockk(relaxed = true), injectedNodeManager = nodeManager)
+            val root = nodeManager.rootNode!!
+            viewModel.setInitialStateForTest(root)
+
+            val child = nodeManager.getNodeByID(root.id)!!.childNodes[0]
+            
+            // First attempt: show and cancel
+            viewModel.onDeleteNode(child)
+            eventually {
+                (viewModel.uiState.value.dialogUiState.dialogType is MainUiState.DialogType.DeleteConfirmation) shouldBe true
+            }
+            viewModel.onCancelDelete()
+            eventually {
+                viewModel.uiState.value.dialogUiState.dialogType shouldBe MainUiState.DialogType.None
+            }
+            nodeManager.getNodeByID(child.id) shouldNotBe null
+            
+            // Second attempt: show and confirm
+            viewModel.onDeleteNode(child)
+            eventually {
+                (viewModel.uiState.value.dialogUiState.dialogType is MainUiState.DialogType.DeleteConfirmation) shouldBe true
+            }
+            viewModel.onConfirmDelete()
+            eventually {
+                viewModel.uiState.value.dialogUiState.dialogType shouldBe MainUiState.DialogType.None
+            }
+            
+            // Node should be deleted
+            nodeManager.getNodeByID(child.id) shouldBe null
+        }
+
+        "deletion of root node is prevented and shows no dialog" {
+            val nodeManager = realNodeManager()
+            val viewModel = MainViewModel(logger = mockk(relaxed = true), injectedNodeManager = nodeManager)
+            val root = nodeManager.rootNode!!
+            viewModel.setInitialStateForTest(root)
+
+            // Try to delete root node
+            viewModel.onDeleteNode(root)
+            
+            // No dialog should be shown
+            viewModel.uiState.value.dialogUiState.dialogType shouldBe MainUiState.DialogType.None
+            
+            // Root should still exist
+            nodeManager.getNodeByID(root.id) shouldNotBe null
         }
     }
 

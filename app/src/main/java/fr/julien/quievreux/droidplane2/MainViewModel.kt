@@ -21,7 +21,6 @@ import fr.julien.quievreux.droidplane2.model.ContentNodeType.Classic
 import fr.julien.quievreux.droidplane2.model.ContentNodeType.RelativeFile
 import fr.julien.quievreux.droidplane2.model.ContextMenuAction
 import fr.julien.quievreux.droidplane2.model.ContextMenuAction.CopyText
-import fr.julien.quievreux.droidplane2.model.ContextMenuAction.Edit
 import fr.julien.quievreux.droidplane2.model.ContextMenuAction.NodeLink
 import fr.julien.quievreux.droidplane2.model.ContextMenuAction.AddChildNode
 import fr.julien.quievreux.droidplane2.model.ContextMenuAction.OpenLink
@@ -83,6 +82,8 @@ class MainViewModel(
         get() = hasUnsavedChanges
     val canUndoDelete: Boolean
         get() = undoStack.isNotEmpty()
+    val isLeaving: Boolean
+        get() = _uiState.value.leaving
 
     override fun onCleared() {
         super.onCleared()
@@ -560,6 +561,12 @@ class MainViewModel(
         }
     }
 
+    fun resetLeaving() {
+        updateUiState {
+            it.copy(leaving = false)
+        }
+    }
+
     private fun updateUiState(newUiState: (MainUiState) -> MainUiState) {
         _uiState.update {
             newUiState(it)
@@ -809,17 +816,6 @@ nodeFindList:${nodeManager.getSearchResult().map { getNodeText(it) }.joinToStrin
 
     fun onNodeContextMenuClick(contextMenuAction: ContextMenuAction) {
         when (contextMenuAction) {
-            is Edit -> {
-                nodeManager.getNodeByID(contextMenuAction.node.id)?.let { node ->
-                    setDialogState(
-                        DialogType.EditNodeDescription(
-                            node = node,
-                            oldValue = getNodeText(node).orEmpty(),
-                        )
-                    )
-                }
-            }
-
             is ContextMenuAction.Properties -> {
                 onOpenNodeInspector(contextMenuAction.node)
             }
@@ -1088,12 +1084,22 @@ nodeFindList:${nodeManager.getSearchResult().map { getNodeText(it) }.joinToStrin
             val parent = node.parentNode
             val updatedParent = parent?.id?.let { nodeManager.getNodeByID(it) } ?: parent
             if (updatedParent != null) {
-                showNode(updatedParent)
+                // Show parent's children list without selecting any node (FR-007)
+                val titleText = getNodeText(updatedParent).orEmpty()
+                val canGoBack = updatedParent.parentNode != null
+                updateUiState { currentState ->
+                    currentState.copy(
+                        nodeCurrentlyDisplayed = updatedParent,
+                        title = titleText,
+                        canGoBack = canGoBack,
+                        // Keep navigationStack as-is, don't push parent onto it
+                    )
+                }
             }
             val nodeTitle = node.text ?: "Node"
             updateUiState { currentState ->
                 val newSelectedId = if (currentState.selectedNodeId == node.id) {
-                    updatedParent?.id
+                    null  // FR-007: show parent's children list with no selection
                 } else {
                     currentState.selectedNodeId
                 }
@@ -1108,6 +1114,7 @@ nodeFindList:${nodeManager.getSearchResult().map { getNodeText(it) }.joinToStrin
                     selectedNodeId = newSelectedId,
                     collapsedNodeIds = newCollapsedIds,
                     canUndoDelete = undoStack.isNotEmpty(),
+                    leaving = false,  // Reset leaving flag on deletion
                     snackbarMessage = MainUiState.SnackbarMessage(
                         message = "\"$nodeTitle\" deleted",
                         actionLabel = R.string.undo,
@@ -1146,6 +1153,7 @@ nodeFindList:${nodeManager.getSearchResult().map { getNodeText(it) }.joinToStrin
                     collapsedNodeIds = newCollapsed,
                     selectedNodeId = restoredNode?.id ?: currentState.selectedNodeId,
                     canUndoDelete = undoStack.isNotEmpty(),
+                    leaving = false,  // Reset leaving flag on undo
                     snackbarMessage = null
                 )
             }
@@ -1194,6 +1202,7 @@ nodeFindList:${nodeManager.getSearchResult().map { getNodeText(it) }.joinToStrin
                         treeVersion = currentState.treeVersion + 1,
                         collapsedNodeIds = newCollapsed,
                         selectedNodeId = createdNodeId ?: currentState.selectedNodeId,
+                        leaving = false,  // Reset leaving flag on node creation
                     )
                 }
             }
