@@ -8,16 +8,13 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -45,6 +42,11 @@ import fr.julien.quievreux.droidplane2.model.getNodeIconsResIdFromName
 import fr.julien.quievreux.droidplane2.R
 import fr.julien.quievreux.droidplane2.data.model.Node
 import fr.julien.quievreux.droidplane2.model.ContextMenuAction
+import fr.julien.quievreux.droidplane2.model.ContextMenuAction.AddChildNode
+import fr.julien.quievreux.droidplane2.model.ContextMenuAction.CopyText
+import fr.julien.quievreux.droidplane2.model.ContextMenuAction.DeleteNode
+import fr.julien.quievreux.droidplane2.model.ContextMenuAction.OpenLink
+import fr.julien.quievreux.droidplane2.model.ContextMenuAction.Properties
 import fr.julien.quievreux.droidplane2.ui.theme.ContrastAwareReplyTheme
 
 @OptIn(ExperimentalFoundationApi::class)
@@ -56,10 +58,10 @@ fun MindMapNodeCard(
     branchDirection: BranchDirection,
     onNodeClick: () -> Unit,
     onToggleCollapse: () -> Unit,
+    modifier: Modifier = Modifier,
     onNodeDoubleClick: (() -> Unit)? = null,
     onContextMenuAction: (ContextMenuAction) -> Unit = {},
     fetchText: (Node) -> String? = { it.text },
-    modifier: Modifier = Modifier,
 ) {
     var showMenu by remember { mutableStateOf(false) }
 
@@ -214,7 +216,7 @@ fun MindMapNodeCard(
                 text = { Text(stringResource(R.string.node_properties)) },
                 onClick = {
                     showMenu = false
-                    onContextMenuAction(ContextMenuAction.Properties(node))
+                    onContextMenuAction(Properties(node))
                 },
             )
             if (node.link != null) {
@@ -222,29 +224,22 @@ fun MindMapNodeCard(
                     text = { Text(stringResource(R.string.open_link)) },
                     onClick = {
                         showMenu = false
-                        onContextMenuAction(ContextMenuAction.OpenLink(node))
+                        onContextMenuAction(OpenLink(node))
                     },
                 )
             }
             DropdownMenuItem(
-                text = { Text(stringResource(R.string.node_properties)) },
-                onClick = {
-                    showMenu = false
-                    onContextMenuAction(ContextMenuAction.Properties(node))
-                },
-            )
-            DropdownMenuItem(
                 text = { Text(stringResource(R.string.add_child_node)) },
                 onClick = {
                     showMenu = false
-                    onContextMenuAction(ContextMenuAction.AddChildNode(node))
+                    onContextMenuAction(AddChildNode(node))
                 },
             )
             DropdownMenuItem(
                 text = { Text(stringResource(R.string.copynodetext)) },
                 onClick = {
                     showMenu = false
-                    onContextMenuAction(ContextMenuAction.CopyText(node.text.orEmpty()))
+                    onContextMenuAction(CopyText(node.text.orEmpty()))
                 },
             )
             if (!isRoot) {
@@ -252,7 +247,7 @@ fun MindMapNodeCard(
                     text = { Text(stringResource(R.string.delete)) },
                     onClick = {
                         showMenu = false
-                        onContextMenuAction(ContextMenuAction.DeleteNode(node))
+                        onContextMenuAction(DeleteNode(node))
                     },
                 )
             }
@@ -346,7 +341,7 @@ private fun parseHexColor(hex: String): Color? {
             else -> return null
         }
         Color(colorInt)
-    } catch (e: Exception) {
+    } catch (_: Exception) {
         null
     }
 }

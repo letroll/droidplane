@@ -32,7 +32,6 @@ import androidx.compose.material3.SnackbarResult.Dismissed
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.State
 import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
@@ -51,9 +50,6 @@ import fr.julien.quievreux.droidplane2.data.RecentFilesRepository
 import fr.julien.quievreux.droidplane2.data.RecentFilesRepositoryImpl
 import fr.julien.quievreux.droidplane2.data.createStorageFileChecker
 import fr.julien.quievreux.droidplane2.data.getFileNameFromUri
-import fr.julien.quievreux.droidplane2.core.PermissionUtils.checkStoragePermissions
-import fr.julien.quievreux.droidplane2.core.PermissionUtils.requestForStoragePermissions
-import fr.julien.quievreux.droidplane2.core.extensions.getOpenFileLauncher
 import fr.julien.quievreux.droidplane2.core.extensions.getSaveFileLauncher
 import fr.julien.quievreux.droidplane2.core.log.Logger
 import fr.julien.quievreux.droidplane2.core.ui.component.AppFloatingActionButton
@@ -261,8 +257,13 @@ class MainActivity : FragmentActivity(), FileRegister {
                         NodePropertiesInspector(
                             node = dialog.node,
                             initialTab = dialog.initialTab,
+                            parentNode = dialog.parentNode,
+                            isNewNode = dialog.isNewNode,
                             onSave = { updatedNode ->
                                 viewModel.onSaveNodeProperties(updatedNode)
+                            },
+                            onAddNode = { newNode, parentNode ->
+                                viewModel.onAddNodeFromInspector(newNode, parentNode)
                             },
                             onDismiss = {
                                 viewModel.onDismissNodeInspector()
@@ -301,8 +302,7 @@ class MainActivity : FragmentActivity(), FileRegister {
                                     Top -> viewModel.navigateToTop()
 
                                     NewMindmap -> {
-                                        val defaultTitle = getString(R.string.default_root_node_title)
-                                        viewModel.onNewMindmapRequested(defaultTitle)
+                                        viewModel.onNewMindmapRequested(getString(R.string.default_root_node_title))
                                     }
 
                                     Open -> openFileLauncher.launch(arrayOf("*/*"))
@@ -341,8 +341,24 @@ class MainActivity : FragmentActivity(), FileRegister {
                                 } else {
                                     state.value.nodeCurrentlyDisplayed
                                 }
-                                targetParent?.let { node ->
-                                    viewModel.setDialogState(AddChildNode(parentNode = node))
+                                targetParent?.let { parentNode ->
+                                    val timestamp = System.currentTimeMillis()
+                                    val newNode = Node(
+                                        parentNode = parentNode,
+                                        id = "temp_$timestamp",
+                                        numericId = 0,
+                                        text = "",
+                                        creationDate = timestamp,
+                                        modificationDate = timestamp
+                                    )
+                                    viewModel.setDialogState(
+                                        DialogType.NodePropertiesInspector(
+                                            node = newNode,
+                                            initialTab = InspectorTab.CONTENT,
+                                            parentNode = parentNode,
+                                            isNewNode = true,
+                                        )
+                                    )
                                 }
                             },
                             iconContentDsc = "Add",

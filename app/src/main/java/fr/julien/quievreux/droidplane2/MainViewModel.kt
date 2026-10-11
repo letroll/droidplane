@@ -774,6 +774,13 @@ nodeFindList:${nodeManager.getSearchResult().map { getNodeText(it) }.joinToStrin
         }
     }
 
+    fun onAddNodeFromInspector(newNode: Node, parentNode: Node?) {
+        val text = newNode.text.orEmpty()
+            .also { if (it.isBlank()) return }
+        addNode(text, parentNode)
+        setDialogState(DialogType.None)
+    }
+
     fun onDismissNodeInspector() {
         setDialogState(DialogType.None)
     }
@@ -831,9 +838,22 @@ nodeFindList:${nodeManager.getSearchResult().map { getNodeText(it) }.joinToStrin
             }
 
             is AddChildNode -> {
-                nodeManager.getNodeByID(contextMenuAction.parentNode.id)?.let { node ->
+                nodeManager.getNodeByID(contextMenuAction.parentNode.id)?.let { parentNode ->
+                    val newNode = Node(
+                        parentNode = parentNode,
+                        id = "temp_${System.currentTimeMillis()}",
+                        numericId = 0,
+                        text = "",
+                        creationDate = System.currentTimeMillis(),
+                        modificationDate = System.currentTimeMillis()
+                    )
                     setDialogState(
-                        DialogType.AddChildNode(parentNode = node)
+                        DialogType.NodePropertiesInspector(
+                            node = newNode,
+                            initialTab = InspectorTab.CONTENT,
+                            parentNode = parentNode,
+                            isNewNode = true,
+                        )
                     )
                 }
             }

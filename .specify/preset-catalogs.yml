@@ -1,0 +1,6 @@
+catalogs:
+- name: community
+  url: https://github.github.com/spec-kit/community/presets.html
+  priority: 10
+  install_allowed: false
+  description: ''

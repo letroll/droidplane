@@ -1,19 +1,13 @@
 <!--
 SYNC IMPACT REPORT
 ==================
-- Version change: 0.0.0 (Uninitialized Template) -> 1.0.0
-- Bump type: MAJOR (Initial ratification of repository constitution)
-- Modified principles:
-  * [PRINCIPLE_1_NAME] -> I. Modular Separation of Concerns (:core, :data, :app)
-  * [PRINCIPLE_2_NAME] -> II. Unidirectional Data Flow & State Consistency
-  * [PRINCIPLE_3_NAME] -> III. Test-Driven Verification (NON-NEGOTIABLE)
-  * [PRINCIPLE_4_NAME] -> IV. Freeplane Format Compatibility & Data Integrity
-  * [PRINCIPLE_5_NAME] -> V. Performance, Large Map Responsiveness & Simplicity
+- Version change: 1.0.0 -> 1.1.0
+- Bump type: MINOR (New principle added: SOLID Principles & Cyclomatic Complexity)
+- Modified principles: None
 - Added sections:
-  * Technical Constraints & Quality Standards
-  * Development Workflow & Quality Gates
+  * Core Principle VI: SOLID Principles & Cyclomatic Complexity
 - Removed sections: None
-- Follow-up TODOs: None (all template slots defined)
+- Follow-up TODOs: None
 -->
 
 # Droidplane Constitution
@@ -61,6 +55,18 @@ The application MUST remain fast, responsive, and lightweight even with complex 
 
 Rationale: Mobile devices face constrained memory and CPU; large mindmaps must render effortlessly without ANRs or UI lag.
 
+### VI. SOLID Principles & Cyclomatic Complexity
+All source code MUST adhere to SOLID design principles:
+- **Single Responsibility**: Each class/module has one reason to change.
+- **Open/Closed**: Entities open for extension, closed for modification.
+- **Liskov Substitution**: Subtypes substitutable for their base types.
+- **Interface Segregation**: Clients not forced to depend on unused interfaces.
+- **Dependency Inversion**: Depend on abstractions, not concretions.
+
+Cyclomatic complexity of methods MUST NOT exceed 20. Methods exceeding this threshold MUST be refactored into smaller, single-purpose functions.
+
+Rationale: SOLID principles ensure maintainable, testable, and extensible code. Limiting cyclomatic complexity reduces defect density and improves testability.
+
 ## Technical Constraints & Quality Standards
 
 Droidplane targets modern Android platforms while adhering to proven architectural standards:
@@ -78,6 +84,7 @@ All contributions and automated implementations MUST satisfy the following quali
 - Static Analysis: Code MUST comply with project formatting conventions and build without compilation warnings or fatal lint errors (`./gradlew lint`).
 - Architecture Review: Any new dependency or cross-module linkage MUST be evaluated against module boundaries defined in Principle I.
 - Backward Compatibility: Any change affecting XML reading or writing MUST include a test using realistic `.mm` fixtures.
+- Complexity Gate: Cyclomatic complexity MUST be verified via static analysis tooling (e.g., Detekt) and MUST NOT exceed the limit in Principle VI.
 
 ## Governance
 
@@ -93,4 +100,4 @@ This constitution is the authoritative reference for architectural rules, design
   - PATCH version bumps indicate clarifications, typo fixes, or non-semantic wording refinements.
 - Compliance Review: Pull request reviews and automated tools MUST verify compliance with these principles during feature development and refactoring.
 
-**Version**: 1.0.0 | **Ratified**: 2026-10-03 | **Last Amended**: 2026-10-03
+**Version**: 1.1.0 | **Ratified**: 2026-10-03 | **Last Amended**: 2026-10-11

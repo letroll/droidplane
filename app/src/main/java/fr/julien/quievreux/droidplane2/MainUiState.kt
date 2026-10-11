@@ -86,6 +86,8 @@ data class MainUiState(
         data class NodePropertiesInspector(
             val node: Node,
             val initialTab: InspectorTab = InspectorTab.CONTENT,
+            val parentNode: Node? = null,
+            val isNewNode: Boolean = false,
         ) : DialogType()
     }
 }

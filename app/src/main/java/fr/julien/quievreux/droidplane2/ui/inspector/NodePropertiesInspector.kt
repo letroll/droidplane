@@ -52,6 +52,9 @@ fun NodePropertiesInspector(
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier,
     onMoveCloudToParent: ((Node) -> Unit)? = null,
+    parentNode: Node? = null,
+    isNewNode: Boolean = false,
+    onAddNode: ((Node, Node?) -> Unit)? = null,
     contentTabContent: @Composable (Node, (Node) -> Unit) -> Unit = { n, onC -> ContentTab(node = n, onNodeChanged = onC) },
     attributesTabContent: @Composable (Node, (Node) -> Unit) -> Unit = { n, onC -> AttributesTab(node = n, onNodeChanged = onC) },
     stylingTabContent: @Composable (Node, (Node) -> Unit) -> Unit = { n, onC -> StylingTab(node = n, onNodeChanged = onC, onMoveCloudToParent = onMoveCloudToParent) },
@@ -61,6 +64,14 @@ fun NodePropertiesInspector(
 ) {
     var currentNode by remember(node) { mutableStateOf(node) }
     var selectedTab by remember(initialTab) { mutableStateOf(initialTab) }
+
+    val effectiveOnSave = if (isNewNode) {
+        { updatedNode: Node ->
+            onAddNode?.invoke(updatedNode, parentNode)
+        }
+    } else {
+        onSave
+    }
 
     BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
         val isExpandedScreen = maxWidth >= 600.dp
@@ -90,7 +101,7 @@ fun NodePropertiesInspector(
                             selectedTab = selectedTab,
                             onTabSelected = { selectedTab = it },
                             onNodeChanged = { currentNode = it },
-                            onSave = { onSave(currentNode) },
+                            onSave = { effectiveOnSave(currentNode) },
                             onDismiss = onDismiss,
                             contentTabContent = contentTabContent,
                             attributesTabContent = attributesTabContent,
@@ -98,6 +109,7 @@ fun NodePropertiesInspector(
                             edgesConnectorsTabContent = edgesConnectorsTabContent,
                             iconsMediaTabContent = iconsMediaTabContent,
                             scriptsTabContent = scriptsTabContent,
+                            isNewNode = isNewNode,
                         )
                     }
                 }
@@ -114,7 +126,7 @@ fun NodePropertiesInspector(
                     selectedTab = selectedTab,
                     onTabSelected = { selectedTab = it },
                     onNodeChanged = { currentNode = it },
-                    onSave = { onSave(currentNode) },
+                    onSave = { effectiveOnSave(currentNode) },
                     onDismiss = onDismiss,
                     contentTabContent = contentTabContent,
                     attributesTabContent = attributesTabContent,
@@ -122,7 +134,8 @@ fun NodePropertiesInspector(
                     edgesConnectorsTabContent = edgesConnectorsTabContent,
                     iconsMediaTabContent = iconsMediaTabContent,
                     scriptsTabContent = scriptsTabContent,
-                    modifier = Modifier.fillMaxHeight(0.85f)
+                    modifier = Modifier.fillMaxHeight(0.85f),
+                    isNewNode = isNewNode,
                 )
             }
         }
@@ -144,6 +157,7 @@ fun InspectorScaffold(
     iconsMediaTabContent: @Composable (Node, (Node) -> Unit) -> Unit,
     scriptsTabContent: @Composable (Node, (Node) -> Unit) -> Unit,
     modifier: Modifier = Modifier,
+    isNewNode: Boolean = false,
 ) {
     Column(
         modifier = modifier
@@ -158,12 +172,12 @@ fun InspectorScaffold(
         ) {
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = stringResource(R.string.node_properties),
+                    text = if (isNewNode) stringResource(R.string.add_child) else node.text.orEmpty(),
                     style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.Bold
                 )
                 Text(
-                    text = node.text ?: node.id,
+                    text = if (isNewNode) node.text.orEmpty() else node.id,
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1
@@ -174,7 +188,7 @@ fun InspectorScaffold(
                     Text(stringResource(R.string.cancel))
                 }
                 Button(onClick = onSave) {
-                    Text(stringResource(R.string.save))
+                    Text(if (isNewNode) stringResource(R.string.add) else stringResource(R.string.save))
                 }
             }
         }

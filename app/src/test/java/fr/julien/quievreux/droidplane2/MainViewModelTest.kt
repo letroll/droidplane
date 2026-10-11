@@ -489,9 +489,12 @@ class MainViewModelTest : KStringSpec() {
 
             val child = nodeManager.getNodeByID(root.id)!!.childNodes[0]
 
-            // Trigger AddChildNode context menu
+            // Trigger AddChildNode context menu - now opens NodePropertiesInspector
             viewModel.onNodeContextMenuClick(ContextMenuAction.AddChildNode(parentNode = child))
-            viewModel.uiState.value.dialogUiState.dialogType shouldBe MainUiState.DialogType.AddChildNode(parentNode = child)
+            val dialog = viewModel.uiState.value.dialogUiState.dialogType
+            val inspectorDialog = dialog as MainUiState.DialogType.NodePropertiesInspector
+            inspectorDialog.isNewNode shouldBe true
+            inspectorDialog.parentNode shouldBe child
 
             // Add node
             viewModel.addNode("mindmap child", parentNode = child)
@@ -504,8 +507,8 @@ class MainViewModelTest : KStringSpec() {
 
             // Trigger Properties context menu
             viewModel.onNodeContextMenuClick(ContextMenuAction.Properties(node = child))
-            val dialog = viewModel.uiState.value.dialogUiState.dialogType
-            (dialog is MainUiState.DialogType.NodePropertiesInspector) shouldBe true
+            val propsInspectorDialog = viewModel.uiState.value.dialogUiState.dialogType
+            (propsInspectorDialog is MainUiState.DialogType.NodePropertiesInspector) shouldBe true
         }
 
         "deleting a node increments treeVersion and cleans selection and collapsed state" {
