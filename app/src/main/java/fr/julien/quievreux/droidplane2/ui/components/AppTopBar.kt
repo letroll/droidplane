@@ -66,6 +66,7 @@ enum class AppTopBarAction {
     Backpress,
     ExitSearch,
     ToggleDisplayMode,
+    RecentFiles,
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -298,6 +299,15 @@ fun AppTopBar(
                     },
                     text = {
                         Text(stringResource(R.string.save))
+                    },
+                )
+                DropdownMenuItem(
+                    onClick = {
+                        showMenu = false
+                        onBarAction(AppTopBarAction.RecentFiles)
+                    },
+                    text = {
+                        Text(stringResource(R.string.menu_recent_files))
                     },
                 )
                 // Undo action - only visible when undo is available

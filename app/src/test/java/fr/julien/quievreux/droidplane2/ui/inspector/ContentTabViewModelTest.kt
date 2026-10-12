@@ -1,17 +1,19 @@
 package fr.julien.quievreux.droidplane2.ui.inspector
 
+import fr.julien.quievreux.droidplane2.data.RecentFilesRepository
+import fr.julien.quievreux.droidplane2.data.NodeManager
+import fr.julien.quievreux.droidplane2.data.NodeUtilsDefaultImpl
+import fr.julien.quievreux.droidplane2.data.XmlParseUtilsDefaultImpl
+import fr.julien.quievreux.droidplane2.data.model.CloudProperties
 import fr.julien.quievreux.droidplane2.InspectorTab
 import fr.julien.quievreux.droidplane2.MainUiState
 import fr.julien.quievreux.droidplane2.MainViewModel
 import fr.julien.quievreux.droidplane2.core.log.Logger
 import fr.julien.quievreux.droidplane2.core.testutils.KStringSpec
-import fr.julien.quievreux.droidplane2.data.NodeManager
-import fr.julien.quievreux.droidplane2.data.NodeUtilsDefaultImpl
-import fr.julien.quievreux.droidplane2.data.XmlParseUtilsDefaultImpl
-import fr.julien.quievreux.droidplane2.data.model.CloudProperties
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.shouldNotBe
 import io.mockk.mockk
+import io.mockk.coEvery
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.test.TestScope
 
@@ -22,7 +24,11 @@ class ContentTabViewModelTest : KStringSpec() {
 
         "opening and saving node properties inspector updates node content and state" {
             val nodeManager = realNodeManager()
-            val viewModel = MainViewModel(logger = mockk(relaxed = true), injectedNodeManager = nodeManager)
+            val viewModel = MainViewModel(
+                logger = mockk(relaxed = true),
+                injectedNodeManager = nodeManager,
+                recentFilesRepository = mockk(relaxed = true),
+            )
             val root = nodeManager.rootNode!!
             viewModel.setInitialStateForTest(root)
 
@@ -59,7 +65,11 @@ class ContentTabViewModelTest : KStringSpec() {
 
         "dismissing inspector resets dialog state without saving" {
             val nodeManager = realNodeManager()
-            val viewModel = MainViewModel(logger = mockk(relaxed = true), injectedNodeManager = nodeManager)
+            val viewModel = MainViewModel(
+                logger = mockk(relaxed = true),
+                injectedNodeManager = nodeManager,
+                recentFilesRepository = mockk(relaxed = true),
+            )
             val root = nodeManager.rootNode!!
             viewModel.setInitialStateForTest(root)
 
@@ -72,7 +82,11 @@ class ContentTabViewModelTest : KStringSpec() {
 
         "moving cloud to parent transfers cloud from child to parent node" {
             val nodeManager = realNodeManager()
-            val viewModel = MainViewModel(logger = mockk(relaxed = true), injectedNodeManager = nodeManager)
+            val viewModel = MainViewModel(
+                logger = mockk(relaxed = true),
+                injectedNodeManager = nodeManager,
+                recentFilesRepository = mockk(relaxed = true),
+            )
             val root = nodeManager.rootNode!!
             viewModel.setInitialStateForTest(root)
 
@@ -97,7 +111,11 @@ class ContentTabViewModelTest : KStringSpec() {
 
         "saving rich text node updates richText content and state" {
             val nodeManager = realNodeManager()
-            val viewModel = MainViewModel(logger = mockk(relaxed = true), injectedNodeManager = nodeManager)
+            val viewModel = MainViewModel(
+                logger = mockk(relaxed = true),
+                injectedNodeManager = nodeManager,
+                recentFilesRepository = mockk(relaxed = true),
+            )
             val root = nodeManager.rootNode!!
             viewModel.setInitialStateForTest(root)
 

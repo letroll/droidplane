@@ -1,16 +1,17 @@
 package fr.julien.quievreux.droidplane2.ui.inspector
 
-import fr.julien.quievreux.droidplane2.InspectorTab
 import fr.julien.quievreux.droidplane2.MainViewModel
-import fr.julien.quievreux.droidplane2.core.log.Logger
-import fr.julien.quievreux.droidplane2.core.testutils.KStringSpec
+import fr.julien.quievreux.droidplane2.data.RecentFilesRepository
 import fr.julien.quievreux.droidplane2.data.NodeManager
 import fr.julien.quievreux.droidplane2.data.NodeUtilsDefaultImpl
 import fr.julien.quievreux.droidplane2.data.XmlParseUtilsDefaultImpl
 import fr.julien.quievreux.droidplane2.data.model.NodeAttributeEntry
+import fr.julien.quievreux.droidplane2.core.log.Logger
+import fr.julien.quievreux.droidplane2.core.testutils.KStringSpec
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.shouldNotBe
 import io.mockk.mockk
+import io.mockk.coEvery
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.test.TestScope
 
@@ -21,7 +22,11 @@ class AttributesTabTest : KStringSpec() {
 
         "adding, modifying, and deleting attributes persists on node update" {
             val nodeManager = realNodeManager()
-            val viewModel = MainViewModel(logger = mockk(relaxed = true), injectedNodeManager = nodeManager)
+            val viewModel = MainViewModel(
+                logger = mockk(relaxed = true),
+                injectedNodeManager = nodeManager,
+                recentFilesRepository = mockk(relaxed = true),
+            )
             val root = nodeManager.rootNode!!
             viewModel.setInitialStateForTest(root)
 

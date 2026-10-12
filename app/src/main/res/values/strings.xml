@@ -45,6 +45,9 @@
     <string name="recent_files">Recent Files</string>
     <string name="browse_files">Browse other file…</string>
     <string name="no_recent_files">No recent files found</string>
+    <string name="recent_files_dialog_title">Recent Files</string>
+    <string name="exit_app">Exit App</string>
+    <string name="menu_recent_files">Recent Files</string>
 
     <!-- Node Properties Inspector -->
     <string name="node_properties">Properties</string>

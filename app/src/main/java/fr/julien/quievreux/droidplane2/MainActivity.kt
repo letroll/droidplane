@@ -45,6 +45,7 @@ import fr.julien.quievreux.droidplane2.MainUiState.DialogType.None
 import fr.julien.quievreux.droidplane2.ui.view.DeleteConfirmationDialog
 import fr.julien.quievreux.droidplane2.ui.view.DiscardConfirmationDialog
 import fr.julien.quievreux.droidplane2.ui.view.ExitConfirmationDialog
+import fr.julien.quievreux.droidplane2.ui.view.RecentFilesDialog
 import fr.julien.quievreux.droidplane2.ui.view.StartupChooserDialog
 import fr.julien.quievreux.droidplane2.data.RecentFilesRepository
 import fr.julien.quievreux.droidplane2.data.RecentFilesRepositoryImpl
@@ -66,7 +67,14 @@ import fr.julien.quievreux.droidplane2.ui.components.AppTopBarAction.ExitSearch
 import fr.julien.quievreux.droidplane2.ui.components.AppTopBarAction.Help
 import fr.julien.quievreux.droidplane2.ui.components.AppTopBarAction.NewMindmap
 import fr.julien.quievreux.droidplane2.ui.components.AppTopBarAction.Open
+import fr.julien.quievreux.droidplane2.ui.components.AppTopBarAction.RecentFiles
 import fr.julien.quievreux.droidplane2.ui.components.AppTopBarAction.Save
+import fr.julien.quievreux.droidplane2.ui.components.AppTopBarAction.SearchNext
+import fr.julien.quievreux.droidplane2.ui.components.AppTopBarAction.SearchPrevious
+import fr.julien.quievreux.droidplane2.ui.components.AppTopBarAction.Top
+import fr.julien.quievreux.droidplane2.ui.components.AppTopBarAction.ToggleDisplayMode
+import fr.julien.quievreux.droidplane2.ui.components.AppTopBarAction.Undo
+import fr.julien.quievreux.droidplane2.ui.components.AppTopBarAction.Up
 import fr.julien.quievreux.droidplane2.ui.components.AppTopBarAction.SearchNext
 import fr.julien.quievreux.droidplane2.ui.components.AppTopBarAction.SearchPrevious
 import fr.julien.quievreux.droidplane2.ui.components.AppTopBarAction.ToggleDisplayMode
@@ -188,7 +196,29 @@ class MainActivity : FragmentActivity(), FileRegister {
                 val nodeFindList = viewModel.getSearchResultFlow().collectAsState()
 
                 BackHandler(true) {
-                    viewModel.upOrClose()
+                    viewModel.upOrClose(
+                        fileAccessibilityChecker = createStorageFileChecker(this@MainActivity),
+                        onOpenRecent = { recent ->
+                            openSelectedUri(Uri.parse(recent.uriString))
+                        },
+                        onNewMindmap = {
+                            viewModel.onNewMindmapRequested(getString(R.string.default_root_node_title))
+                        },
+                        onBrowse = {
+                            openFileLauncher.launch(arrayOf("*/*"))
+                        },
+                        onOpenDemo = {
+                            viewModel.onHelpDemoRequested {
+                                viewModel.setMapUri(Uri.parse("android.resource://$packageName/raw/example.mm"))
+                                lifecycleScope.launch {
+                                    resources.openRawResource(R.raw.example).let { viewModel.loadMindMap(it) }
+                                }
+                            }
+                        },
+                        onExitApp = {
+                            finish()
+                        }
+                    )
                 }
 
                 LaunchedEffect(state.value.error) {
@@ -253,6 +283,11 @@ class MainActivity : FragmentActivity(), FileRegister {
                             chooser = dialog,
                         )
                     }
+                    is DialogType.RecentFiles -> {
+                        RecentFilesDialog(
+                            recentFilesDialog = dialog,
+                        )
+                    }
                     is DialogType.NodePropertiesInspector -> {
                         NodePropertiesInspector(
                             node = dialog.node,
@@ -291,7 +326,29 @@ class MainActivity : FragmentActivity(), FileRegister {
                             displayMode = state.value.displayMode,
                             onBarAction = { action ->
                                 when (action) {
-                                    Backpress -> viewModel.upOrClose()
+                                    Backpress -> viewModel.upOrClose(
+                                        fileAccessibilityChecker = createStorageFileChecker(this@MainActivity),
+                                        onOpenRecent = { recent ->
+                                            openSelectedUri(Uri.parse(recent.uriString))
+                                        },
+                                        onNewMindmap = {
+                                            viewModel.onNewMindmapRequested(getString(R.string.default_root_node_title))
+                                        },
+                                        onBrowse = {
+                                            openFileLauncher.launch(arrayOf("*/*"))
+                                        },
+                                        onOpenDemo = {
+                                            viewModel.onHelpDemoRequested {
+                                                viewModel.setMapUri(Uri.parse("android.resource://$packageName/raw/example.mm"))
+                                                lifecycleScope.launch {
+                                                    resources.openRawResource(R.raw.example).let { viewModel.loadMindMap(it) }
+                                                }
+                                            }
+                                        },
+                                        onExitApp = {
+                                            finish()
+                                        }
+                                    )
 
                                     SearchNext -> viewModel.searchNext()
 
@@ -323,6 +380,30 @@ class MainActivity : FragmentActivity(), FileRegister {
                                     ExitSearch -> viewModel.onExitSearchMode()
 
                                     ToggleDisplayMode -> viewModel.toggleDisplayMode()
+
+                                    RecentFiles -> viewModel.showRecentFilesDialog(
+                                        fileAccessibilityChecker = createStorageFileChecker(this@MainActivity),
+                                        onOpenRecent = { recent ->
+                                            openSelectedUri(Uri.parse(recent.uriString))
+                                        },
+                                        onNewMindmap = {
+                                            viewModel.onNewMindmapRequested(getString(R.string.default_root_node_title))
+                                        },
+                                        onBrowse = {
+                                            openFileLauncher.launch(arrayOf("*/*"))
+                                        },
+                                        onOpenDemo = {
+                                            viewModel.onHelpDemoRequested {
+                                                viewModel.setMapUri(Uri.parse("android.resource://$packageName/raw/example.mm"))
+                                                lifecycleScope.launch {
+                                                    resources.openRawResource(R.raw.example).let { viewModel.loadMindMap(it) }
+                                                }
+                                            }
+                                        },
+                                        onExitApp = {
+                                            finish()
+                                        }
+                                    )
                                 }
                             },
                         )

@@ -83,6 +83,16 @@ data class MainUiState(
             val onDismiss: () -> Unit,
         ) : DialogType()
 
+        data class RecentFiles(
+            val recentFiles: List<RecentFile>,
+            val onOpenRecent: (RecentFile) -> Unit,
+            val onNewMindmap: () -> Unit,
+            val onBrowse: () -> Unit,
+            val onOpenDemo: () -> Unit,
+            val onExitApp: () -> Unit,
+            val onDismiss: () -> Unit,
+        ) : DialogType()
+
         data class NodePropertiesInspector(
             val node: Node,
             val initialTab: InspectorTab = InspectorTab.CONTENT,

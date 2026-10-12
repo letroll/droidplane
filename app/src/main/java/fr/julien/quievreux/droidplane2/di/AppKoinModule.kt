@@ -2,10 +2,13 @@ package fr.julien.quievreux.droidplane2.di
 
 import fr.julien.quievreux.droidplane2.MainViewModel
 import fr.julien.quievreux.droidplane2.data.NodeManager
+import fr.julien.quievreux.droidplane2.data.RecentFilesRepository
+import fr.julien.quievreux.droidplane2.data.RecentFilesRepositoryImpl
 import fr.julien.quievreux.droidplane2.core.extensions.default
 import fr.julien.quievreux.droidplane2.ui.view.MindMapViewModel
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import org.koin.android.ext.koin.androidContext
 import org.koin.core.module.dsl.viewModel
 import org.koin.dsl.module
 
@@ -17,12 +20,19 @@ val appKoinModule = module {
     viewModel{
         MainViewModel(
             logger = get(),
+            recentFilesRepository = get(),
         )
     }
 
     viewModel{
         MindMapViewModel(
             logger = get(),
+        )
+    }
+
+    single<RecentFilesRepository> {
+        RecentFilesRepositoryImpl(
+            androidContext().getSharedPreferences("droidplane_recent_files", android.content.Context.MODE_PRIVATE)
         )
     }
 

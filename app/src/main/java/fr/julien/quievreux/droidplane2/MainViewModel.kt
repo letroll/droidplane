@@ -25,6 +25,7 @@ import fr.julien.quievreux.droidplane2.model.ContextMenuAction.NodeLink
 import fr.julien.quievreux.droidplane2.model.ContextMenuAction.AddChildNode
 import fr.julien.quievreux.droidplane2.model.ContextMenuAction.OpenLink
 import fr.julien.quievreux.droidplane2.model.DisplayMode
+import fr.julien.quievreux.droidplane2.data.RecentFilesRepository
 import fr.julien.quievreux.droidplane2.model.RecentFile
 import fr.julien.quievreux.droidplane2.model.ViewIntentNode
 import kotlinx.coroutines.Deferred
@@ -50,6 +51,7 @@ import java.util.Date
 class MainViewModel(
     val logger: Logger,
     private val injectedNodeManager: NodeManager? = null,
+    private val recentFilesRepository: RecentFilesRepository,
 ) : ViewModel(), KoinScopeComponent {
 
     override val scope: Scope by lazy { createScope(this) }
@@ -337,6 +339,53 @@ class MainViewModel(
     }
 
     /**
+     * Displays the recent files dialog allowing the user to open recent files,
+     * create a new mindmap, browse storage, open the demo, or exit the app.
+     */
+    fun showRecentFilesDialog(
+        fileAccessibilityChecker: (String) -> Boolean,
+        onOpenRecent: (RecentFile) -> Unit,
+        onNewMindmap: () -> Unit,
+        onBrowse: () -> Unit,
+        onOpenDemo: () -> Unit,
+        onExitApp: () -> Unit,
+    ) {
+        viewModelScope.launch(Dispatchers.IO) {
+            val recentFiles = recentFilesRepository.getRecentFiles(fileAccessibilityChecker)
+            viewModelScope.launch(Dispatchers.Main) {
+                setDialogState(
+                    MainUiState.DialogType.RecentFiles(
+                        recentFiles = recentFiles,
+                        onOpenRecent = { recent ->
+                            setDialogState(MainUiState.DialogType.None)
+                            onOpenRecent(recent)
+                        },
+                        onNewMindmap = {
+                            setDialogState(MainUiState.DialogType.None)
+                            onNewMindmap()
+                        },
+                        onBrowse = {
+                            setDialogState(MainUiState.DialogType.None)
+                            onBrowse()
+                        },
+                        onOpenDemo = {
+                            setDialogState(MainUiState.DialogType.None)
+                            onOpenDemo()
+                        },
+                        onExitApp = {
+                            setDialogState(MainUiState.DialogType.None)
+                            onExitApp()
+                        },
+                        onDismiss = {
+                            setDialogState(MainUiState.DialogType.None)
+                        }
+                    )
+                )
+            }
+        }
+    }
+
+    /**
      * Creates a new empty mindmap in memory with a single root node.
      */
     fun createEmptyMindmap(rootTitle: String = "Central Idea") {
@@ -521,18 +570,50 @@ class MainViewModel(
 
     /**
      * Navigates back up one level in the MainViewModel. If we already display the root node, the application will finish
+     * or show the Recent Files dialog if there are no unsaved changes.
+     * This version is called from the Activity with full callbacks.
      */
-    fun upOrClose() {
-        up(true)
+    fun upOrClose(
+        fileAccessibilityChecker: (String) -> Boolean,
+        onOpenRecent: (RecentFile) -> Unit,
+        onNewMindmap: () -> Unit,
+        onBrowse: () -> Unit,
+        onOpenDemo: () -> Unit,
+        onExitApp: () -> Unit,
+    ) {
+        up(
+            force = true,
+            fileAccessibilityChecker = fileAccessibilityChecker,
+            onOpenRecent = onOpenRecent,
+            onNewMindmap = onNewMindmap,
+            onBrowse = onBrowse,
+            onOpenDemo = onOpenDemo,
+            onExitApp = onExitApp,
+        )
     }
 
     /**
-     * Navigates back up one level in the MainViewModel, if possible. If force is true, the application closes if we can't
-     * go further up
+     * Navigates back up one level in the MainViewModel, if possible. If force is true and we can't
+     * go further up, shows the Recent Files dialog if there are no unsaved changes, otherwise shows
+     * the Exit Confirmation dialog.
      *
-     * @param force
+     * @param force Whether to force exit when at root
+     * @param fileAccessibilityChecker Optional checker for recent file accessibility. Required when force=true at root.
+     * @param onOpenRecent Callback to open a recent file
+     * @param onNewMindmap Callback to create a new mindmap
+     * @param onBrowse Callback to browse for files
+     * @param onOpenDemo Callback to open the demo mindmap
+     * @param onExitApp Callback to exit the app
      */
-    fun up(force: Boolean) {
+    fun up(
+        force: Boolean,
+        fileAccessibilityChecker: ((String) -> Boolean)? = null,
+        onOpenRecent: (RecentFile) -> Unit = {},
+        onNewMindmap: () -> Unit = {},
+        onBrowse: () -> Unit = {},
+        onOpenDemo: () -> Unit = {},
+        onExitApp: () -> Unit = {},
+    ) {
         viewModelScope.launch {
             _uiState.value.nodeCurrentlyDisplayed?.id?.let { nodeId ->
                 nodeManager.getNodeByID(nodeId)?.let { node ->
@@ -542,12 +623,38 @@ class MainViewModel(
                     }
                 } ?: run {
                     if (force) {
-                        leaveApp()
+                        if (hasUnsavedChangesState) {
+                            leaveApp()
+                        } else {
+                            fileAccessibilityChecker?.let { checker ->
+                                showRecentFilesDialog(
+                                    fileAccessibilityChecker = checker,
+                                    onOpenRecent = onOpenRecent,
+                                    onNewMindmap = onNewMindmap,
+                                    onBrowse = onBrowse,
+                                    onOpenDemo = onOpenDemo,
+                                    onExitApp = onExitApp,
+                                )
+                            } ?: leaveApp()
+                        }
                     }
                 }
             } ?: run {
                 if (force) {
-                    leaveApp()
+                    if (hasUnsavedChangesState) {
+                        leaveApp()
+                    } else {
+                        fileAccessibilityChecker?.let { checker ->
+                            showRecentFilesDialog(
+                                fileAccessibilityChecker = checker,
+                                onOpenRecent = onOpenRecent,
+                                onNewMindmap = onNewMindmap,
+                                onBrowse = onBrowse,
+                                onOpenDemo = onOpenDemo,
+                                onExitApp = onExitApp,
+                            )
+                        } ?: leaveApp()
+                    }
                 }
             }
         }

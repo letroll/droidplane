@@ -10,6 +10,8 @@ import fr.julien.quievreux.droidplane2.MainUiState.SearchUiState
 import fr.julien.quievreux.droidplane2.core.log.Logger
 import fr.julien.quievreux.droidplane2.core.testutils.KStringSpec
 import io.kotest.matchers.comparables.shouldBeGreaterThan
+import fr.julien.quievreux.droidplane2.data.RecentFilesRepository
+import fr.julien.quievreux.droidplane2.data.RecentFilesRepositoryImpl
 import fr.julien.quievreux.droidplane2.data.FakeDataSource
 import fr.julien.quievreux.droidplane2.data.NodeManager
 import fr.julien.quievreux.droidplane2.data.NodeUtilsDefaultImpl
@@ -192,7 +194,11 @@ class MainViewModelTest : KStringSpec() {
 
         "updateNodeText should be reflected in the displayed node and its parent listing" {
             val nodeManager = realNodeManager()
-            val viewModel = MainViewModel(logger = mockk(relaxed = true), injectedNodeManager = nodeManager)
+            val viewModel = MainViewModel(
+                logger = mockk(relaxed = true),
+                injectedNodeManager = nodeManager,
+                recentFilesRepository = mockk(relaxed = true),
+            )
             val root = nodeManager.rootNode!!
             viewModel.setInitialStateForTest(root)
 
@@ -210,7 +216,11 @@ class MainViewModelTest : KStringSpec() {
 
         "addNode should append the new child to the parent" {
             val nodeManager = realNodeManager()
-            val viewModel = MainViewModel(logger = mockk(relaxed = true), injectedNodeManager = nodeManager)
+            val viewModel = MainViewModel(
+                logger = mockk(relaxed = true),
+                injectedNodeManager = nodeManager,
+                recentFilesRepository = mockk(relaxed = true),
+            )
             val root = nodeManager.rootNode!!
             viewModel.setInitialStateForTest(root)
             val before = root.childNodes.size
@@ -226,7 +236,11 @@ class MainViewModelTest : KStringSpec() {
 
         "addNode should ignore blank text" {
             val nodeManager = realNodeManager()
-            val viewModel = MainViewModel(logger = mockk(relaxed = true), injectedNodeManager = nodeManager)
+            val viewModel = MainViewModel(
+                logger = mockk(relaxed = true),
+                injectedNodeManager = nodeManager,
+                recentFilesRepository = mockk(relaxed = true),
+            )
             val root = nodeManager.rootNode!!
             viewModel.setInitialStateForTest(root)
             val before = nodeManager.getNodeByID(root.id)!!.childNodes.size
@@ -238,7 +252,11 @@ class MainViewModelTest : KStringSpec() {
 
         "delete node and navigate to sibling and back should not restore deleted node in UI state" {
             val nodeManager = realNodeManager()
-            val viewModel = MainViewModel(logger = mockk(relaxed = true), injectedNodeManager = nodeManager)
+            val viewModel = MainViewModel(
+                logger = mockk(relaxed = true),
+                injectedNodeManager = nodeManager,
+                recentFilesRepository = mockk(relaxed = true),
+            )
             val root = nodeManager.rootNode!!
             viewModel.setInitialStateForTest(root)
 
@@ -277,7 +295,11 @@ class MainViewModelTest : KStringSpec() {
 
         "addNode targeting a child of currently displayed node should keep current node displayed and attach child to target" {
             val nodeManager = realNodeManager()
-            val viewModel = MainViewModel(logger = mockk(relaxed = true), injectedNodeManager = nodeManager)
+            val viewModel = MainViewModel(
+                logger = mockk(relaxed = true),
+                injectedNodeManager = nodeManager,
+                recentFilesRepository = mockk(relaxed = true),
+            )
             val root = nodeManager.rootNode!!
             viewModel.setInitialStateForTest(root)
 
@@ -308,7 +330,11 @@ class MainViewModelTest : KStringSpec() {
 
         "FAB addition targets screen node while context menu addition targets listed item" {
             val nodeManager = realNodeManager()
-            val viewModel = MainViewModel(logger = mockk(relaxed = true), injectedNodeManager = nodeManager)
+            val viewModel = MainViewModel(
+                logger = mockk(relaxed = true),
+                injectedNodeManager = nodeManager,
+                recentFilesRepository = mockk(relaxed = true),
+            )
             val root = nodeManager.rootNode!!
             viewModel.setInitialStateForTest(root)
 
@@ -342,7 +368,11 @@ class MainViewModelTest : KStringSpec() {
 
         "addNode with blank or whitespace text should reject addition and leave target node unchanged" {
             val nodeManager = realNodeManager()
-            val viewModel = MainViewModel(logger = mockk(relaxed = true), injectedNodeManager = nodeManager)
+            val viewModel = MainViewModel(
+                logger = mockk(relaxed = true),
+                injectedNodeManager = nodeManager,
+                recentFilesRepository = mockk(relaxed = true),
+            )
             val root = nodeManager.rootNode!!
             viewModel.setInitialStateForTest(root)
 
@@ -360,7 +390,11 @@ class MainViewModelTest : KStringSpec() {
 
         "onNodeClick on target child immediately after adding subchild navigates to target and displays subchild" {
             val nodeManager = realNodeManager()
-            val viewModel = MainViewModel(logger = mockk(relaxed = true), injectedNodeManager = nodeManager)
+            val viewModel = MainViewModel(
+                logger = mockk(relaxed = true),
+                injectedNodeManager = nodeManager,
+                recentFilesRepository = mockk(relaxed = true),
+            )
             val root = nodeManager.rootNode!!
             viewModel.setInitialStateForTest(root)
 
@@ -388,7 +422,11 @@ class MainViewModelTest : KStringSpec() {
 
         "node deletion emits undo snackbar and sets canUndoDelete, and undoing restores the node" {
             val nodeManager = realNodeManager()
-            val viewModel = MainViewModel(logger = mockk(relaxed = true), injectedNodeManager = nodeManager)
+            val viewModel = MainViewModel(
+                logger = mockk(relaxed = true),
+                injectedNodeManager = nodeManager,
+                recentFilesRepository = mockk(relaxed = true),
+            )
             val root = nodeManager.rootNode!!
             viewModel.setInitialStateForTest(root)
 
@@ -461,7 +499,11 @@ class MainViewModelTest : KStringSpec() {
 
         "switching from MIND_MAP to LIST focuses nodeCurrentlyDisplayed on selectedNodeId" {
             val nodeManager = realNodeManager()
-            val viewModel = MainViewModel(logger = mockk(relaxed = true), injectedNodeManager = nodeManager)
+            val viewModel = MainViewModel(
+                logger = mockk(relaxed = true),
+                injectedNodeManager = nodeManager,
+                recentFilesRepository = mockk(relaxed = true),
+            )
             val root = nodeManager.rootNode!!
             viewModel.setInitialStateForTest(root)
 
@@ -480,7 +522,11 @@ class MainViewModelTest : KStringSpec() {
 
         "context menu node operations and node addition work while in MIND_MAP mode" {
             val nodeManager = realNodeManager()
-            val viewModel = MainViewModel(logger = mockk(relaxed = true), injectedNodeManager = nodeManager)
+            val viewModel = MainViewModel(
+                logger = mockk(relaxed = true),
+                injectedNodeManager = nodeManager,
+                recentFilesRepository = mockk(relaxed = true),
+            )
             val root = nodeManager.rootNode!!
             viewModel.setInitialStateForTest(root)
 
@@ -513,7 +559,11 @@ class MainViewModelTest : KStringSpec() {
 
         "deleting a node increments treeVersion and cleans selection and collapsed state" {
             val nodeManager = realNodeManager()
-            val viewModel = MainViewModel(logger = mockk(relaxed = true), injectedNodeManager = nodeManager)
+            val viewModel = MainViewModel(
+                logger = mockk(relaxed = true),
+                injectedNodeManager = nodeManager,
+                recentFilesRepository = mockk(relaxed = true),
+            )
             val root = nodeManager.rootNode!!
             viewModel.setInitialStateForTest(root)
 
@@ -536,7 +586,11 @@ class MainViewModelTest : KStringSpec() {
 
         "restoring a deleted node increments treeVersion, auto-expands collapsed parent, and selects restored node" {
             val nodeManager = realNodeManager()
-            val viewModel = MainViewModel(logger = mockk(relaxed = true), injectedNodeManager = nodeManager)
+            val viewModel = MainViewModel(
+                logger = mockk(relaxed = true),
+                injectedNodeManager = nodeManager,
+                recentFilesRepository = mockk(relaxed = true),
+            )
             val root = nodeManager.rootNode!!
             viewModel.setInitialStateForTest(root)
 
@@ -572,7 +626,11 @@ class MainViewModelTest : KStringSpec() {
 
         "onNewMindmapRequested creates new mindmap immediately when no unsaved changes" {
             val nodeManager = realNodeManager()
-            val viewModel = MainViewModel(logger = mockk(relaxed = true), injectedNodeManager = nodeManager)
+            val viewModel = MainViewModel(
+                logger = mockk(relaxed = true),
+                injectedNodeManager = nodeManager,
+                recentFilesRepository = mockk(relaxed = true),
+            )
             val root = nodeManager.rootNode!!
             viewModel.setInitialStateForTest(root)
 
@@ -588,7 +646,11 @@ class MainViewModelTest : KStringSpec() {
 
         "onNewMindmapRequested shows DiscardConfirmation when unsaved changes exist" {
             val nodeManager = realNodeManager()
-            val viewModel = MainViewModel(logger = mockk(relaxed = true), injectedNodeManager = nodeManager)
+            val viewModel = MainViewModel(
+                logger = mockk(relaxed = true),
+                injectedNodeManager = nodeManager,
+                recentFilesRepository = mockk(relaxed = true),
+            )
             val root = nodeManager.rootNode!!
             viewModel.setInitialStateForTest(root)
 
@@ -622,7 +684,11 @@ class MainViewModelTest : KStringSpec() {
 
         "onHelpDemoRequested executes onConfirmLoad immediately when no unsaved changes" {
             val nodeManager = realNodeManager()
-            val viewModel = MainViewModel(logger = mockk(relaxed = true), injectedNodeManager = nodeManager)
+            val viewModel = MainViewModel(
+                logger = mockk(relaxed = true),
+                injectedNodeManager = nodeManager,
+                recentFilesRepository = mockk(relaxed = true),
+            )
             val root = nodeManager.rootNode!!
             viewModel.setInitialStateForTest(root)
 
@@ -637,7 +703,11 @@ class MainViewModelTest : KStringSpec() {
 
         "onHelpDemoRequested shows DiscardConfirmation when unsaved changes exist" {
             val nodeManager = realNodeManager()
-            val viewModel = MainViewModel(logger = mockk(relaxed = true), injectedNodeManager = nodeManager)
+            val viewModel = MainViewModel(
+                logger = mockk(relaxed = true),
+                injectedNodeManager = nodeManager,
+                recentFilesRepository = mockk(relaxed = true),
+            )
             val root = nodeManager.rootNode!!
             viewModel.setInitialStateForTest(root)
 
@@ -676,7 +746,11 @@ class MainViewModelTest : KStringSpec() {
 
         "editing root node on an empty mindmap updates document title and enables unsaved changes" {
             val nodeManager = realNodeManager()
-            val viewModel = MainViewModel(logger = mockk(relaxed = true), injectedNodeManager = nodeManager)
+            val viewModel = MainViewModel(
+                logger = mockk(relaxed = true),
+                injectedNodeManager = nodeManager,
+                recentFilesRepository = mockk(relaxed = true),
+            )
             viewModel.createEmptyMindmap("Initial Idea")
 
             viewModel.uiState.value.title shouldBe "Initial Idea"
@@ -693,7 +767,11 @@ class MainViewModelTest : KStringSpec() {
 
         "showStartupChooser presents dialog and dispatches choices correctly" {
             val nodeManager = realNodeManager()
-            val viewModel = MainViewModel(logger = mockk(relaxed = true), injectedNodeManager = nodeManager)
+            val viewModel = MainViewModel(
+                logger = mockk(relaxed = true),
+                injectedNodeManager = nodeManager,
+                recentFilesRepository = mockk(relaxed = true),
+            )
             val sampleRecents = listOf(
                 RecentFile("content://test/map.mm", "map.mm", 1000L)
             )
@@ -743,7 +821,11 @@ class MainViewModelTest : KStringSpec() {
 
         "loading new mindmap after creating empty mindmap replaces root and preserves displayed map across view modes" {
             val nodeManager = realNodeManager()
-            val viewModel = MainViewModel(logger = mockk(relaxed = true), injectedNodeManager = nodeManager)
+            val viewModel = MainViewModel(
+                logger = mockk(relaxed = true),
+                injectedNodeManager = nodeManager,
+                recentFilesRepository = mockk(relaxed = true),
+            )
 
             // Step 1: Start with empty mindmap
             viewModel.createEmptyMindmap("Empty Initial")
@@ -796,7 +878,11 @@ class MainViewModelTest : KStringSpec() {
 
         "loadMindMap reads stream asynchronously without error and closes it in finally" {
             val nodeManager = realNodeManager()
-            val viewModel = MainViewModel(logger = mockk(relaxed = true), injectedNodeManager = nodeManager)
+            val viewModel = MainViewModel(
+                logger = mockk(relaxed = true),
+                injectedNodeManager = nodeManager,
+                recentFilesRepository = mockk(relaxed = true),
+            )
 
             var streamClosed = false
             val trackingStream = object : java.io.ByteArrayInputStream("<map><node TEXT=\"Root\"/></map>".toByteArray()) {
@@ -817,7 +903,11 @@ class MainViewModelTest : KStringSpec() {
 
         "launchSaveFile derives valid filename from title for a newly created empty mindmap and invokes registerFile" {
             val nodeManager = realNodeManager()
-            val viewModel = MainViewModel(logger = mockk(relaxed = true), injectedNodeManager = nodeManager)
+            val viewModel = MainViewModel(
+                logger = mockk(relaxed = true),
+                injectedNodeManager = nodeManager,
+                recentFilesRepository = mockk(relaxed = true),
+            )
 
             viewModel.createEmptyMindmap("My Fresh Brainstorm")
             viewModel.getSaveFilename() shouldBe "My_Fresh_Brainstorm.mm"
@@ -842,7 +932,11 @@ class MainViewModelTest : KStringSpec() {
 
         "unsaved changes tracking is enabled after node deletion" {
             val nodeManager = realNodeManager()
-            val viewModel = MainViewModel(logger = mockk(relaxed = true), injectedNodeManager = nodeManager)
+            val viewModel = MainViewModel(
+                logger = mockk(relaxed = true),
+                injectedNodeManager = nodeManager,
+                recentFilesRepository = mockk(relaxed = true),
+            )
             val root = nodeManager.rootNode!!
             viewModel.setInitialStateForTest(root)
 
@@ -862,7 +956,11 @@ class MainViewModelTest : KStringSpec() {
 
         "unsaved changes tracking is enabled after node addition" {
             val nodeManager = realNodeManager()
-            val viewModel = MainViewModel(logger = mockk(relaxed = true), injectedNodeManager = nodeManager)
+            val viewModel = MainViewModel(
+                logger = mockk(relaxed = true),
+                injectedNodeManager = nodeManager,
+                recentFilesRepository = mockk(relaxed = true),
+            )
             val root = nodeManager.rootNode!!
             viewModel.setInitialStateForTest(root)
 
@@ -879,7 +977,11 @@ class MainViewModelTest : KStringSpec() {
 
         "unsaved changes tracking is enabled after node text update" {
             val nodeManager = realNodeManager()
-            val viewModel = MainViewModel(logger = mockk(relaxed = true), injectedNodeManager = nodeManager)
+            val viewModel = MainViewModel(
+                logger = mockk(relaxed = true),
+                injectedNodeManager = nodeManager,
+                recentFilesRepository = mockk(relaxed = true),
+            )
             val root = nodeManager.rootNode!!
             viewModel.setInitialStateForTest(root)
 
@@ -898,7 +1000,11 @@ class MainViewModelTest : KStringSpec() {
 
         "unsaved changes are cleared after save" {
             val nodeManager = realNodeManager()
-            val viewModel = MainViewModel(logger = mockk(relaxed = true), injectedNodeManager = nodeManager)
+            val viewModel = MainViewModel(
+                logger = mockk(relaxed = true),
+                injectedNodeManager = nodeManager,
+                recentFilesRepository = mockk(relaxed = true),
+            )
             val root = nodeManager.rootNode!!
             viewModel.setInitialStateForTest(root)
 
@@ -917,7 +1023,11 @@ class MainViewModelTest : KStringSpec() {
 
         "exit confirmation sets leaving flag when unsaved changes exist and user tries to leave" {
             val nodeManager = realNodeManager()
-            val viewModel = MainViewModel(logger = mockk(relaxed = true), injectedNodeManager = nodeManager)
+            val viewModel = MainViewModel(
+                logger = mockk(relaxed = true),
+                injectedNodeManager = nodeManager,
+                recentFilesRepository = mockk(relaxed = true),
+            )
             val root = nodeManager.rootNode!!
             viewModel.setInitialStateForTest(root)
 
@@ -929,7 +1039,14 @@ class MainViewModelTest : KStringSpec() {
             }
             
             // Trigger leaveApp (simulates user pressing back/exiting)
-            viewModel.upOrClose()
+            viewModel.upOrClose(
+                fileAccessibilityChecker = { true },
+                onOpenRecent = {},
+                onNewMindmap = {},
+                onBrowse = {},
+                onOpenDemo = {},
+                onExitApp = {},
+            )
             
             eventually {
                 // ViewModel sets leaving = true, MainActivity will show ExitConfirmation dialog
@@ -937,21 +1054,34 @@ class MainViewModelTest : KStringSpec() {
             }
         }
 
-        "exit confirmation does not set leaving when no unsaved changes" {
+        "shows Recent Files dialog instead of exit confirmation when no unsaved changes" {
             val nodeManager = realNodeManager()
-            val viewModel = MainViewModel(logger = mockk(relaxed = true), injectedNodeManager = nodeManager)
+            val viewModel = MainViewModel(
+                logger = mockk(relaxed = true),
+                injectedNodeManager = nodeManager,
+                recentFilesRepository = mockk(relaxed = true),
+            )
             val root = nodeManager.rootNode!!
             viewModel.setInitialStateForTest(root)
 
             // No unsaved changes
             viewModel.hasUnsavedChangesState shouldBe false
             
-            // Trigger leaveApp
-            viewModel.upOrClose()
+            // Trigger back press - should show Recent Files dialog instead of setting leaving = true
+            viewModel.upOrClose(
+                fileAccessibilityChecker = { true },
+                onOpenRecent = {},
+                onNewMindmap = {},
+                onBrowse = {},
+                onOpenDemo = {},
+                onExitApp = {},
+            )
             
-            // With no unsaved changes, leaving should be true immediately (no confirmation needed)
+            // With no unsaved changes, leaving should NOT be set (shows Recent Files dialog instead)
             eventually {
-                viewModel.uiState.value.leaving shouldBe true
+                viewModel.uiState.value.leaving shouldBe false
+                // Should show Recent Files dialog
+                (viewModel.uiState.value.dialogUiState.dialogType is MainUiState.DialogType.RecentFiles) shouldBe true
             }
         }
 
@@ -959,7 +1089,11 @@ class MainViewModelTest : KStringSpec() {
 
         "onDeleteNode shows DeleteConfirmation dialog with correct descendant count" {
             val nodeManager = realNodeManager()
-            val viewModel = MainViewModel(logger = mockk(relaxed = true), injectedNodeManager = nodeManager)
+            val viewModel = MainViewModel(
+                logger = mockk(relaxed = true),
+                injectedNodeManager = nodeManager,
+                recentFilesRepository = mockk(relaxed = true),
+            )
             val root = nodeManager.rootNode!!
             viewModel.setInitialStateForTest(root)
 
@@ -979,7 +1113,11 @@ class MainViewModelTest : KStringSpec() {
 
         "onDeleteNode shows DeleteConfirmation dialog with correct descendant count for node with children" {
             val nodeManager = realNodeManager()
-            val viewModel = MainViewModel(logger = mockk(relaxed = true), injectedNodeManager = nodeManager)
+            val viewModel = MainViewModel(
+                logger = mockk(relaxed = true),
+                injectedNodeManager = nodeManager,
+                recentFilesRepository = mockk(relaxed = true),
+            )
             val root = nodeManager.rootNode!!
             viewModel.setInitialStateForTest(root)
 
@@ -1002,7 +1140,11 @@ class MainViewModelTest : KStringSpec() {
 
         "onCancelDelete dismisses dialog without deleting" {
             val nodeManager = realNodeManager()
-            val viewModel = MainViewModel(logger = mockk(relaxed = true), injectedNodeManager = nodeManager)
+            val viewModel = MainViewModel(
+                logger = mockk(relaxed = true),
+                injectedNodeManager = nodeManager,
+                recentFilesRepository = mockk(relaxed = true),
+            )
             val root = nodeManager.rootNode!!
             viewModel.setInitialStateForTest(root)
 
@@ -1029,7 +1171,11 @@ class MainViewModelTest : KStringSpec() {
 
         "onConfirmDelete executes deletion after confirmation" {
             val nodeManager = realNodeManager()
-            val viewModel = MainViewModel(logger = mockk(relaxed = true), injectedNodeManager = nodeManager)
+            val viewModel = MainViewModel(
+                logger = mockk(relaxed = true),
+                injectedNodeManager = nodeManager,
+                recentFilesRepository = mockk(relaxed = true),
+            )
             val root = nodeManager.rootNode!!
             viewModel.setInitialStateForTest(root)
 
@@ -1054,7 +1200,11 @@ class MainViewModelTest : KStringSpec() {
 
         "confirmation dialog state transitions: show -> cancel -> show -> confirm" {
             val nodeManager = realNodeManager()
-            val viewModel = MainViewModel(logger = mockk(relaxed = true), injectedNodeManager = nodeManager)
+            val viewModel = MainViewModel(
+                logger = mockk(relaxed = true),
+                injectedNodeManager = nodeManager,
+                recentFilesRepository = mockk(relaxed = true),
+            )
             val root = nodeManager.rootNode!!
             viewModel.setInitialStateForTest(root)
 
@@ -1087,7 +1237,11 @@ class MainViewModelTest : KStringSpec() {
 
         "deletion of root node is prevented and shows no dialog" {
             val nodeManager = realNodeManager()
-            val viewModel = MainViewModel(logger = mockk(relaxed = true), injectedNodeManager = nodeManager)
+            val viewModel = MainViewModel(
+                logger = mockk(relaxed = true),
+                injectedNodeManager = nodeManager,
+                recentFilesRepository = mockk(relaxed = true),
+            )
             val root = nodeManager.rootNode!!
             viewModel.setInitialStateForTest(root)
 
@@ -1141,11 +1295,14 @@ class MainViewModelTest : KStringSpec() {
     private fun initMainViewModel(): MainViewModel {
         val logger = mockk<Logger>(relaxed = true)
         val nodeManager = mockk<NodeManager>(relaxed = true)
+        val recentFilesRepository = mockk<RecentFilesRepository>(relaxed = true)
         coEvery { nodeManager.getNodeText(any()) } answers { firstArg<Node>().text.orEmpty() }
         coEvery { nodeManager.rootNode } returns null
+        coEvery { recentFilesRepository.getRecentFiles(any()) } returns emptyList()
         return MainViewModel(
             logger = logger,
             injectedNodeManager = nodeManager,
+            recentFilesRepository = recentFilesRepository,
         )
     }
 
