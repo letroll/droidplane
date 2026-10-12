@@ -15,8 +15,26 @@ android {
         consumerProguardFiles("consumer-rules.pro")
     }
 
+    signingConfigs {
+        create("release") {
+            // Récupère le chemin du keystore depuis la variable d'environnement,
+            // ou utilise un fichier local par défaut pour vos builds en local sur votre machine.
+            val storePathEnv = System.getenv("KEYSTORE_PATH")
+            storeFile = if (!storePathEnv.isNullOrEmpty()) {
+                file(storePathEnv)
+            } else {
+                file("release-key.jks") // Chemin par défaut en local si la variable n'est pas définie
+            }
+
+            storePassword = System.getenv("KEYSTORE_PASSWORD")
+            keyAlias = System.getenv("KEYSTORE_ALIAS")
+            keyPassword = System.getenv("KEYSTORE_ALIAS_PASSWORD")
+        }
+    }
+
     buildTypes {
         release {
+            signingConfig = signingConfigs.getByName("release")
             isMinifyEnabled = false
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
         }
