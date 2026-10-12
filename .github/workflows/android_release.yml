@@ -28,10 +28,15 @@ jobs:
         run: |
           echo "${{ secrets.SIGNING_KEY_STORE_BASE64 }}" | base64 --decode > app/release-key.jks
 
+      # 2. Restaurer le google-services.json
+      - name: 🔓 Restaurer Google Services JSON
+        run: |
+          echo "${{ secrets.GOOGLE_SERVICES_JSON_BASE64 }}" | base64 --decode > app/google-services.json
+
       - name: 🧪 Lancer les tests unitaires
         run: ./gradlew testDebugUnitTest
 
-      # 2. Compilation de l'APK Release (les variables d'env sont passées à Gradle)
+      # 3. Compilation de l'APK Release (les variables d'env sont passées à Gradle)
       - name: 📦 Compiler l'APK Release Signé
         env:
           KEYSTORE_PASSWORD: ${{ secrets.KEY_STORE_PASSWORD }}
@@ -39,7 +44,7 @@ jobs:
           KEYSTORE_ALIAS_PASSWORD: ${{ secrets.KEY_PASSWORD }}
         run: ./gradlew assembleRelease
 
-      # 3. Publication sur GitHub Releases
+      # 4. Publication sur GitHub Releases
       - name: 🚀 Publier sur GitHub Releases
         uses: softprops/action-gh-release@v2
         with:
