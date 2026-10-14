@@ -5,6 +5,10 @@ on:
     branches:
       - master
 
+# 🔑 Permission requise pour créer une Release GitHub et charger les fichiers
+permissions:
+  contents: write
+
 jobs:
   build-and-release:
     runs-on: ubuntu-latest
@@ -36,7 +40,7 @@ jobs:
       - name: 🧪 Lancer les tests unitaires
         run: ./gradlew testDebugUnitTest
 
-      # 3. Compilation de l'APK Release (les variables d'env sont passées à Gradle)
+      # 3. Compilation de l'APK Release (avec ajustement de la mémoire JVM)
       - name: 📦 Compiler l'APK Release Signé
         env:
           KEYSTORE_PASSWORD: ${{ secrets.KEY_STORE_PASSWORD }}
@@ -45,13 +49,15 @@ jobs:
           GRADLE_OPTS: "-Xmx4096m -XX:MaxMetaspaceSize=1024m"
         run: ./gradlew assembleRelease --no-daemon
 
-      # 4. Publication sur GitHub Releases
+      # 4. Publication de l'APK sur GitHub Releases
       - name: 🚀 Publier sur GitHub Releases
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v1.0.${{ github.run_number }}
           name: "Release v1.0.${{ github.run_number }}"
           body: "APK de release signé généré automatiquement suite au push sur master."
-          files: app/build/outputs/apk/release/app-release.apk
+          draft: false
+          prerelease: false
+          files: app/build/outputs/apk/release/*.apk
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
