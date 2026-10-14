@@ -87,10 +87,18 @@ enum class NodeIcons(
     Wizard("wizard", R.drawable.ic_launcher, FontAwesomeIcons.Solid.HatWizard),
 }
 
+@Deprecated(
+    message = "Use NodeIconRegistry.resolve(iconName) instead",
+    replaceWith = ReplaceWith("NodeIconRegistry.resolve(iconName)", "fr.julien.quievreux.droidplane2.model.NodeIconRegistry")
+)
 fun getNodeIconsResIdFromName(iconName: String): Int? = NodeIcons.entries.firstOrNull {
     it.text == iconName
 }?.resId
 
+@Deprecated(
+    message = "Use NodeIconRegistry.resolve(iconName) instead",
+    replaceWith = ReplaceWith("NodeIconRegistry.resolve(iconName)", "fr.julien.quievreux.droidplane2.model.NodeIconRegistry")
+)
 fun getNodeFontIconsFromName(iconName: String): ImageVector? = NodeIcons.entries.firstOrNull {
     it.text == iconName
 }?.imageVector

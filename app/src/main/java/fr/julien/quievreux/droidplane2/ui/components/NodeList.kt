@@ -71,13 +71,7 @@ import fr.julien.quievreux.droidplane2.model.ContextMenuDropDownItem
 import fr.julien.quievreux.droidplane2.data.model.Node
 import fr.julien.quievreux.droidplane2.model.NodeIcons.Link
 import fr.julien.quievreux.droidplane2.model.NodeIcons.RicheText
-import fr.julien.quievreux.droidplane2.model.getNodeFontIconsFromName
-import fr.julien.quievreux.droidplane2.model.getNodeIconsResIdFromName
 import fr.julien.quievreux.droidplane2.ui.theme.ContrastAwareReplyTheme
-import java.util.Locale
-import java.util.concurrent.ConcurrentHashMap
-
-private val drawableResIdCache = ConcurrentHashMap<String, Int>()
 
 fun LazyListScope.nodeList(
     node: Node,
@@ -288,67 +282,38 @@ fun NodeItem(
             horizontalArrangement = Arrangement.SpaceAround,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            val context = LocalContext.current
-            val iconNames = node.iconNames
-            val iconResourceIds = mutableListOf<Int>()
-            val imageVectors = mutableListOf<ImageVector>()
-
-            for (iconName in iconNames) {
-                getNodeFontIconsFromName(iconName)?.let {
-                    imageVectors.add(it)
-                }
-
-                getNodeIconsResIdFromName(iconName)?.let {
-                    iconResourceIds.add(it)
-                } ?: run {
-                    val drawableName = getDrawableNameFromMindmapIcon(iconName)
-                    val resId = drawableResIdCache.getOrPut(drawableName) {
-                        context.resources.getIdentifier("@drawable/$drawableName", "id", context.packageName)
-                    }
-                    if (resId != 0) {
-                        iconResourceIds.add(resId)
-                    }
-                }
+            // Display assigned Freeplane icons (up to 3 inline with +N overflow)
+            if (node.iconNames.isNotEmpty()) {
+                NodeIconsRow(
+                    iconNames = node.iconNames,
+                    maxInlineIcons = 3,
+                    iconSize = 18.dp,
+                    modifier = Modifier.padding(start = 8.dp)
+                )
             }
 
-            // set link icon if node has a link. The link icon will be the first icon shown
+            // Display link indicator badge
             if (node.link != null) {
-                imageVectors.add(Link.imageVector)
-            }
-
-            // set the rich text icon if it has
-            if (node.richTextContents.isNotEmpty()) {
-                imageVectors.add(RicheText.imageVector)
-            }
-
-            if (imageVectors.isNotEmpty()) {
                 Icon(
-                    imageVector = imageVectors.first(),
+                    imageVector = Link.imageVector,
                     tint = MaterialTheme.colorScheme.primary,
+                    contentDescription = stringResource(R.string.hyperlink),
+                    modifier = Modifier
+                        .padding(start = 6.dp)
+                        .size(16.dp)
+                )
+            }
+
+            // Display rich text indicator badge
+            if (node.richTextContents.isNotEmpty()) {
+                Icon(
+                    imageVector = RicheText.imageVector,
+                    tint = MaterialTheme.colorScheme.secondary,
                     contentDescription = null,
                     modifier = Modifier
-                        .padding(start = 8.dp)
-                        .size(24.dp)
+                        .padding(start = 6.dp)
+                        .size(16.dp)
                 )
-            } else {
-                if (iconResourceIds.isNotEmpty()) {
-                    Icon(
-                        painter = painterResource(iconResourceIds.first()),
-                        contentDescription = null,
-                        modifier = Modifier
-                            .padding(start = 8.dp)
-                            .size(24.dp)
-                    )
-                    if (iconResourceIds.size > 1) {
-                        Icon(
-                            painter = painterResource(iconResourceIds[1]),
-                            contentDescription = null,
-                            modifier = Modifier
-                                .padding(start = 8.dp)
-                                .size(24.dp)
-                        )
-                    }
-                }
             }
             Text(
                 modifier = Modifier
@@ -427,19 +392,6 @@ fun applyTextStyle(node: Node) = TextStyle(
     fontWeight = if (node.isBold) FontWeight.Bold else FontWeight.Normal,
 )
 
-/**
- * MainViewModel icons have names such as 'button-ok', but resources have to have names with pattern [a-z0-9_.]. This
- * method translates the MainViewModel icon names to Android resource names.
- *
- * @param iconName the icon name as it is specified in the XML
- * @return the name of the corresponding android resource icon
- */
-private fun getDrawableNameFromMindmapIcon(iconName: String): String {
-    var name = "icon_" + iconName.lowercase(Locale.getDefault()).replace("[^a-z0-9_.]".toRegex(), "_")
-    name = name.replace("_$".toRegex(), "")
-    return name
-}
-
 @Composable
 @Preview
 private fun NodeListPreview() {
@@ -460,7 +412,8 @@ private fun NodeListPreview() {
         parentNode = nodeParent,
         id = "sumo",
         numericId = 11963,
-        text = "node1",
+        text = "node1 (2 icons)",
+        iconNames = mutableListOf("button_ok", "flag-red"),
         link = null,
         treeIdAttribute = null,
         creationDate = 1728740019071,
@@ -472,7 +425,8 @@ private fun NodeListPreview() {
         parentNode = nodeParent,
         id = "dqfqsd",
         numericId = 11962,
-        text = "node2",
+        text = "node2 (5 icons - shows +2)",
+        iconNames = mutableListOf("full-1", "priority-2", "idea", "attach", "help"),
         link = null,
         treeIdAttribute = null,
         creationDate = 1728740019071,
@@ -487,7 +441,8 @@ private fun NodeListPreview() {
         parentNode = nodeParent,
         id = "sqdfqsd",
         numericId = 1196,
-        text = "node3",
+        text = "node3 (unmapped badge)",
+        iconNames = mutableListOf("custom_unknown_badge"),
         link = null,
         treeIdAttribute = null,
         creationDate = 1728740019071,
