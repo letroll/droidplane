@@ -43,6 +43,7 @@ jobs:
       # 3. Compilation de l'APK Release (avec ajustement de la mémoire JVM)
       - name: 📦 Compiler l'APK Release Signé
         env:
+          KEYSTORE_FILE: "release-key.jks"
           KEYSTORE_PASSWORD: ${{ secrets.KEY_STORE_PASSWORD }}
           KEYSTORE_ALIAS: ${{ secrets.KEY_ALIAS }}
           KEYSTORE_ALIAS_PASSWORD: ${{ secrets.KEY_PASSWORD }}
