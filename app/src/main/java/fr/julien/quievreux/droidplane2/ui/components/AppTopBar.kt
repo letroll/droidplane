@@ -67,6 +67,7 @@ enum class AppTopBarAction {
     ExitSearch,
     ToggleDisplayMode,
     RecentFiles,
+    CheckForUpdates,
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -322,6 +323,16 @@ fun AppTopBar(
                         },
                     )
                 }
+
+                DropdownMenuItem(
+                    onClick = {
+                        showMenu = false
+                        onBarAction(AppTopBarAction.CheckForUpdates)
+                    },
+                    text = {
+                        Text(stringResource(R.string.check_for_updates))
+                    },
+                )
             }
         }
     )

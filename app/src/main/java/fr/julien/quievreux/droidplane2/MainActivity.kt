@@ -68,6 +68,9 @@ import fr.julien.quievreux.droidplane2.ui.components.AppTopBarAction.Help
 import fr.julien.quievreux.droidplane2.ui.components.AppTopBarAction.NewMindmap
 import fr.julien.quievreux.droidplane2.ui.components.AppTopBarAction.Open
 import fr.julien.quievreux.droidplane2.ui.components.AppTopBarAction.RecentFiles
+import fr.julien.quievreux.droidplane2.ui.components.AppTopBarAction.CheckForUpdates
+import fr.julien.quievreux.droidplane2.ui.dialog.UpdateAvailableDialog
+import fr.julien.quievreux.droidplane2.update.ApkDownloadHelper
 import fr.julien.quievreux.droidplane2.ui.components.AppTopBarAction.Save
 import fr.julien.quievreux.droidplane2.ui.components.AppTopBarAction.SearchNext
 import fr.julien.quievreux.droidplane2.ui.components.AppTopBarAction.SearchPrevious
@@ -159,9 +162,44 @@ class MainActivity : FragmentActivity(), FileRegister {
         }
     }
 
+    private fun triggerUpdateCheck(isManual: Boolean) {
+        val packageInfo = try {
+            packageManager.getPackageInfo(packageName, 0)
+        } catch (_: Exception) {
+            null
+        }
+        val currentVersion = packageInfo?.versionName ?: "1.0.18"
+
+        viewModel.checkForUpdates(
+            currentVersion = currentVersion,
+            isManual = isManual,
+            onDownloadAndInstall = { apkUrl, fileName ->
+                try {
+                    ApkDownloadHelper.enqueueDownload(
+                        context = this@MainActivity,
+                        apkUrl = apkUrl,
+                        fileName = fileName,
+                        title = getString(R.string.app_name)
+                    )
+                    viewModel.showSnackbarMessage(getString(R.string.update_downloading_enqueued))
+                } catch (_: Exception) {
+                    val browserIntent = Intent(Intent.ACTION_VIEW, Uri.parse(apkUrl))
+                    startActivity(browserIntent)
+                }
+            },
+            onViewOnGitHub = { url ->
+                val browserIntent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
+                startActivity(browserIntent)
+            },
+            upToDateMessage = getString(R.string.update_up_to_date, currentVersion),
+            errorMessage = getString(R.string.update_error)
+        )
+    }
+
     @SuppressLint("RemeddmberReturnType")
     public override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        triggerUpdateCheck(isManual = false)
         enableEdgeToEdge(
             navigationBarStyle = SystemBarStyle.light(
                 scrim = primaryLight.toArgb(),
@@ -308,6 +346,16 @@ class MainActivity : FragmentActivity(), FileRegister {
                             }
                         )
                     }
+                    is DialogType.UpdateAvailable -> {
+                        UpdateAvailableDialog(
+                            currentVersion = dialog.currentVersion,
+                            release = dialog.release,
+                            onDownloadAndInstall = dialog.onDownloadAndInstall,
+                            onViewOnGitHub = dialog.onViewOnGitHub,
+                            onDismiss = dialog.onDismiss
+                        )
+                    }
+                    is DialogType.None -> {}
                 }
 
                 Scaffold(
@@ -404,6 +452,8 @@ class MainActivity : FragmentActivity(), FileRegister {
                                             finish()
                                         }
                                     )
+
+                                    CheckForUpdates -> triggerUpdateCheck(isManual = true)
                                 }
                             },
                         )

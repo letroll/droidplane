@@ -6,6 +6,8 @@ import fr.julien.quievreux.droidplane2.data.RecentFilesRepository
 import fr.julien.quievreux.droidplane2.data.RecentFilesRepositoryImpl
 import fr.julien.quievreux.droidplane2.core.extensions.default
 import fr.julien.quievreux.droidplane2.ui.view.MindMapViewModel
+import fr.julien.quievreux.droidplane2.update.GitHubUpdateCheckerServiceImpl
+import fr.julien.quievreux.droidplane2.update.UpdateCheckerService
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import org.koin.android.ext.koin.androidContext
@@ -17,10 +19,15 @@ val appKoinModule = module {
         Dispatchers.default()
     }
 
-    viewModel{
+    single<UpdateCheckerService> {
+        GitHubUpdateCheckerServiceImpl()
+    }
+
+    viewModel {
         MainViewModel(
             logger = get(),
             recentFilesRepository = get(),
+            updateCheckerService = get(),
         )
     }
 

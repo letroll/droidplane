@@ -28,6 +28,10 @@ import fr.julien.quievreux.droidplane2.model.DisplayMode
 import fr.julien.quievreux.droidplane2.data.RecentFilesRepository
 import fr.julien.quievreux.droidplane2.model.RecentFile
 import fr.julien.quievreux.droidplane2.model.ViewIntentNode
+import fr.julien.quievreux.droidplane2.update.GitHubRelease
+import fr.julien.quievreux.droidplane2.update.GitHubUpdateCheckerServiceImpl
+import fr.julien.quievreux.droidplane2.update.UpdateCheckResult
+import fr.julien.quievreux.droidplane2.update.UpdateCheckerService
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
@@ -52,6 +56,7 @@ class MainViewModel(
     val logger: Logger,
     private val injectedNodeManager: NodeManager? = null,
     private val recentFilesRepository: RecentFilesRepository,
+    private val updateCheckerService: UpdateCheckerService = GitHubUpdateCheckerServiceImpl(),
 ) : ViewModel(), KoinScopeComponent {
 
     override val scope: Scope by lazy { createScope(this) }
@@ -1291,6 +1296,48 @@ nodeFindList:${nodeManager.getSearchResult().map { getNodeText(it) }.joinToStrin
     fun clearSnackbarMessage() {
         updateUiState {
             it.copy(snackbarMessage = null)
+        }
+    }
+
+    fun showSnackbarMessage(message: String) {
+        updateUiState {
+            it.copy(snackbarMessage = MainUiState.SnackbarMessage(message = message))
+        }
+    }
+
+    fun checkForUpdates(
+        currentVersion: String,
+        isManual: Boolean = false,
+        onDownloadAndInstall: (apkUrl: String, fileName: String) -> Unit,
+        onViewOnGitHub: (url: String) -> Unit,
+        upToDateMessage: String? = null,
+        errorMessage: String? = null
+    ) {
+        viewModelScope.launch {
+            val result = updateCheckerService.checkForUpdates(currentVersion)
+            when (result) {
+                is UpdateCheckResult.UpdateAvailable -> {
+                    setDialogState(
+                        DialogType.UpdateAvailable(
+                            currentVersion = result.currentVersion,
+                            release = result.release,
+                            onDownloadAndInstall = onDownloadAndInstall,
+                            onViewOnGitHub = onViewOnGitHub,
+                            onDismiss = { setDialogState(DialogType.None) }
+                        )
+                    )
+                }
+                is UpdateCheckResult.UpToDate -> {
+                    if (isManual && upToDateMessage != null) {
+                        showSnackbarMessage(upToDateMessage)
+                    }
+                }
+                is UpdateCheckResult.Error -> {
+                    if (isManual && errorMessage != null) {
+                        showSnackbarMessage(errorMessage)
+                    }
+                }
+            }
         }
     }
 

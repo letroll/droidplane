@@ -6,6 +6,7 @@ import fr.julien.quievreux.droidplane2.model.ContentNodeType
 import fr.julien.quievreux.droidplane2.model.DisplayMode
 import fr.julien.quievreux.droidplane2.model.RecentFile
 import fr.julien.quievreux.droidplane2.model.ViewIntentNode
+import fr.julien.quievreux.droidplane2.update.GitHubRelease
 
 data class MainUiState(
     val title: String = "",
@@ -98,6 +99,14 @@ data class MainUiState(
             val initialTab: InspectorTab = InspectorTab.CONTENT,
             val parentNode: Node? = null,
             val isNewNode: Boolean = false,
+        ) : DialogType()
+
+        data class UpdateAvailable(
+            val currentVersion: String,
+            val release: GitHubRelease,
+            val onDownloadAndInstall: (apkUrl: String, fileName: String) -> Unit,
+            val onViewOnGitHub: (url: String) -> Unit,
+            val onDismiss: () -> Unit,
         ) : DialogType()
     }
 }
