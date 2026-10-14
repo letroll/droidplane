@@ -16,6 +16,8 @@ jobs:
     steps:
       - name: 📥 Cloner le dépôt
         uses: actions/checkout@v4
+        with:
+          ref: master
 
       - name: ☕ Configurer le JDK (Java 21)
         uses: actions/setup-java@v4
@@ -26,6 +28,24 @@ jobs:
 
       - name: 🔑 Rendre Gradle exécutable
         run: chmod +x gradlew
+
+      # Auto-incrémenter la version dans app/build.gradle.kts et committer avec [skip ci]
+      - name: 🔢 Auto-incrémenter la version
+        run: |
+          chmod +x scripts/bump-version.sh
+          ./scripts/bump-version.sh
+          
+          NEW_CODE=$(awk -F'=' '/val appVersionCode/{gsub(/[^0-9]/, "", $2); print $2}' app/build.gradle.kts)
+          NEW_NAME="1.0.${NEW_CODE}"
+          
+          echo "APP_VERSION_NAME=${NEW_NAME}" >> $GITHUB_ENV
+          echo "APP_VERSION_CODE=${NEW_CODE}" >> $GITHUB_ENV
+          
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add app/build.gradle.kts
+          git commit -m "chore(release): bump version to ${NEW_NAME} (code ${NEW_CODE}) [skip ci]"
+          git push origin master
 
       # 1. Restauration du Keystore à partir du secret Base64
       - name: 🔓 Restaurer le Keystore
@@ -54,8 +74,8 @@ jobs:
       - name: 🚀 Publier sur GitHub Releases
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v1.0.${{ github.run_number }}
-          name: "Release v1.0.${{ github.run_number }}"
+          tag_name: v${{ env.APP_VERSION_NAME }}
+          name: "Release v${{ env.APP_VERSION_NAME }}"
           body: "APK de release signé généré automatiquement suite au push sur master."
           draft: false
           prerelease: false

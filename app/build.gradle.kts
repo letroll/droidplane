@@ -6,11 +6,16 @@ plugins {
     alias(libs.plugins.firebase.crashlytics)
 }
 
+val appVersionCode = 18
+val appVersionName = "1.0.18"
+
 android {
     defaultConfig {
         applicationId = "fr.julien.quievreux.droidplane2"
         minSdk = libs.versions.minSdkVersion.get().toInt()
         targetSdk = libs.versions.targetSdkVersion.get().toInt()
+        versionCode = appVersionCode
+        versionName = appVersionName
     }
 
     buildFeatures {
@@ -44,7 +49,7 @@ android {
     buildTypes {
         named("release") {
             isMinifyEnabled = false
-            setProguardFiles(listOf(getDefaultProguardFile("proguard-android.txt"), "proguard-rules.txt"))
+            setProguardFiles(listOf(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.txt"))
             signingConfig = signingConfigs.getByName("release")
         }
     }
@@ -105,10 +110,10 @@ dependencies {
     implementation(libs.turbine)
 
     testImplementation(kotlin("test"))
-    testImplementation("org.json:json:20240303")
+    testImplementation(libs.json)
     //real XmlPullParser for JVM unit tests: android.jar only ships throwing stubs
-    testImplementation("xmlpull:xmlpull:1.1.3.1")
-    testImplementation("xpp3:xpp3:1.1.4c")
+    testImplementation(libs.xmlpull)
+    testImplementation(libs.xpp3)
 
     //firebase
     implementation(platform(libs.firebase.bom))
