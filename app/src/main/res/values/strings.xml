@@ -112,6 +112,20 @@
 
     <!-- Icons & Media Tab -->
     <string name="icons">Icons</string>
+    <string name="assigned_icons">Assigned Icons</string>
+    <string name="no_assigned_icons">No icons assigned to this node.</string>
+    <string name="clear_all_icons">Clear All</string>
+    <string name="remove_icon">Remove %1$s</string>
+    <string name="move_icon_left">Move earlier</string>
+    <string name="move_icon_right">Move later</string>
+    <string name="icon_catalog">Icon Catalog</string>
+    <string name="search_icons_placeholder">Search icons…</string>
+    <string name="category_all">All</string>
+    <string name="category_status">Status &amp; Flags</string>
+    <string name="category_priority">Priorities &amp; Numbers</string>
+    <string name="category_emotion">Emoticons</string>
+    <string name="category_actions_tools">Actions &amp; Tools</string>
+    <string name="category_people_objects">People &amp; Objects</string>
     <string name="external_object">External Image / Media</string>
     <string name="image_uri">URI</string>
     <string name="image_scale">Scale Factor</string>

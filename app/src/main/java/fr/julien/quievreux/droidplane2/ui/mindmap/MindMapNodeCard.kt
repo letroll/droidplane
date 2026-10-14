@@ -37,8 +37,7 @@ import androidx.compose.ui.unit.sp
 import compose.icons.FontAwesomeIcons
 import compose.icons.fontawesomeicons.Solid
 import compose.icons.fontawesomeicons.solid.Link
-import fr.julien.quievreux.droidplane2.model.getNodeFontIconsFromName
-import fr.julien.quievreux.droidplane2.model.getNodeIconsResIdFromName
+import fr.julien.quievreux.droidplane2.ui.components.NodeIconsRow
 import fr.julien.quievreux.droidplane2.R
 import fr.julien.quievreux.droidplane2.data.model.Node
 import fr.julien.quievreux.droidplane2.model.ContextMenuAction
@@ -137,27 +136,11 @@ fun MindMapNodeCard(
                     }
 
                     // Display assigned icons
-                    node.iconNames.forEach { iconName ->
-                        val imageVec = getNodeFontIconsFromName(iconName)
-                        if (imageVec != null) {
-                            Icon(
-                                imageVector = imageVec,
-                                contentDescription = iconName,
-                                tint = contentColor,
-                                modifier = Modifier.size(16.dp)
-                            )
-                        } else {
-                            val resId = getNodeIconsResIdFromName(iconName)
-                            if (resId != null && resId != 0 && resId != R.drawable.ic_launcher) {
-                                Icon(
-                                    painter = painterResource(resId),
-                                    contentDescription = iconName,
-                                    tint = contentColor,
-                                    modifier = Modifier.size(16.dp)
-                                )
-                            }
-                        }
-                    }
+                    NodeIconsRow(
+                        iconNames = node.iconNames,
+                        maxInlineIcons = Int.MAX_VALUE,
+                        iconSize = 16.dp
+                    )
 
                     // Display link indicator badge
                     if (node.link != null) {
@@ -317,6 +300,7 @@ fun PreviewMindMapNodeCardRoot() {
             id = "root",
             numericId = 1,
             text = "Main Concept Root",
+            iconNames = mutableListOf("button_ok", "flag-red", "full-1", "unmapped_tag"),
             creationDate = 0L,
             modificationDate = 0L,
         )

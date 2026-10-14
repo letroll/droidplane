@@ -86,6 +86,7 @@ dependencies {
 
     implementation(libs.turbine)
 
+    testImplementation(kotlin("test"))
     //real XmlPullParser for JVM unit tests: android.jar only ships throwing stubs
     testImplementation("xmlpull:xmlpull:1.1.3.1")
     testImplementation("xpp3:xpp3:1.1.4c")

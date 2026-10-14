@@ -167,9 +167,11 @@ object FakeDataSource {
   <attribute NAME="Version" VALUE="2.0"/>
 </node>
 <node TEXT="Icons &amp; Connectors" ID="ID_ICONS_CONN_DEMO">
-  <icon BUILTIN="yes"/>
+  <icon BUILTIN="button_ok"/>
+  <icon BUILTIN="flag-red"/>
+  <icon BUILTIN="full-1"/>
   <icon BUILTIN="idea"/>
-  <icon BUILTIN="flag-green"/>
+  <icon BUILTIN="unmapped_demo_badge"/>
   <arrowlink DESTINATION="ID_SHAPES_DEMO" COLOR="#D32F2F" MIDDLE_LABEL="demonstrates"/>
 </node>
 <node TEXT="LaTeX Formulas &amp; Media" ID="ID_LATEX_MEDIA_DEMO">
