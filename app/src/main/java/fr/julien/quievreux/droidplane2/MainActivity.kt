@@ -199,7 +199,9 @@ class MainActivity : FragmentActivity(), FileRegister {
     @SuppressLint("RemeddmberReturnType")
     public override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        triggerUpdateCheck(isManual = false)
+        if (savedInstanceState == null) {
+            triggerUpdateCheck(isManual = false)
+        }
         enableEdgeToEdge(
             navigationBarStyle = SystemBarStyle.light(
                 scrim = primaryLight.toArgb(),
@@ -562,39 +564,57 @@ class MainActivity : FragmentActivity(), FileRegister {
 
         viewModel.apply {
             setFileRegister(this@MainActivity)
-            if (isAnExternalMindMapEdit()) {
-                val uri = intent.data
-                setMapUri(uri)
-                uri?.let { u ->
-                    val fileName = u.lastPathSegment?.substringAfterLast('/') ?: "mindmap.mm"
-                    recentFilesRepository.addRecentFile(u.toString(), fileName)
-                }
-                lifecycleScope.launch {
-                    getDocumentInputStream(true)?.let { loadMindMap(it) }
-                }
-            } else {
-                // Initialize an empty mindmap by default
-                createEmptyMindmap(getString(R.string.default_root_node_title))
-
-                // Query accessible recent files
-                val recentFiles = recentFilesRepository.getRecentFiles(createStorageFileChecker(this@MainActivity))
-
-                // Show Startup Chooser Dialog
-                showStartupChooser(
-                    recentFiles = recentFiles,
-                    onOpenRecent = { recent ->
-                        openSelectedUri(Uri.parse(recent.uriString))
-                    },
-                    onBrowse = {
-                        openFileLauncher.launch(arrayOf("*/*"))
-                    },
-                    onOpenDemo = {
-                        setMapUri(Uri.parse("android.resource://$packageName/raw/example.mm"))
-                        lifecycleScope.launch {
-                            resources.openRawResource(R.raw.example).let { loadMindMap(it) }
-                        }
+            if (savedInstanceState == null && getRootNode() == null) {
+                if (isAnExternalMindMapEdit()) {
+                    val uri = intent.data
+                    setMapUri(uri)
+                    uri?.let { u ->
+                        val fileName = u.lastPathSegment?.substringAfterLast('/') ?: "mindmap.mm"
+                        recentFilesRepository.addRecentFile(u.toString(), fileName)
                     }
-                )
+                    lifecycleScope.launch {
+                        getDocumentInputStream(true)?.let { loadMindMap(it) }
+                    }
+                } else {
+                    // Initialize an empty mindmap by default
+                    createEmptyMindmap(getString(R.string.default_root_node_title))
+
+                    // Query accessible recent files
+                    val recentFiles = recentFilesRepository.getRecentFiles(createStorageFileChecker(this@MainActivity))
+
+                    // Show Startup Chooser Dialog
+                    showStartupChooser(
+                        recentFiles = recentFiles,
+                        onOpenRecent = { recent ->
+                            openSelectedUri(Uri.parse(recent.uriString))
+                        },
+                        onBrowse = {
+                            openFileLauncher.launch(arrayOf("*/*"))
+                        },
+                        onOpenDemo = {
+                            setMapUri(Uri.parse("android.resource://$packageName/raw/example.mm"))
+                            lifecycleScope.launch {
+                                resources.openRawResource(R.raw.example).let { loadMindMap(it) }
+                            }
+                        }
+                    )
+                }
+            }
+        }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        if (isAnExternalMindMapEdit()) {
+            val uri = intent.data
+            viewModel.setMapUri(uri)
+            uri?.let { u ->
+                val fileName = u.lastPathSegment?.substringAfterLast('/') ?: "mindmap.mm"
+                recentFilesRepository.addRecentFile(u.toString(), fileName)
+            }
+            lifecycleScope.launch {
+                getDocumentInputStream(true)?.let { viewModel.loadMindMap(it) }
             }
         }
     }
