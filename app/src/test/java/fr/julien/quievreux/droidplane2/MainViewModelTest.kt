@@ -905,7 +905,7 @@ class MainViewModelTest : KStringSpec() {
             }
         }
 
-        "launchSaveFile derives valid filename from title for a newly created empty mindmap and invokes registerFile" {
+        "launchSaveFile derives valid filename from title for a newly created empty mindmap and emits pendingSaveTempFile" {
             val nodeManager = realNodeManager()
             val viewModel = MainViewModel(
                 logger = mockk(relaxed = true),
@@ -916,20 +916,15 @@ class MainViewModelTest : KStringSpec() {
             viewModel.createEmptyMindmap("My Fresh Brainstorm")
             viewModel.getSaveFilename() shouldBe "My_Fresh_Brainstorm.mm"
 
-            var registeredFileName: String? = null
-            val mockRegister = object : fr.julien.quievreux.droidplane2.helper.FileRegister {
-                override fun registerFile(file: java.io.File) {
-                    registeredFileName = file.name
-                }
-                override fun getfilesDir(): String = System.getProperty("java.io.tmpdir")
-            }
-            viewModel.setFileRegister(mockRegister)
-
-            viewModel.launchSaveFile()
+            val tempDir = System.getProperty("java.io.tmpdir") ?: "/tmp"
+            viewModel.launchSaveFile(tempDir)
 
             eventually {
-                registeredFileName shouldBe "My_Fresh_Brainstorm.mm"
+                viewModel.uiState.value.pendingSaveTempFile?.name shouldBe "My_Fresh_Brainstorm.mm"
             }
+
+            viewModel.clearPendingSaveTempFile()
+            viewModel.uiState.value.pendingSaveTempFile shouldBe null
         }
 
         // ===== UNSAVED CHANGES TRACKING (T060) =====
@@ -1261,7 +1256,7 @@ class MainViewModelTest : KStringSpec() {
 
         // ===== REPLACE EXISTING FILE ON SAVE (011-replace-existing-file-save) =====
 
-        "getSaveFilename and launchSaveFile pre-fill exact original displayName and pass initialUri when editing an existing file (T009)" {
+        "getSaveFilename and launchSaveFile pre-fill exact original displayName and preserve mapUri when editing an existing file (T009)" {
             val nodeManager = realNodeManager()
             val viewModel = MainViewModel(
                 logger = mockk(relaxed = true),
@@ -1279,26 +1274,16 @@ class MainViewModelTest : KStringSpec() {
 
             assertEquals("Sprint_Retro.mm", viewModel.getSaveFilename())
 
-            var registeredFileName: String? = null
-            var registeredInitialUri: android.net.Uri? = null
-            val mockRegister = object : fr.julien.quievreux.droidplane2.helper.FileRegister {
-                override fun registerFile(file: java.io.File) {
-                    registeredFileName = file.name
-                }
-                override fun registerFile(file: java.io.File, initialUri: android.net.Uri?) {
-                    registeredFileName = file.name
-                    registeredInitialUri = initialUri
-                }
-                override fun getfilesDir(): String = System.getProperty("java.io.tmpdir")
-            }
-            viewModel.setFileRegister(mockRegister)
-
-            viewModel.launchSaveFile()
+            val tempDir = System.getProperty("java.io.tmpdir") ?: "/tmp"
+            viewModel.launchSaveFile(tempDir)
 
             eventually {
-                assertEquals("Sprint_Retro.mm", registeredFileName)
-                assertEquals(fakeUri, registeredInitialUri)
+                assertEquals("Sprint_Retro.mm", viewModel.uiState.value.pendingSaveTempFile?.name)
+                assertEquals(fakeUri, viewModel.getMapUri())
             }
+
+            viewModel.clearPendingSaveTempFile()
+            assertEquals(null, viewModel.uiState.value.pendingSaveTempFile)
         }
 
         "OverwriteConfirmation dialog confirm clears hasUnsavedChanges and dismisses dialog while cancel preserves hasUnsavedChanges (T014)" {

@@ -27,7 +27,7 @@ provides:
 hooks:
   after_specify:
     command: speckit.worktree.create
-    optional: true
+    optional: false
     prompt: "Create an isolated worktree for this new feature?"
     description: "Auto-spawn a worktree after a new feature is specified"
 

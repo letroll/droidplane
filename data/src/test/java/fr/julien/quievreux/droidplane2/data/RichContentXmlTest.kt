@@ -78,6 +78,86 @@ class RichContentXmlTest : KStringSpec() {
             // Clean up
             savedFile?.delete()
         }
+
+        "preserve literal CDATA sequences and XML special characters in richcontent across round-trip" {
+            val xml = """
+                <map version="freeplane 1.2.0">
+                    <node ID="ID_1" TEXT="Code snippet: &lt;![CDATA[raw]]&gt;" CREATED="1000" MODIFIED="2000">
+                        <richcontent TYPE="NOTE">
+                            <html><head></head><body><p><a href="https://example.com?a=1&amp;b=2" title="quote &quot;here&quot;">a &lt; b &amp; c &gt; d and &lt;![CDATA[test]]&gt;</a></p></body></html>
+                        </richcontent>
+                    </node>
+                </map>
+            """.trimIndent()
+
+            val nodeManager = initNodeManager()
+            nodeManager.loadMindMapFromInputStream(
+                inputStream = ByteArrayInputStream(xml.toByteArray(StandardCharsets.UTF_8)),
+                onError = { throw it },
+                onParentNodeUpdate = {},
+                onLoadFinished = {},
+            )
+
+            val root = nodeManager.rootNode!!
+            root.text shouldBe "Code snippet: <![CDATA[raw]]>"
+            root.noteText shouldContain "a &lt; b &amp; c &gt; d and &lt;![CDATA[test]]&gt;"
+            root.noteText shouldContain "href=\"https://example.com?a=1&amp;b=2\""
+            root.noteText shouldContain "title=\"quote &quot;here&quot;\""
+
+            val tempDir = System.getProperty("java.io.tmpdir")
+            val fileName = "test_cdata_entities_${System.currentTimeMillis()}.mm"
+            var savedFile: File? = null
+
+            nodeManager.serializeMindmap(
+                filePath = "$tempDir/",
+                filename = fileName,
+                onError = { throw it },
+                onSaveFinished = { file -> savedFile = file }
+            )
+
+            savedFile shouldNotBe null
+            val reloadedManager = initNodeManager()
+            reloadedManager.loadMindMapFromInputStream(
+                inputStream = savedFile!!.inputStream(),
+                onError = { throw it },
+                onParentNodeUpdate = {},
+                onLoadFinished = {},
+            )
+
+            val reloadedRoot = reloadedManager.rootNode!!
+            reloadedRoot.text shouldBe "Code snippet: <![CDATA[raw]]>"
+            reloadedRoot.noteText shouldNotBe null
+            reloadedRoot.noteText shouldContain "a &lt; b &amp; c &gt; d and &lt;![CDATA[test]]&gt;"
+            reloadedRoot.noteText shouldContain "href=\"https://example.com?a=1&amp;b=2\""
+            reloadedRoot.noteText shouldContain "title=\"quote &quot;here&quot;\""
+
+            savedFile?.delete()
+        }
+
+        "serializeMindmap returns early without calling onSaveFinished when filePath or filename is invalid" {
+            val nodeManager = initNodeManager()
+            var errorCalled = false
+            var saveFinishedCalled = false
+
+            nodeManager.serializeMindmap(
+                filePath = "",
+                filename = "valid.mm",
+                onError = { errorCalled = true },
+                onSaveFinished = { saveFinishedCalled = true }
+            )
+            errorCalled shouldBe true
+            saveFinishedCalled shouldBe false
+
+            errorCalled = false
+            nodeManager.serializeMindmap(
+                filePath = "/tmp/",
+                filename = "invalid_name",
+                onError = { errorCalled = true },
+                onSaveFinished = { saveFinishedCalled = true }
+            )
+            errorCalled shouldBe true
+            saveFinishedCalled shouldBe false
+        }
     }
 
     private fun initNodeManager(): NodeManager {

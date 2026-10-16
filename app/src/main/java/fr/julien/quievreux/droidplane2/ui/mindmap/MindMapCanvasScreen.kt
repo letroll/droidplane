@@ -48,11 +48,10 @@ fun MindMapCanvasScreen(
 
     val density = LocalDensity.current
 
-    val layoutResult = remember(rootNode, treeVersion, collapsedNodeIds, selectedNodeId, density.density) {
+    val layoutResult = remember(rootNode, treeVersion, collapsedNodeIds, density.density) {
         MindMapLayoutEngine.computeLayout(
             rootNode = rootNode,
             collapsedNodeIds = collapsedNodeIds,
-            selectedNodeId = selectedNodeId,
             density = density.density,
             fetchText = fetchText,
         )
@@ -198,7 +197,7 @@ fun MindMapCanvasScreen(
 
                 MindMapNodeCard(
                     node = nodeLayout.node,
-                    isSelected = nodeLayout.isSelected,
+                    isSelected = nodeLayout.node.id == selectedNodeId,
                     isCollapsed = nodeLayout.isCollapsed,
                     branchDirection = nodeLayout.branchDirection,
                     onNodeClick = { onNodeSelect(nodeLayout.node) },

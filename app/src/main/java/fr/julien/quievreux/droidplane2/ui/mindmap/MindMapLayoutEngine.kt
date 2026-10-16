@@ -48,10 +48,18 @@ object MindMapLayoutEngine {
     const val CLOUD_EXTRA_VERTICAL_MARGIN_DP = 32f
     const val CLOUD_EXTRA_HORIZONTAL_MARGIN_DP = 24f
 
-    private fun hasCloudInSubtree(node: Node, collapsedNodeIds: Set<String>): Boolean {
-        if (node.cloud != null) return true
-        if (collapsedNodeIds.contains(node.id)) return false
-        return node.childNodes.toList().any { hasCloudInSubtree(it, collapsedNodeIds) }
+    private fun hasCloudInSubtree(
+        node: Node,
+        collapsedNodeIds: Set<String>,
+        cache: MutableMap<String, Boolean>,
+    ): Boolean = cache.getOrPut(node.id) {
+        if (node.cloud != null) {
+            true
+        } else if (collapsedNodeIds.contains(node.id)) {
+            false
+        } else {
+            node.childNodes.toList().any { hasCloudInSubtree(it, collapsedNodeIds, cache) }
+        }
     }
 
     fun computeLayout(
@@ -65,6 +73,8 @@ object MindMapLayoutEngine {
     ): MindMapLayoutResult {
         val horizontalSpacing = horizontalSpacingDp * density
         val verticalSpacing = verticalSpacingDp * density
+        val subtreeHeightCache = mutableMapOf<String, Float>()
+        val subtreeCloudCache = mutableMapOf<String, Boolean>()
 
         val rootSize = measureNode(rootNode, density, fetchText)
         val isRootSelected = selectedNodeId == rootNode.id
@@ -100,6 +110,8 @@ object MindMapLayoutEngine {
                 horizontalSpacing = horizontalSpacing,
                 verticalSpacing = verticalSpacing,
                 fetchText = fetchText,
+                subtreeHeightCache = subtreeHeightCache,
+                subtreeCloudCache = subtreeCloudCache,
                 outNodes = nodes,
                 outConnectors = connectors,
             )
@@ -115,6 +127,8 @@ object MindMapLayoutEngine {
                 horizontalSpacing = horizontalSpacing,
                 verticalSpacing = verticalSpacing,
                 fetchText = fetchText,
+                subtreeHeightCache = subtreeHeightCache,
+                subtreeCloudCache = subtreeCloudCache,
                 outNodes = nodes,
                 outConnectors = connectors,
             )
@@ -177,6 +191,8 @@ object MindMapLayoutEngine {
         horizontalSpacing: Float,
         verticalSpacing: Float,
         fetchText: (Node) -> String?,
+        subtreeHeightCache: MutableMap<String, Float>,
+        subtreeCloudCache: MutableMap<String, Boolean>,
         outNodes: MutableList<MindMapNodeLayout>,
         outConnectors: MutableList<BranchConnector>,
     ) {
@@ -184,7 +200,7 @@ object MindMapLayoutEngine {
 
         // Compute total height required for all child subtrees
         val subtreeHeights = children.map { child ->
-            computeSubtreeHeight(child, collapsedNodeIds, density, verticalSpacing, fetchText)
+            computeSubtreeHeight(child, collapsedNodeIds, density, verticalSpacing, fetchText, subtreeHeightCache)
         }
         val totalSpan = subtreeHeights.sum() + (children.size - 1) * verticalSpacing
 
@@ -197,7 +213,7 @@ object MindMapLayoutEngine {
             val isCollapsed = collapsedNodeIds.contains(child.id)
             val isSelected = selectedNodeId == child.id
 
-            val childHasCloud = child.cloud != null || hasCloudInSubtree(child, collapsedNodeIds)
+            val childHasCloud = child.cloud != null || hasCloudInSubtree(child, collapsedNodeIds, subtreeCloudCache)
             val extraHorizontal = if (childHasCloud) CLOUD_EXTRA_HORIZONTAL_MARGIN_DP * density else 0f
 
             val childX = if (direction == BranchDirection.RIGHT) {
@@ -260,6 +276,8 @@ object MindMapLayoutEngine {
                     horizontalSpacing = horizontalSpacing,
                     verticalSpacing = verticalSpacing,
                     fetchText = fetchText,
+                    subtreeHeightCache = subtreeHeightCache,
+                    subtreeCloudCache = subtreeCloudCache,
                     outNodes = outNodes,
                     outConnectors = outConnectors,
                 )
@@ -275,20 +293,21 @@ object MindMapLayoutEngine {
         density: Float,
         verticalSpacing: Float,
         fetchText: (Node) -> String?,
-    ): Float {
+        cache: MutableMap<String, Float>,
+    ): Float = cache.getOrPut(node.id) {
         val selfHeight = measureNode(node, density, fetchText).second
         val cloudMargin = if (node.cloud != null) CLOUD_EXTRA_VERTICAL_MARGIN_DP * density else 0f
 
         if (collapsedNodeIds.contains(node.id) || node.childNodes.isEmpty()) {
-            return selfHeight + cloudMargin
+            selfHeight + cloudMargin
+        } else {
+            val children = node.childNodes.toList()
+            val childHeights = children.sumOf { child ->
+                computeSubtreeHeight(child, collapsedNodeIds, density, verticalSpacing, fetchText, cache).toDouble()
+            }.toFloat() + (children.size - 1) * verticalSpacing
+
+            maxOf(selfHeight, childHeights) + cloudMargin
         }
-
-        val children = node.childNodes.toList()
-        val childHeights = children.sumOf { child ->
-            computeSubtreeHeight(child, collapsedNodeIds, density, verticalSpacing, fetchText).toDouble()
-        }.toFloat() + (children.size - 1) * verticalSpacing
-
-        return maxOf(selfHeight, childHeights) + cloudMargin
     }
 
     fun measureNode(

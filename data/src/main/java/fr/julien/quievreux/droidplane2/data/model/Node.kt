@@ -81,14 +81,22 @@ data class Node(
         if (other !is Node) return false
 
         if (id != other.id) return false
+        if (parentNode?.id != other.parentNode?.id) return false
         if (text != other.text) return false
         if (detailsText != other.detailsText) return false
         if (noteText != other.noteText) return false
+        if (isFolded != other.isFolded) return false
         if (color != other.color) return false
         if (backgroundColor != other.backgroundColor) return false
         if (style != other.style) return false
+        if (fontName != other.fontName) return false
+        if (fontSize != other.fontSize) return false
+        if (isBold != other.isBold) return false
+        if (isItalic != other.isItalic) return false
         if (cloud != other.cloud) return false
         if (edge != other.edge) return false
+        if (latexEquation != other.latexEquation) return false
+        if (externalObject != other.externalObject) return false
         if (attributes != other.attributes) return false
         if (iconNames != other.iconNames) return false
         if (modificationDate != other.modificationDate) return false
@@ -112,10 +120,24 @@ data class Node(
 
     override fun hashCode(): Int {
         var result = id.hashCode()
+        result = 31 * result + (parentNode?.id?.hashCode() ?: 0)
         result = 31 * result + (text?.hashCode() ?: 0)
         result = 31 * result + (detailsText?.hashCode() ?: 0)
         result = 31 * result + (noteText?.hashCode() ?: 0)
+        result = 31 * result + isFolded.hashCode()
+        result = 31 * result + (color?.hashCode() ?: 0)
+        result = 31 * result + (backgroundColor?.hashCode() ?: 0)
+        result = 31 * result + (style?.hashCode() ?: 0)
+        result = 31 * result + (fontName?.hashCode() ?: 0)
+        result = 31 * result + (fontSize ?: 0)
+        result = 31 * result + isBold.hashCode()
+        result = 31 * result + isItalic.hashCode()
+        result = 31 * result + (cloud?.hashCode() ?: 0)
+        result = 31 * result + (edge?.hashCode() ?: 0)
+        result = 31 * result + (latexEquation?.hashCode() ?: 0)
+        result = 31 * result + (externalObject?.hashCode() ?: 0)
         result = 31 * result + attributes.hashCode()
+        result = 31 * result + iconNames.hashCode()
         result = 31 * result + connectors.hashCode()
         result = 31 * result + arrowLinkDestinationIds.hashCode()
         return result

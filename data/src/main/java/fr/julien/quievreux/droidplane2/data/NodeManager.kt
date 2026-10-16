@@ -151,15 +151,7 @@ class NodeManager(
                     }
 
                     XmlPullParser.START_TAG -> {
-                        // Track nodes before parsing
-                        val sizeBefore = _allNodes.value.size
-                        loadXmlTagNode(xpp, nodes, onParentNodeUpdate)
-                        // Capture newly added nodes
-                        val sizeAfter = _allNodes.value.size
-                        if (sizeAfter > sizeBefore) {
-                            val newNodes = _allNodes.value.subList(sizeBefore, sizeAfter)
-                            allParsedNodes.addAll(newNodes)
-                        }
+                        loadXmlTagNode(xpp, nodes, allParsedNodes, onParentNodeUpdate)
                     }
 
                     XmlPullParser.END_TAG -> {
@@ -203,17 +195,24 @@ class NodeManager(
         }
     }
 
-    private fun loadXmlTagNode(xpp: XmlPullParser, nodes: MutableList<Node>, onParentNodeUpdate: (Node) -> Unit) {
+    private fun loadXmlTagNode(
+        xpp: XmlPullParser,
+        nodes: MutableList<Node>,
+        allParsedNodes: MutableList<Node>,
+        onParentNodeUpdate: (Node) -> Unit,
+    ) {
         with(xmlParseUtils) {
             when {
                 xpp.name == NODE.text -> parseNodeText(
                     nodes = nodes,
                     xpp = xpp,
-                    addChildIntoParent = ::addChildIntoParent,
+                    addChildIntoParent = { nodeRelation ->
+                        addChildIntoParent(nodeRelation)
+                        allParsedNodes.add(nodeRelation.child)
+                    },
                     onParentNodeUpdate = { parsedNode ->
-                        // For root node (no parent), add it to _allNodes
                         if (parsedNode.parentNode == null) {
-                            _allNodes.update { it + parsedNode }
+                            allParsedNodes.add(parsedNode)
                         }
                         onParentNodeUpdate(parsedNode)
                     },
@@ -253,15 +252,7 @@ class NodeManager(
     }
 
     fun addChildIntoParent(nodeRelation: NodeRelation) {
-        //TODO change to immutable list
         nodeRelation.parent.addChildMindmapNode(nodeRelation.child)
-        //            parentNode = parentNode.copy(
-        //                childNodes = parentNode.childNodes + newMindmapNode
-        //            )
-
-        _allNodes.update {
-            it + nodeRelation.child
-        }
     }
 
     fun updateRootNode(newNode: Node) {
@@ -352,52 +343,6 @@ class NodeManager(
         }
     }
 
-    //TODO Try with clone
-    /** Depth-first search in the core text of the nodes in this sub-tree.  */ // TODO: this doesn't work while viewModel is still loading
-    suspend fun findFilledNode(
-        parentNodeId: String,
-    ): Node? {
-        // Get all nodes
-        val nodes = _allNodes.first()
-
-        // Find the target node
-        val targetNode = nodes.find { it.id == parentNodeId } ?: return null
-
-        // Create a map of parent ID to children
-        val childrenByParentId = nodes.groupBy { it.parentNode?.id }
-
-        // Function to recursively rebuild a node with its children
-        fun rebuildNode(node: Node): Node {
-            val children = childrenByParentId[node.id] ?: emptyList()
-            return node.copy(
-                childNodes = children.map { rebuildNode(it) }.toMutableList(),
-                parentNode = nodes.find { it.id == node.parentNode?.id }
-            )
-        }
-
-        // Rebuild the target node with its children
-        return rebuildNode(targetNode)
-    }
-
-    private fun depthFirstSearchRecursive(
-        node: Node?,
-        targetId: String,
-    ): Node? {
-        if (node == null) {
-            return null
-        }
-        if (node.id == targetId) {
-            return node
-        }
-        for (child in node.childNodes) {
-            val result = depthFirstSearchRecursive(child, targetId)
-            if (result != null) {
-                return result
-            }
-        }
-        return null
-    }
-
     override fun search(
         query: String,
         onResultFound: () -> Unit,
@@ -446,13 +391,15 @@ class NodeManager(
         onError: (Exception) -> Unit,
         onSaveFinished: ((File) -> Unit)?,
     ) {
-        if (isInvalidFilePath(filePath)) onError.invoke(
-            Exception("Invalid file path")
-        )
+        if (isInvalidFilePath(filePath)) {
+            onError.invoke(Exception("Invalid file path"))
+            return
+        }
 
-        if (isInvalidFileName(filename)) onError.invoke(
-            Exception("Invalid file name")
-        )
+        if (isInvalidFileName(filename)) {
+            onError.invoke(Exception("Invalid file name"))
+            return
+        }
 
         val fileSaveDestination = File(filePath, filename)
         try {
@@ -497,22 +444,10 @@ class NodeManager(
                         serializer.endDocument()
                     }
 
-                    // Now read from temp file, remove CDATA tags, and write to final file
-                    logger.e("Reading from temp file and writing to final file")
-                    tempFile.useLines { lines ->
-                        fileSaveDestination.bufferedWriter().use { writer ->
-                            lines.forEach { line ->
-                                val cleanedLine = line.replace("<![CDATA[", "").replace("]]>", "")
-                                writer.write(cleanedLine)
-                                writer.newLine()
-                            }
-                        }
-                    }
-
-                    // Delete the temporary file
-                    if (tempFile.exists()) {
-                        val deleted = tempFile.delete()
-                        logger.e("Temp file deleted: $deleted")
+                    // Atomically replace destination with temp file (fallback to copy + delete)
+                    if (!tempFile.renameTo(fileSaveDestination)) {
+                        tempFile.copyTo(fileSaveDestination, overwrite = true)
+                        tempFile.delete()
                     }
 
                     logger.e("Save completed successfully")
@@ -530,11 +465,11 @@ class NodeManager(
                     throw e
                 }
             }
+            onSaveFinished?.invoke(fileSaveDestination)
         } catch (e: Exception) {
             logger.e("Save failed: ${e.message}")
             onError(e)
         }
-        onSaveFinished?.invoke(fileSaveDestination)
     }
 
     fun isInvalidFilePath(filePath: String): Boolean = filePath.isBlank() || !filePath.contains("/") || !filePath.startsWith("/")
@@ -911,11 +846,13 @@ class NodeManager(
         val targetNode = getNodeByID(updatedNode.id) ?: return false
         val time = System.currentTimeMillis()
         val nodeWithTimestamp = updatedNode.copy(
+            childNodes = updatedNode.childNodes.toMutableList(),
             modificationDate = time,
         )
 
         val updatedNodesMap = mutableMapOf<String, Node>()
         updatedNodesMap[nodeWithTimestamp.id] = nodeWithTimestamp
+        updateDescendantParents(nodeWithTimestamp, updatedNodesMap)
 
         val parent = nodeWithTimestamp.parentNode ?: targetNode.parentNode
         if (parent != null) {
@@ -932,6 +869,7 @@ class NodeManager(
                 modificationDate = time,
             )
             updatedNodesMap[updatedParent.id] = updatedParent
+            updateDescendantParents(updatedParent, updatedNodesMap)
             propagateUpdatedParentToRoot(updatedParent, updatedNodesMap)
         } else if (nodeWithTimestamp.id == rootNode?.id) {
             rootNode = nodeWithTimestamp
@@ -950,7 +888,10 @@ class NodeManager(
 
     private fun updateDescendantParents(node: Node, updatedNodesMap: MutableMap<String, Node>): Node {
         node.childNodes.replaceAll { child ->
-            val updatedChild = child.copy(parentNode = node)
+            val updatedChild = child.copy(
+                parentNode = node,
+                childNodes = child.childNodes.toMutableList(),
+            )
             updatedNodesMap[updatedChild.id] = updatedChild
             updateDescendantParents(updatedChild, updatedNodesMap)
         }
@@ -962,6 +903,7 @@ class NodeManager(
         updatedNodesMap: MutableMap<String, Node>,
     ) {
         if (updatedParent.id == rootNode?.id) {
+            updateDescendantParents(updatedParent, updatedNodesMap)
             rootNode = updatedParent
             return
         }
@@ -977,13 +919,12 @@ class NodeManager(
                 modificationDate = updatedParent.modificationDate ?: System.currentTimeMillis(),
             )
 
-            val fixedChild = currentChild.copy(parentNode = updatedAncestor)
+            val fixedChild = currentChild.copy(
+                parentNode = updatedAncestor,
+                childNodes = currentChild.childNodes.toMutableList(),
+            )
             updatedNodesMap[fixedChild.id] = fixedChild
-            fixedChild.childNodes.replaceAll { c ->
-                val updatedC = c.copy(parentNode = fixedChild)
-                updatedNodesMap[updatedC.id] = updatedC
-                updatedC
-            }
+            updateDescendantParents(fixedChild, updatedNodesMap)
 
             if (childIdx != -1) {
                 newAncestorChildren[childIdx] = fixedChild
@@ -993,9 +934,12 @@ class NodeManager(
                 if (c.id == fixedChild.id) {
                     fixedChild
                 } else {
-                    val updatedC = c.copy(parentNode = updatedAncestor)
+                    val updatedC = c.copy(
+                        parentNode = updatedAncestor,
+                        childNodes = c.childNodes.toMutableList(),
+                    )
                     updatedNodesMap[updatedC.id] = updatedC
-                    updatedC
+                    updateDescendantParents(updatedC, updatedNodesMap)
                 }
             }
             updatedNodesMap[updatedAncestor.id] = updatedAncestor

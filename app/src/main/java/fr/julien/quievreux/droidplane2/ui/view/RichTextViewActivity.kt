@@ -13,7 +13,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.fragment.app.FragmentActivity
-import fr.julien.quievreux.droidplane2.R
 import fr.julien.quievreux.droidplane2.ui.theme.primaryContainerLight
 import fr.julien.quievreux.droidplane2.ui.theme.primaryLight
 import fr.julien.quievreux.droidplane2.ui.view.WebViewContent.EncodedContent
@@ -28,7 +27,6 @@ class RichTextViewActivity : FragmentActivity() {
                 darkScrim = primaryContainerLight.toArgb()
             )
         )
-        setContentView(R.layout.activity_main)
         // get data from intent. Data has to be base64 encoded, otherwise WebView stops processing
         // at the first # character. See https://developer.android.com/reference/android/webkit/WebView#loadData(java.lang.String,%20java.lang.String,%20java.lang.String)
         // > For all other values of encoding (including null) it is assumed that the data uses

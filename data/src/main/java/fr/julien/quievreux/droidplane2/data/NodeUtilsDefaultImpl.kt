@@ -16,8 +16,8 @@ class NodeUtilsDefaultImpl : NodeUtils {
         // richcontent tag is closed (i.e. until we're back at the current parsing depth)
         // eagerly parse until richcontent node is closed
         val startingDepth = xpp.depth
-        val richContentType = xpp.getNodeAttribute(TYPE)?.let { RichContentType.fromString(it) }?:RichContentType.NODE
-        var richTextContent = ""
+        val richContentType = xpp.getNodeAttribute(TYPE)?.let { RichContentType.fromString(it) } ?: RichContentType.NODE
+        val richTextBuilder = StringBuilder()
 
         var richContentSubParserEventType = xpp.next()
 
@@ -30,35 +30,29 @@ class NodeUtilsDefaultImpl : NodeUtils {
                 XmlPullParser.END_DOCUMENT -> return Result.failure(IllegalStateException("Received END_DOCUMENT but expected to just parse a sub-document"))
 
                 XmlPullParser.START_TAG -> {
-                    var tagString = ""
-
                     val tagName = xpp.name
-                    tagString += "<$tagName"
+                    richTextBuilder.append('<').append(tagName)
 
-                    var i = 0
-                    while (i < xpp.attributeCount) {
+                    for (i in 0 until xpp.attributeCount) {
                         val attributeName = xpp.getAttributeName(i)
-                        val attributeValue = xpp.getAttributeValue(i)
-
-                        val attributeString = " $attributeName=\"$attributeValue\""
-                        tagString += attributeString
-                        i++
+                        val attributeValue = escapeXmlAttribute(xpp.getAttributeValue(i))
+                        richTextBuilder.append(' ')
+                            .append(attributeName)
+                            .append("=\"")
+                            .append(attributeValue)
+                            .append('"')
                     }
 
-                    tagString += ">"
-
-                    richTextContent += tagString
+                    richTextBuilder.append('>')
                 }
 
                 XmlPullParser.END_TAG -> {
                     val tagName = xpp.name
-                    val tagString = "</$tagName>"
-                    richTextContent += tagString
+                    richTextBuilder.append("</").append(tagName).append('>')
                 }
 
                 XmlPullParser.TEXT -> {
-                    val text = xpp.text
-                    richTextContent += text
+                    richTextBuilder.append(escapeXmlText(xpp.text))
                 }
 
                 else -> return Result.failure(IllegalStateException("Received unexpected event type $richContentSubParserEventType"))
@@ -69,7 +63,36 @@ class NodeUtilsDefaultImpl : NodeUtils {
 
             // stop parsing once we have come out far enough from the XML to be at the starting depth again
         } while (xpp.depth != startingDepth)
-        return Result.success(RichContent(richContentType,richTextContent))
+        return Result.success(RichContent(richContentType, richTextBuilder.toString()))
+    }
+
+    private fun escapeXmlText(text: String?): String {
+        if (text.isNullOrEmpty()) return ""
+        val sb = StringBuilder(text.length)
+        for (ch in text) {
+            when (ch) {
+                '&' -> sb.append("&amp;")
+                '<' -> sb.append("&lt;")
+                '>' -> sb.append("&gt;")
+                else -> sb.append(ch)
+            }
+        }
+        return sb.toString()
+    }
+
+    private fun escapeXmlAttribute(value: String?): String {
+        if (value.isNullOrEmpty()) return ""
+        val sb = StringBuilder(value.length)
+        for (ch in value) {
+            when (ch) {
+                '&' -> sb.append("&amp;")
+                '<' -> sb.append("&lt;")
+                '>' -> sb.append("&gt;")
+                '"' -> sb.append("&quot;")
+                else -> sb.append(ch)
+            }
+        }
+        return sb.toString()
     }
 
     override fun fillArrowLinks(nodesById: Map<String, Node>?) {

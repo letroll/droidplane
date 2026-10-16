@@ -22,9 +22,6 @@ android {
         compose = true
     }
     packaging {
-        // Exclure le fichier en conflit de la dépendance 'kotlinx-coroutines-debug'
-        resources.excludes.add("win32-x86-64/attach_hotspot_windows.dll")
-        resources.excludes.add("win32-x86/attach_hotspot_windows.dll")
         resources.excludes.add("META-INF/licenses/*")
         resources.excludes.add("META-INF/*")
     }
@@ -48,9 +45,12 @@ android {
 
     buildTypes {
         named("release") {
-            isMinifyEnabled = false
-            setProguardFiles(listOf(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.txt"))
-            signingConfig = signingConfigs.getByName("release")
+            isMinifyEnabled = true
+            setProguardFiles(listOf(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro"))
+            val releaseSigning = signingConfigs.getByName("release")
+            if (releaseSigning.storeFile?.exists() == true && !releaseSigning.storePassword.isNullOrEmpty()) {
+                signingConfig = releaseSigning
+            }
         }
     }
     compileOptions {
@@ -76,16 +76,13 @@ kotlin {
 }
 
 dependencies {
-    implementation(libs.androidx.legacy.support.v4)
-    implementation(libs.androidx.lifecycle.extensions)
     implementation(libs.androidx.lifecycle.viewmodel.ktx)
-    implementation(libs.androidx.constraintlayout)
 
     implementation(project(":core"))
     implementation(project(":data"))
 
     //jetpack compose
-    val composeBom = platform("androidx.compose:compose-bom:2024.09.03")
+    val composeBom = platform(libs.androidx.compose.bom)
     implementation(composeBom)
     testImplementation(composeBom)
     androidTestImplementation(composeBom)
@@ -105,10 +102,9 @@ dependencies {
     implementation(libs.koin.compose.viewmodel)
     implementation(libs.koin.compose.viewmodel.navigation)
 
-    implementation(libs.mindmapview)
-
-    implementation(libs.turbine)
-
+    testImplementation(testFixtures(project(":core")))
+    testImplementation(testFixtures(project(":data")))
+    testImplementation(libs.turbine)
     testImplementation(kotlin("test"))
     testImplementation(libs.json)
     //real XmlPullParser for JVM unit tests: android.jar only ships throwing stubs
@@ -120,8 +116,10 @@ dependencies {
     implementation(libs.firebase.crashlytics)
     implementation(libs.firebase.analytics)
 
-
     // UI Tests
+    androidTestImplementation(testFixtures(project(":data")))
+    androidTestImplementation(libs.androidx.junit)
+    androidTestImplementation(libs.androidx.espresso.core)
     androidTestImplementation(libs.androidx.ui.test.junit4)
     androidTestImplementation(libs.androidx.ui.test)
     debugImplementation(libs.androidx.ui.test.manifest)

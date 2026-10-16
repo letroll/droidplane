@@ -7,6 +7,7 @@ import fr.julien.quievreux.droidplane2.model.DisplayMode
 import fr.julien.quievreux.droidplane2.model.RecentFile
 import fr.julien.quievreux.droidplane2.model.ViewIntentNode
 import fr.julien.quievreux.droidplane2.update.GitHubRelease
+import java.io.File
 
 data class MainUiState(
     val title: String = "",
@@ -27,6 +28,7 @@ data class MainUiState(
     val selectedNodeId: String? = null,
     val collapsedNodeIds: Set<String> = emptySet(),
     val treeVersion: Long = 0L,
+    val pendingSaveTempFile: File? = null,
 ) {
     data class SnackbarMessage(
         val message: String,

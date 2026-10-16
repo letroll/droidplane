@@ -1,6 +1,5 @@
 package fr.julien.quievreux.droidplane2
 
-import android.annotation.SuppressLint
 import android.content.ActivityNotFoundException
 import android.content.ClipData
 import android.content.ClipboardManager
@@ -8,7 +7,6 @@ import android.content.Intent
 import android.content.Intent.ACTION_EDIT
 import android.content.Intent.ACTION_OPEN_DOCUMENT
 import android.content.Intent.ACTION_VIEW
-import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Bundle
 import androidx.activity.result.contract.ActivityResultContracts
@@ -37,6 +35,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.res.stringResource
+import androidx.core.content.FileProvider
 import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.lifecycleScope
 import fr.julien.quievreux.droidplane2.MainUiState.DialogType
@@ -58,7 +57,6 @@ import fr.julien.quievreux.droidplane2.core.extensions.getSaveFileLauncher
 import fr.julien.quievreux.droidplane2.core.log.Logger
 import fr.julien.quievreux.droidplane2.core.ui.component.AppFloatingActionButton
 import fr.julien.quievreux.droidplane2.data.model.Node
-import fr.julien.quievreux.droidplane2.helper.FileRegister
 import fr.julien.quievreux.droidplane2.helper.SaveResolution
 import fr.julien.quievreux.droidplane2.helper.SaveTargetResolver
 import fr.julien.quievreux.droidplane2.model.ContentNodeType.Classic
@@ -83,12 +81,6 @@ import fr.julien.quievreux.droidplane2.ui.components.AppTopBarAction.Top
 import fr.julien.quievreux.droidplane2.ui.components.AppTopBarAction.ToggleDisplayMode
 import fr.julien.quievreux.droidplane2.ui.components.AppTopBarAction.Undo
 import fr.julien.quievreux.droidplane2.ui.components.AppTopBarAction.Up
-import fr.julien.quievreux.droidplane2.ui.components.AppTopBarAction.SearchNext
-import fr.julien.quievreux.droidplane2.ui.components.AppTopBarAction.SearchPrevious
-import fr.julien.quievreux.droidplane2.ui.components.AppTopBarAction.ToggleDisplayMode
-import fr.julien.quievreux.droidplane2.ui.components.AppTopBarAction.Top
-import fr.julien.quievreux.droidplane2.ui.components.AppTopBarAction.Undo
-import fr.julien.quievreux.droidplane2.ui.components.AppTopBarAction.Up
 import fr.julien.quievreux.droidplane2.core.ui.component.CustomDialog
 import fr.julien.quievreux.droidplane2.ui.components.nodeList
 import fr.julien.quievreux.droidplane2.ui.inspector.NodePropertiesInspector
@@ -98,6 +90,7 @@ import fr.julien.quievreux.droidplane2.ui.theme.primaryContainerLight
 import fr.julien.quievreux.droidplane2.ui.theme.primaryLight
 import fr.julien.quievreux.droidplane2.ui.view.RichTextViewActivity
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import org.koin.android.ext.android.inject
 import org.koin.androidx.viewmodel.ext.android.viewModel
@@ -111,7 +104,7 @@ import java.io.InputStream
  * before it got restarted. A restart can happen when the screen is rotated, and we want to continue wherever we were
  * before the screen rotate.
  */
-class MainActivity : FragmentActivity(), FileRegister {
+class MainActivity : FragmentActivity() {
 
     private val viewModel: MainViewModel by viewModel()
     private val logger by inject<Logger>()
@@ -160,10 +153,14 @@ class MainActivity : FragmentActivity(), FileRegister {
 
             when (resolution) {
                 is SaveResolution.WriteNewFile -> {
-                    writeMindMapToUri(Uri.parse(resolution.targetUriString), resolution.displayName)
+                    lifecycleScope.launch(Dispatchers.IO) {
+                        writeMindMapToUri(Uri.parse(resolution.targetUriString), resolution.displayName)
+                    }
                 }
                 is SaveResolution.DirectOverwrite -> {
-                    writeMindMapToUri(Uri.parse(resolution.targetUriString), resolution.displayName)
+                    lifecycleScope.launch(Dispatchers.IO) {
+                        writeMindMapToUri(Uri.parse(resolution.targetUriString), resolution.displayName)
+                    }
                 }
                 is SaveResolution.ConfirmOverwrite -> {
                     val targetOriginalUri = originalUri ?: Uri.parse(resolution.originalUriString)
@@ -171,18 +168,22 @@ class MainActivity : FragmentActivity(), FileRegister {
                     viewModel.showOverwriteConfirmation(
                         fileName = resolution.originalDisplayName,
                         onConfirm = {
-                            val wroteOriginal = writeMindMapToUri(
-                                targetOriginalUri,
-                                resolution.originalDisplayName
-                            )
-                            if (wroteOriginal) {
-                                deleteSafDocument(this@MainActivity, duplicateUri)
-                            } else {
-                                writeMindMapToUri(duplicateUri, resolution.duplicateDisplayName)
+                            lifecycleScope.launch(Dispatchers.IO) {
+                                val wroteOriginal = writeMindMapToUri(
+                                    targetOriginalUri,
+                                    resolution.originalDisplayName
+                                )
+                                if (wroteOriginal) {
+                                    deleteSafDocument(this@MainActivity, duplicateUri)
+                                } else {
+                                    writeMindMapToUri(duplicateUri, resolution.duplicateDisplayName)
+                                }
                             }
                         },
                         onCancel = {
-                            deleteSafDocument(this@MainActivity, duplicateUri)
+                            lifecycleScope.launch(Dispatchers.IO) {
+                                deleteSafDocument(this@MainActivity, duplicateUri)
+                            }
                             viewModel.cancelSaveFile()
                         }
                     )
@@ -238,7 +239,7 @@ class MainActivity : FragmentActivity(), FileRegister {
         } catch (_: Exception) {
             null
         }
-        val currentVersion = packageInfo?.versionName ?: "1.0.18"
+        val currentVersion = packageInfo?.versionName.orEmpty()
 
         viewModel.checkForUpdates(
             currentVersion = currentVersion,
@@ -266,7 +267,6 @@ class MainActivity : FragmentActivity(), FileRegister {
         )
     }
 
-    @SuppressLint("RemeddmberReturnType")
     public override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         if (savedInstanceState == null) {
@@ -278,32 +278,43 @@ class MainActivity : FragmentActivity(), FileRegister {
                 darkScrim = primaryContainerLight.toArgb()
             )
         )
-        setContentView(R.layout.activity_main)
         setContent {
             val scope = rememberCoroutineScope()
             val snackbarHostState = remember { SnackbarHostState() }
 
             ContrastAwareReplyTheme {
                 val state = viewModel.uiState.collectAsState()
-                // Handle exit confirmation for unsaved changes
-                val hasUnsavedChanges = viewModel.hasUnsavedChangesState
-                if (state.value.leaving) {
-                    if (hasUnsavedChanges && state.value.dialogUiState.dialogType is DialogType.None) {
-                        viewModel.setDialogState(
-                            DialogType.ExitConfirmation(
-                                onConfirm = {
-                                    viewModel.resetLeaving()
-                                    finish()
-                                },
-                                onCancel = {
-                                    viewModel.resetLeaving()
-                                    viewModel.setDialogState(DialogType.None)
-                                }
+                val nodeFindList = viewModel.getSearchResultFlow().collectAsState()
+
+                LaunchedEffect(state.value.leaving) {
+                    if (state.value.leaving) {
+                        if (viewModel.hasUnsavedChangesState && state.value.dialogUiState.dialogType is DialogType.None) {
+                            viewModel.resetLeaving()
+                            viewModel.setDialogState(
+                                DialogType.ExitConfirmation(
+                                    onConfirm = {
+                                        viewModel.resetLeaving()
+                                        finish()
+                                    },
+                                    onCancel = {
+                                        viewModel.resetLeaving()
+                                        viewModel.setDialogState(DialogType.None)
+                                    }
+                                )
                             )
-                        )
+                        } else if (!viewModel.hasUnsavedChangesState) {
+                            viewModel.resetLeaving()
+                            finish()
+                        }
                     }
                 }
-                val nodeFindList = viewModel.getSearchResultFlow().collectAsState()
+
+                LaunchedEffect(state.value.pendingSaveTempFile) {
+                    state.value.pendingSaveTempFile?.let { file ->
+                        viewModel.clearPendingSaveTempFile()
+                        launchFileSavingIntent(file.name, viewModel.getMapUri())
+                    }
+                }
 
                 BackHandler(true) {
                     viewModel.upOrClose(
@@ -498,7 +509,7 @@ class MainActivity : FragmentActivity(), FileRegister {
                                         }
                                     }
 
-                                    Save -> viewModel.launchSaveFile()
+                                    Save -> viewModel.launchSaveFile(filesDir.path)
 
                                     Undo -> viewModel.onUndoDelete()
 
@@ -638,7 +649,6 @@ class MainActivity : FragmentActivity(), FileRegister {
         }
 
         viewModel.apply {
-            setFileRegister(this@MainActivity)
             if (savedInstanceState == null && getRootNode() == null) {
                 if (isAnExternalMindMapEdit()) {
                     val uri = intent.data
@@ -654,12 +664,9 @@ class MainActivity : FragmentActivity(), FileRegister {
                     // Initialize an empty mindmap by default
                     createEmptyMindmap(getString(R.string.default_root_node_title))
 
-                    // Query accessible recent files
-                    val recentFiles = recentFilesRepository.getRecentFiles(createStorageFileChecker(this@MainActivity))
-
-                    // Show Startup Chooser Dialog
+                    // Query accessible recent files off the main thread and show Startup Chooser Dialog
                     showStartupChooser(
-                        recentFiles = recentFiles,
+                        fileAccessibilityChecker = createStorageFileChecker(this@MainActivity),
                         onOpenRecent = { recent ->
                             openSelectedUri(Uri.parse(recent.uriString))
                         },
@@ -710,7 +717,22 @@ class MainActivity : FragmentActivity(), FileRegister {
 
                 RelativeFile -> {
                     try {
-                        startActivity(viewIntentNode.intent)
+                        val originalIntent = viewIntentNode.intent
+                        val dataUri = originalIntent.data
+                        val launchIntent = if (dataUri?.scheme == "file" && dataUri.path != null) {
+                            val contentUri = FileProvider.getUriForFile(
+                                this@MainActivity,
+                                "$packageName.fileprovider",
+                                File(dataUri.path!!)
+                            )
+                            Intent(originalIntent).apply {
+                                setDataAndType(contentUri, originalIntent.type)
+                                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                            }
+                        } else {
+                            originalIntent
+                        }
+                        startActivity(launchIntent)
                     } catch (e1: Exception) {
                         showError(
                             message = "No application found to open ${viewIntentNode.node.link}",
@@ -798,12 +820,6 @@ class MainActivity : FragmentActivity(), FileRegister {
 // launcher started from ACTION_EDIT/VIEW intent
     private fun isAnExternalMindMapEdit(): Boolean = ACTION_EDIT == intent.action || ACTION_VIEW == intent.action || ACTION_OPEN_DOCUMENT == intent.action
 
-    private fun showHelp() {
-        val helpIntent = Intent(this, MainActivity::class.java)
-        helpIntent.putExtra(INTENT_START_HELP, true)
-        startActivity(helpIntent)
-    }
-
     private fun updateClipboard(text: String) {
         val clipData = ClipData.newPlainText("node", text)
         clipboardManager.setPrimaryClip(clipData)
@@ -834,43 +850,5 @@ class MainActivity : FragmentActivity(), FileRegister {
             }
         }
         return super.onKeyDown(keyCode, event)
-    }
-
-    // Handle permission request result
-    override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<String>, grantResults: IntArray) {
-        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
-        when (requestCode) {
-            CREATE_FILE_REQUEST_CODE -> {
-                if (grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-                    // Permission granted, launch file saving intent
-                    viewModel.getNameOfFileToSave()?.let { fileName ->
-                        launchFileSavingIntent(fileName, viewModel.getMapUri())
-                    }
-
-                } else {
-                    // Permission denied, handle accordingly
-                }
-            }
-
-            else -> super.onRequestPermissionsResult(requestCode, permissions, grantResults)
-        }
-
-    }
-
-    override fun registerFile(file: File) {
-        registerFile(file, null)
-    }
-
-    override fun registerFile(file: File, initialUri: Uri?) {
-        runOnUiThread {
-            launchFileSavingIntent(file.name, initialUri)
-        }
-    }
-
-    override fun getfilesDir(): String = filesDir.path
-
-    companion object {
-        const val INTENT_START_HELP: String = "fr.julien.quievreux.droidplane2.INTENT_START_HELP"
-        const val CREATE_FILE_REQUEST_CODE = 1
     }
 }

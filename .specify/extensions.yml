@@ -108,7 +108,7 @@ hooks:
   - extension: worktree
     command: speckit.worktree.create
     enabled: true
-    optional: true
+    optional: false
     priority: 10
     prompt: Create an isolated worktree for this new feature?
     description: Auto-spawn a worktree after a new feature is specified
