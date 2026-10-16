@@ -14,6 +14,10 @@ android {
         consumerProguardFiles("consumer-rules.pro")
     }
 
+    testFixtures {
+        enable = true
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = false
@@ -46,8 +50,10 @@ kotlin {
 
 dependencies {
     implementation(project(":core"))
+    testFixturesImplementation(project(":core"))
 
     testImplementation(project(":core"))
+    testImplementation(testFixtures(project(":core")))
     testImplementation(kotlin("test"))
     testImplementation(libs.xmlpull)
     testImplementation(libs.xpp3)

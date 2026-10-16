@@ -66,7 +66,11 @@
           "speckit.worktree.clean"
         ]
       },
-      "registered_skills": [],
+      "registered_skills": [
+        "speckit-worktree-create",
+        "speckit-worktree-list",
+        "speckit-worktree-clean"
+      ],
       "installed_at": "2026-10-16T16:18:02.053311+00:00"
     }
   }

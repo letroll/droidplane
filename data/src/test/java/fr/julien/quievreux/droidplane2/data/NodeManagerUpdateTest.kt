@@ -6,11 +6,21 @@ import fr.julien.quievreux.droidplane2.data.model.CloudProperties
 import fr.julien.quievreux.droidplane2.data.model.EdgeProperties
 import fr.julien.quievreux.droidplane2.data.model.Node
 import fr.julien.quievreux.droidplane2.data.model.NodeAttributeEntry
+import fr.julien.quievreux.droidplane2.data.model.ExternalObjectProperties
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.shouldNotBe
 import io.mockk.mockk
+import kotlinx.coroutines.flow.toList
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.TestScope
+import kotlinx.coroutines.test.UnconfinedTestDispatcher
+import java.io.ByteArrayInputStream
 import java.io.InputStream
+import kotlin.test.assertEquals
+import kotlin.test.assertNotEquals
+import kotlin.test.assertNotNull
+import kotlin.test.assertSame
+import kotlin.test.assertTrue
 
 class NodeManagerUpdateTest : KStringSpec() {
 
@@ -99,6 +109,128 @@ class NodeManagerUpdateTest : KStringSpec() {
 
             val success = nodeManager.updateNode(fakeNode)
             success shouldBe false
+        }
+
+        "Node.equals and hashCode should detect changes in styling, folding, hooks, and parentNode.id" {
+            val parentA = Node(
+                parentNode = null,
+                id = "ID_1",
+                numericId = 1,
+                text = "Parent A",
+                creationDate = 0L,
+                modificationDate = 0L,
+            )
+            val parentB = Node(
+                parentNode = null,
+                id = "ID_2",
+                numericId = 2,
+                text = "Parent B",
+                creationDate = 0L,
+                modificationDate = 0L,
+            )
+            val baseNode = Node(
+                parentNode = parentA,
+                id = "ID_10",
+                numericId = 10,
+                text = "Node",
+                creationDate = 0L,
+                modificationDate = 0L,
+                isFolded = false,
+                fontSize = 12,
+                fontName = "SansSerif",
+                isBold = false,
+                isItalic = false,
+                latexEquation = null,
+                externalObject = null,
+            )
+
+            assertEquals(baseNode, baseNode.copy())
+            assertEquals(baseNode.hashCode(), baseNode.copy().hashCode())
+
+            assertNotEquals(baseNode, baseNode.copy(isFolded = true))
+            assertNotEquals(baseNode, baseNode.copy(fontSize = 18))
+            assertNotEquals(baseNode, baseNode.copy(fontName = "Monospaced"))
+            assertNotEquals(baseNode, baseNode.copy(isBold = true))
+            assertNotEquals(baseNode, baseNode.copy(isItalic = true))
+            assertNotEquals(baseNode, baseNode.copy(latexEquation = "E = mc^2"))
+            assertNotEquals(
+                baseNode,
+                baseNode.copy(externalObject = ExternalObjectProperties(uri = "image.png"))
+            )
+            assertNotEquals(baseNode, baseNode.copy(parentNode = parentB))
+        }
+
+        "updateNode on ancestor in 4-level tree should keep parentNode references consistent for all deep descendants" {
+            val deepXml = """
+                <map version="freeplane 1.9.13">
+                <node TEXT="Root" ID="ID_1">
+                    <node TEXT="Level 1" ID="ID_2">
+                        <node TEXT="Level 2" ID="ID_3">
+                            <node TEXT="Level 3" ID="ID_4"/>
+                        </node>
+                    </node>
+                </node>
+                </map>
+            """.trimIndent()
+            val nodeManager = initNodeManager()
+            nodeManager.loadMindMapFromInputStream(
+                inputStream = ByteArrayInputStream(deepXml.toByteArray(Charsets.UTF_8)),
+                onError = { throw it },
+                onParentNodeUpdate = {},
+                onLoadFinished = {},
+            )
+
+            val level1 = nodeManager.getNodeByID("ID_2")
+            assertNotNull(level1)
+            val updatedSuccess = nodeManager.updateNode(level1.copy(text = "Level 1 Edited"))
+            assertTrue(updatedSuccess)
+
+            val rootAfter = nodeManager.getNodeByID("ID_1")
+            val level1After = nodeManager.getNodeByID("ID_2")
+            val level2After = nodeManager.getNodeByID("ID_3")
+            val level3After = nodeManager.getNodeByID("ID_4")
+
+            assertNotNull(rootAfter)
+            assertNotNull(level1After)
+            assertNotNull(level2After)
+            assertNotNull(level3After)
+
+            assertEquals("Level 1 Edited", level1After.text)
+            assertSame(rootAfter, level1After.parentNode)
+            assertSame(level1After, level2After.parentNode)
+            assertSame(level2After, level3After.parentNode)
+            assertEquals("Level 1 Edited", level3After.parentNode?.parentNode?.text)
+        }
+
+        "loadMindMapFromInputStream should populate allNodes in a single batch emission" {
+            val deepXml = """
+                <map version="freeplane 1.9.13">
+                <node TEXT="Root" ID="ID_1">
+                    <node TEXT="Child 1" ID="ID_2">
+                        <node TEXT="Grandchild 1" ID="ID_3"/>
+                    </node>
+                    <node TEXT="Child 2" ID="ID_4"/>
+                </node>
+                </map>
+            """.trimIndent()
+            val nodeManager = initNodeManager()
+            val emissions = mutableListOf<List<Node>>()
+            val collectJob = launch(UnconfinedTestDispatcher()) {
+                nodeManager.allNodes.toList(emissions)
+            }
+
+            nodeManager.loadMindMapFromInputStream(
+                inputStream = ByteArrayInputStream(deepXml.toByteArray(Charsets.UTF_8)),
+                onError = { throw it },
+                onParentNodeUpdate = {},
+                onLoadFinished = {},
+            )
+            collectJob.cancel()
+
+            // Initial empty list + 1 batch emission with all 4 nodes (no intermediate 1, 2, 3 node lists)
+            val nonEmptyEmissions = emissions.filter { it.isNotEmpty() }
+            assertEquals(1, nonEmptyEmissions.size)
+            assertEquals(4, nonEmptyEmissions.first().size)
         }
     }
 

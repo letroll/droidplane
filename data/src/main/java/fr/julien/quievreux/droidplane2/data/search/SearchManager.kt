@@ -57,13 +57,6 @@ class SearchManager(
         _isSearching.update {
             query.isNotEmpty()
         }
-        logger.e(
-            "toto", """
-query:$query 
-isSearching:${_isSearching.value} 
-find:${nodeFindList.value.joinToString(separator = "|", transform = { fetchText(it).orEmpty() })} 
-        """.trimIndent()
-        )
 
         if (nodeFindList.value.size > 0) {
             onResultFound()

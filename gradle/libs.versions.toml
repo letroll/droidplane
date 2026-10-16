@@ -2,27 +2,21 @@
 activityCompose = "1.10.0"
 agp = "8.7.3"
 appcompat = "1.7.0"
-constraintlayout = "2.2.0"
+composeBom = "2024.09.03"
 coreKtx = "1.15.0"
 crashlytics = "3.0.2"
 espressoCore = "3.6.1"
 fontAwesome = "1.1.1"
 firebaseBom = "33.8.0"
 googleServices = "4.4.2"
-gradle = "9.0.0"
 json = "20260814"
 junit = "4.13.2"
 junitVersion = "1.2.1"
 koinBom = "4.0.0"
 kotest = "5.9.0"
 kotlin = "2.1.0"
-kotlinGradlePlugin = "2.0.20"
-legacySupportV4 = "1.0.0"
-lifecycleExtensions = "2.2.0"
 lifecycleViewmodelKtx = "2.8.7"
-material = "1.12.0"
-minSdkVersion = "26"# without view mindmap can be "21"
-mindMapView = "0.1.0"
+minSdkVersion = "26"
 mockk = "1.13.13"
 tablerIcons = "1.1.1"
 targetSdkVersion = "35"
@@ -35,9 +29,7 @@ xpp3 = "1.1.4c"
 
 #android x
 androidx-activity-compose = { module = "androidx.activity:activity-compose", version.ref = "activityCompose" }
-androidx-constraintlayout = { module = "androidx.constraintlayout:constraintlayout", version.ref = "constraintlayout" }
-androidx-legacy-support-v4 = { module = "androidx.legacy:legacy-support-v4", version.ref = "legacySupportV4" }
-androidx-lifecycle-extensions = { module = "androidx.lifecycle:lifecycle-extensions", version.ref = "lifecycleExtensions" }
+androidx-compose-bom = { group = "androidx.compose", name = "compose-bom", version.ref = "composeBom" }
 androidx-lifecycle-viewmodel-ktx = { module = "androidx.lifecycle:lifecycle-viewmodel-ktx", version.ref = "lifecycleViewmodelKtx" }
 androidx-material3 = { module = "androidx.compose.material3:material3" }
 androidx-ui-test-junit4 = { module = "androidx.compose.ui:ui-test-junit4", version.ref = "composeUiTest" }
@@ -51,7 +43,6 @@ androidx-appcompat = { group = "androidx.appcompat", name = "appcompat", version
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
 
 font-awesome = { module = "br.com.devsrsouza.compose.icons:font-awesome", version.ref = "fontAwesome" }
-gradle = { module = "com.android.tools.build:gradle", version.ref = "gradle" }
 
 #koin
 json = { module = "org.json:json", version.ref = "json" }
@@ -67,11 +58,8 @@ kotest = { module = "io.kotest:kotest-property", version.ref = "kotest" }
 kotest-assertions = { module = "io.kotest:kotest-assertions-core", version.ref = "kotest" }
 kotest-runner-junit5 = { module = "io.kotest:kotest-runner-junit5", version.ref = "kotest" }
 
-kotlin-gradle-plugin = { module = "org.jetbrains.kotlin:kotlin-gradle-plugin", version.ref = "kotlinGradlePlugin" }
 tabler-icons = { module = "br.com.devsrsouza.compose.icons:tabler-icons", version.ref = "tablerIcons" }
 junit = { group = "junit", name = "junit", version.ref = "junit" }
-material = { group = "com.google.android.material", name = "material", version.ref = "material" }
-mindmapview = { group = "com.github.hegleB", name = "MindMapView", version.ref = "mindMapView" }
 
 mockk = { group = "io.mockk", name = "mockk", version.ref = "mockk" }
 turbine = { group = "app.cash.turbine", name = "turbine", version.ref = "turbine" }

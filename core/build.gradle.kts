@@ -16,6 +16,10 @@ android {
     }
 
 
+    testFixtures {
+        enable = true
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = false
@@ -38,14 +42,15 @@ kotlin {
 dependencies {
     api(libs.androidx.core.ktx)
     api(libs.androidx.appcompat)
-    api(libs.material)
 
-    val composeBom = platform("androidx.compose:compose-bom:2024.09.03")
+    val composeBom = platform(libs.androidx.compose.bom)
     implementation(composeBom)
+    testFixturesImplementation(composeBom)
     testImplementation(composeBom)
     androidTestImplementation(composeBom)
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.material3)
+    testFixturesImplementation(libs.androidx.material3)
     implementation(libs.androidx.ui.tooling.preview)
     debugImplementation(libs.androidx.ui.tooling)
 
@@ -53,13 +58,20 @@ dependencies {
     api(libs.koin.android)
     api(libs.koin.core)
 
+    testFixturesImplementation(project.dependencies.platform(libs.koin.bom))
+    testFixturesImplementation(libs.koin.core)
+    testFixturesApi(libs.junit)
+    testFixturesApi(libs.kotest)
+    testFixturesApi(libs.kotest.assertions)
+    testFixturesApi(libs.kotest.runner.junit5)
+    testFixturesApi(libs.mockk)
 
-    api(libs.junit)
-    api(libs.kotest)
-    api(libs.kotest.assertions)
-    api(libs.kotest.runner.junit5)
-    api(libs.mockk)
+    testImplementation(libs.junit)
+    testImplementation(libs.kotest)
+    testImplementation(libs.kotest.assertions)
+    testImplementation(libs.kotest.runner.junit5)
+    testImplementation(libs.mockk)
 
-    api(libs.androidx.junit)
-    api(libs.androidx.espresso.core)
+    androidTestImplementation(libs.androidx.junit)
+    androidTestImplementation(libs.androidx.espresso.core)
 }

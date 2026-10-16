@@ -15,7 +15,6 @@ import fr.julien.quievreux.droidplane2.data.model.DeleteSnapshot
 import fr.julien.quievreux.droidplane2.data.model.Node
 import fr.julien.quievreux.droidplane2.data.model.isInternalLink
 import fr.julien.quievreux.droidplane2.data.model.shortFamily
-import fr.julien.quievreux.droidplane2.helper.FileRegister
 import fr.julien.quievreux.droidplane2.model.ContentNodeType
 import fr.julien.quievreux.droidplane2.model.ContentNodeType.Classic
 import fr.julien.quievreux.droidplane2.model.ContentNodeType.RelativeFile
@@ -78,7 +77,6 @@ class MainViewModel(
 
     private val nodeManager: NodeManager
         get() = injectedNodeManager ?: scope.get<NodeManager> { parametersOf(viewModelScope) }
-    private var fileRegister: FileRegister? = null
     private var fileToSave: File? = null
     private var nodeBeforeFileSave: Node? = null
     // Undo stack for node deletion
@@ -304,6 +302,28 @@ class MainViewModel(
             hasUnsavedChanges = false
             undoStack.clear()
             onConfirmLoad()
+        }
+    }
+
+    /**
+     * Loads accessible recent files on [Dispatchers.IO] and displays the startup chooser dialog.
+     */
+    fun showStartupChooser(
+        fileAccessibilityChecker: (String) -> Boolean,
+        onOpenRecent: (RecentFile) -> Unit,
+        onBrowse: () -> Unit,
+        onOpenDemo: () -> Unit,
+    ) {
+        viewModelScope.launch(Dispatchers.IO) {
+            val recentFiles = recentFilesRepository.getRecentFiles(fileAccessibilityChecker)
+            viewModelScope.launch(Dispatchers.Main) {
+                showStartupChooser(
+                    recentFiles = recentFiles,
+                    onOpenRecent = onOpenRecent,
+                    onBrowse = onBrowse,
+                    onOpenDemo = onOpenDemo,
+                )
+            }
         }
     }
 
@@ -1141,37 +1161,41 @@ nodeFindList:${nodeManager.getSearchResult().map { getNodeText(it) }.joinToStrin
         return if (sanitized.endsWith(".mm", ignoreCase = true)) sanitized else "$sanitized.mm"
     }
 
-    fun launchSaveFile() {
+    fun launchSaveFile(filesDirPath: String) {
         nodeBeforeFileSave = _uiState.value.nodeCurrentlyDisplayed
         nodeBeforeFileSave?.let {
             top()
             val filename = getSaveFilename()
-            fileRegister?.let { register ->
-                viewModelScope.launch {
-                    nodeManager.serializeMindmap(
-                        filePath = register.getfilesDir(),
-                        filename = filename,
-                        onError = {
-                            logger.e("error saving file:$it")
-                        },
-                        onSaveFinished = { file ->
-                            fileToSave = file
-                            fileRegister?.registerFile(file, nodeManager.getMapUri())
+            viewModelScope.launch {
+                nodeManager.serializeMindmap(
+                    filePath = filesDirPath,
+                    filename = filename,
+                    onError = {
+                        logger.e("error saving file:$it")
+                    },
+                    onSaveFinished = { file ->
+                        fileToSave = file
+                        updateUiState { state ->
+                            state.copy(pendingSaveTempFile = file)
                         }
-                    )
-                }
+                    }
+                )
             }
         }
     }
 
-    fun setFileRegister(fileRegister: FileRegister) {
-        this.fileRegister = fileRegister
+    fun clearPendingSaveTempFile() {
+        updateUiState { state ->
+            state.copy(pendingSaveTempFile = null)
+        }
     }
 
     fun saveFile(outputStream: OutputStream) {
         fileToSave?.let { file ->
             logger.e("Saving file ${file.name} ")
-            outputStream.write(file.readText().toByteArray())
+            file.inputStream().use { inputStream ->
+                inputStream.copyTo(outputStream)
+            }
         }
         hasUnsavedChanges = false
         setDialogState(DialogType.None)
@@ -1200,8 +1224,6 @@ nodeFindList:${nodeManager.getSearchResult().map { getNodeText(it) }.joinToStrin
             onNodeClick(it)
         }
     }
-
-    fun getNameOfFileToSave(): String? = fileToSave?.name
 
 
     fun onDeleteNode(node: Node) {
