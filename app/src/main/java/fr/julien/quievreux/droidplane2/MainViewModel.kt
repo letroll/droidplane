@@ -1115,12 +1115,24 @@ nodeFindList:${nodeManager.getSearchResult().map { getNodeText(it) }.joinToStrin
         }
     }
 
-    fun setMapUri(data: Uri?) = nodeManager.setMapUri(data)
+    fun setMapUri(data: Uri?, displayName: String? = null) = nodeManager.setMapUri(data, displayName)
+
+    fun getMapUri(): Uri? = nodeManager.getMapUri()
+
+    fun getMindmapFileName(): String? = nodeManager.getMindmapFileName()
 
     fun getSaveFilename(): String {
-        val currentName = nodeManager.getMindmapFileName()
-        if (!currentName.isNullOrBlank() && currentName.endsWith(".mm", ignoreCase = true)) {
-            return currentName
+        val currentUri = nodeManager.getMapUri()
+        val isDemoResource = currentUri?.scheme == "android.resource"
+        if (!isDemoResource) {
+            val currentName = nodeManager.getMindmapFileName()
+            if (!currentName.isNullOrBlank()) {
+                return if (currentName.endsWith(".mm", ignoreCase = true)) {
+                    currentName
+                } else {
+                    "$currentName.mm"
+                }
+            }
         }
         val title = _uiState.value.title.trim().ifBlank {
             nodeManager.rootNode?.let { getNodeText(it) }?.trim() ?: "mindmap"
@@ -1144,7 +1156,7 @@ nodeFindList:${nodeManager.getSearchResult().map { getNodeText(it) }.joinToStrin
                         },
                         onSaveFinished = { file ->
                             fileToSave = file
-                            fileRegister?.registerFile(file)
+                            fileRegister?.registerFile(file, nodeManager.getMapUri())
                         }
                     )
                 }
@@ -1162,6 +1174,28 @@ nodeFindList:${nodeManager.getSearchResult().map { getNodeText(it) }.joinToStrin
             outputStream.write(file.readText().toByteArray())
         }
         hasUnsavedChanges = false
+        setDialogState(DialogType.None)
+        nodeBeforeFileSave?.let {
+            onNodeClick(it)
+        }
+    }
+
+    fun showOverwriteConfirmation(
+        fileName: String,
+        onConfirm: () -> Unit,
+        onCancel: () -> Unit,
+    ) {
+        setDialogState(
+            DialogType.OverwriteConfirmation(
+                fileName = fileName,
+                onConfirm = onConfirm,
+                onCancel = onCancel,
+            )
+        )
+    }
+
+    fun cancelSaveFile() {
+        setDialogState(DialogType.None)
         nodeBeforeFileSave?.let {
             onNodeClick(it)
         }

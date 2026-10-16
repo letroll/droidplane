@@ -24,6 +24,8 @@ import kotlinx.coroutines.test.TestScope
 import org.xmlpull.v1.XmlPullParser
 import java.io.InputStream
 import kotlin.io.path.createTempDirectory
+import kotlin.test.assertEquals
+import kotlin.test.assertNull
 
 class NodeManagerTest : KStringSpec() {
 
@@ -750,6 +752,38 @@ class NodeManagerTest : KStringSpec() {
             (elapsed < 100L) shouldBe true
             nodeManager.getNodeByID(parentNode.id) shouldBe null
             nodeManager.rootNode!!.childNodes.none { it.id == parentNode.id } shouldBe true
+        }
+
+        "setMapUri stores URI and displayName and getMindmapFileName returns displayName over opaque URI path" {
+            val nodeManager = initNodeManager()
+            val fakeUri: android.net.Uri = mockk(relaxed = true)
+            coEvery { fakeUri.path } returns "/document/msf:10492"
+
+            nodeManager.setMapUri(fakeUri, "project_plan.mm")
+
+            assertEquals(fakeUri, nodeManager.getMapUri())
+            assertEquals("project_plan.mm", nodeManager.getMindmapFileName())
+        }
+
+        "getMindmapFileName falls back to URI path segment when displayName is null or blank" {
+            val nodeManager = initNodeManager()
+            val fakeUri: android.net.Uri = mockk(relaxed = true)
+            coEvery { fakeUri.path } returns "/storage/emulated/0/Documents/fallback_map.mm"
+
+            nodeManager.setMapUri(fakeUri, null)
+
+            assertEquals("fallback_map.mm", nodeManager.getMindmapFileName())
+        }
+
+        "createNewMindmap resets both currentMindMapUri and currentMindMapDisplayName" {
+            val nodeManager = initNodeManager()
+            val fakeUri: android.net.Uri = mockk(relaxed = true)
+            nodeManager.setMapUri(fakeUri, "existing.mm")
+
+            nodeManager.createNewMindmap("Fresh Mindmap")
+
+            assertNull(nodeManager.getMapUri())
+            assertNull(nodeManager.getMindmapFileName())
         }
     }
 

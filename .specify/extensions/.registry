@@ -52,6 +52,22 @@
       },
       "registered_skills": [],
       "installed_at": "2026-10-06T08:24:30.772938+00:00"
+    },
+    "worktree": {
+      "version": "1.0.0",
+      "source": "local",
+      "manifest_hash": "sha256:7b5d0963fcc6b0f13a38e81448be0604186ab699388b75adbe536387fdd9cf27",
+      "enabled": true,
+      "priority": 10,
+      "registered_commands": {
+        "gemini": [
+          "speckit.worktree.create",
+          "speckit.worktree.list",
+          "speckit.worktree.clean"
+        ]
+      },
+      "registered_skills": [],
+      "installed_at": "2026-10-16T16:18:02.053311+00:00"
     }
   }
 }

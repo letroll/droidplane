@@ -57,6 +57,7 @@ class NodeManager(
         private set
 
     private var currentMindMapUri: Uri? = null
+    private var currentMindMapDisplayName: String? = null
 
     private val searchManager = SearchManager(
         scope = coroutineScope,
@@ -286,6 +287,7 @@ class NodeManager(
 
         rootNode = newRoot
         currentMindMapUri = null
+        currentMindMapDisplayName = null
         _allNodes.value = listOf(newRoot)
 
         val newNodesById = mapOf(stringId to newRoot)
@@ -420,8 +422,11 @@ class NodeManager(
         return mindmapDirectoryPath
     }
 
+    fun getMapUri(): Uri? = currentMindMapUri
+
     fun getMindmapFileName(debug: Boolean = false): String? {
-        if (debug) logger.e("uri:$currentMindMapUri")
+        if (debug) logger.e("uri:$currentMindMapUri, displayName:$currentMindMapDisplayName")
+        currentMindMapDisplayName?.takeIf { it.isNotBlank() }?.let { return it }
         val mindmapPath = currentMindMapUri?.path
         if (debug) logger.e("path $mindmapPath")
         val mindmapFileName = mindmapPath?.substring(mindmapPath.lastIndexOf("/") + 1, mindmapPath.length)
@@ -429,9 +434,10 @@ class NodeManager(
         return mindmapFileName
     }
 
-    fun setMapUri(data: Uri?) {
+    fun setMapUri(data: Uri?, displayName: String? = null) {
         currentMindMapUri = data
-        logger.e("setMapUri uri:$currentMindMapUri")
+        currentMindMapDisplayName = displayName?.takeIf { it.isNotBlank() }
+        logger.e("setMapUri uri:$currentMindMapUri, displayName:$currentMindMapDisplayName")
     }
 
     override suspend fun serializeMindmap(

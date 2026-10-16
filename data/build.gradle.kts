@@ -48,7 +48,8 @@ dependencies {
     implementation(project(":core"))
 
     testImplementation(project(":core"))
-    testImplementation("xmlpull:xmlpull:1.1.3.1")
-    testImplementation("xpp3:xpp3:1.1.4c")
+    testImplementation(kotlin("test"))
+    testImplementation(libs.xmlpull)
+    testImplementation(libs.xpp3)
     testImplementation(libs.turbine)
 }

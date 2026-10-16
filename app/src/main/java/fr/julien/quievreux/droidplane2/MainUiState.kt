@@ -75,6 +75,12 @@ data class MainUiState(
             val onCancel: () -> Unit,
         ) : DialogType()
 
+        data class OverwriteConfirmation(
+            val fileName: String,
+            val onConfirm: () -> Unit,
+            val onCancel: () -> Unit,
+        ) : DialogType()
+
         data class StartupChooser(
             val recentFiles: List<RecentFile>,
             val onNewMindmap: () -> Unit,

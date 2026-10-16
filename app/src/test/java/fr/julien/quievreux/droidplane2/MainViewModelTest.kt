@@ -26,6 +26,10 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.TestScope
 import java.lang.System.currentTimeMillis
+import kotlin.test.assertEquals
+import kotlin.test.assertFalse
+import kotlin.test.assertIs
+import kotlin.test.assertTrue
 
 class MainViewModelTest : KStringSpec() {
     init {
@@ -1253,6 +1257,122 @@ class MainViewModelTest : KStringSpec() {
             
             // Root should still exist
             nodeManager.getNodeByID(root.id) shouldNotBe null
+        }
+
+        // ===== REPLACE EXISTING FILE ON SAVE (011-replace-existing-file-save) =====
+
+        "getSaveFilename and launchSaveFile pre-fill exact original displayName and pass initialUri when editing an existing file (T009)" {
+            val nodeManager = realNodeManager()
+            val viewModel = MainViewModel(
+                logger = mockk(relaxed = true),
+                injectedNodeManager = nodeManager,
+                recentFilesRepository = mockk(relaxed = true),
+            )
+            val root = nodeManager.rootNode!!
+            viewModel.setInitialStateForTest(root)
+
+            val fakeUri = mockk<android.net.Uri>(relaxed = true)
+            coEvery { fakeUri.scheme } returns "content"
+            coEvery { fakeUri.path } returns "/document/msf:99999"
+
+            viewModel.setMapUri(fakeUri, "Sprint_Retro.mm")
+
+            assertEquals("Sprint_Retro.mm", viewModel.getSaveFilename())
+
+            var registeredFileName: String? = null
+            var registeredInitialUri: android.net.Uri? = null
+            val mockRegister = object : fr.julien.quievreux.droidplane2.helper.FileRegister {
+                override fun registerFile(file: java.io.File) {
+                    registeredFileName = file.name
+                }
+                override fun registerFile(file: java.io.File, initialUri: android.net.Uri?) {
+                    registeredFileName = file.name
+                    registeredInitialUri = initialUri
+                }
+                override fun getfilesDir(): String = System.getProperty("java.io.tmpdir")
+            }
+            viewModel.setFileRegister(mockRegister)
+
+            viewModel.launchSaveFile()
+
+            eventually {
+                assertEquals("Sprint_Retro.mm", registeredFileName)
+                assertEquals(fakeUri, registeredInitialUri)
+            }
+        }
+
+        "OverwriteConfirmation dialog confirm clears hasUnsavedChanges and dismisses dialog while cancel preserves hasUnsavedChanges (T014)" {
+            val nodeManager = realNodeManager()
+            val viewModel = MainViewModel(
+                logger = mockk(relaxed = true),
+                injectedNodeManager = nodeManager,
+                recentFilesRepository = mockk(relaxed = true),
+            )
+            val root = nodeManager.rootNode!!
+            viewModel.setInitialStateForTest(root)
+
+            viewModel.addNode("Unsaved Modification", root)
+            eventually {
+                assertTrue(viewModel.hasUnsavedChangesState)
+            }
+
+            // Show OverwriteConfirmation and cancel
+            var cancelCalled = false
+            viewModel.showOverwriteConfirmation(
+                fileName = "Sprint_Retro.mm",
+                onConfirm = {},
+                onCancel = {
+                    cancelCalled = true
+                    viewModel.cancelSaveFile()
+                }
+            )
+
+            val dialog1 = assertIs<MainUiState.DialogType.OverwriteConfirmation>(
+                viewModel.uiState.value.dialogUiState.dialogType
+            )
+            assertEquals("Sprint_Retro.mm", dialog1.fileName)
+
+            dialog1.onCancel()
+            assertTrue(cancelCalled)
+            assertEquals(MainUiState.DialogType.None, viewModel.uiState.value.dialogUiState.dialogType)
+            assertTrue(viewModel.hasUnsavedChangesState)
+
+            // Show OverwriteConfirmation and confirm
+            viewModel.showOverwriteConfirmation(
+                fileName = "Sprint_Retro.mm",
+                onConfirm = {
+                    viewModel.saveFile(java.io.ByteArrayOutputStream())
+                },
+                onCancel = {}
+            )
+
+            val dialog2 = assertIs<MainUiState.DialogType.OverwriteConfirmation>(
+                viewModel.uiState.value.dialogUiState.dialogType
+            )
+            dialog2.onConfirm()
+
+            assertEquals(MainUiState.DialogType.None, viewModel.uiState.value.dialogUiState.dialogType)
+            assertFalse(viewModel.hasUnsavedChangesState)
+        }
+
+        "getSaveFilename derives filename from root node title when current mindmap is the read-only demo resource (T016)" {
+            val nodeManager = realNodeManager()
+            val viewModel = MainViewModel(
+                logger = mockk(relaxed = true),
+                injectedNodeManager = nodeManager,
+                recentFilesRepository = mockk(relaxed = true),
+            )
+            val root = nodeManager.rootNode!!
+            viewModel.setInitialStateForTest(root)
+
+            val demoUri = mockk<android.net.Uri>(relaxed = true)
+            coEvery { demoUri.scheme } returns "android.resource"
+            coEvery { demoUri.path } returns "/raw/example.mm"
+
+            viewModel.setMapUri(demoUri, "example.mm")
+
+            // Because scheme is android.resource, getSaveFilename derives from root node title ("root node")
+            assertEquals("root_node.mm", viewModel.getSaveFilename())
         }
     }
 

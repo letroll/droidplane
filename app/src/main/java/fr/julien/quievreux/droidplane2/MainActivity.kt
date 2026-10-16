@@ -45,17 +45,22 @@ import fr.julien.quievreux.droidplane2.MainUiState.DialogType.None
 import fr.julien.quievreux.droidplane2.ui.view.DeleteConfirmationDialog
 import fr.julien.quievreux.droidplane2.ui.view.DiscardConfirmationDialog
 import fr.julien.quievreux.droidplane2.ui.view.ExitConfirmationDialog
+import fr.julien.quievreux.droidplane2.ui.view.OverwriteConfirmationDialog
 import fr.julien.quievreux.droidplane2.ui.view.RecentFilesDialog
 import fr.julien.quievreux.droidplane2.ui.view.StartupChooserDialog
 import fr.julien.quievreux.droidplane2.data.RecentFilesRepository
 import fr.julien.quievreux.droidplane2.data.RecentFilesRepositoryImpl
 import fr.julien.quievreux.droidplane2.data.createStorageFileChecker
 import fr.julien.quievreux.droidplane2.data.getFileNameFromUri
+import fr.julien.quievreux.droidplane2.core.extensions.buildCreateDocumentIntent
+import fr.julien.quievreux.droidplane2.core.extensions.deleteSafDocument
 import fr.julien.quievreux.droidplane2.core.extensions.getSaveFileLauncher
 import fr.julien.quievreux.droidplane2.core.log.Logger
 import fr.julien.quievreux.droidplane2.core.ui.component.AppFloatingActionButton
 import fr.julien.quievreux.droidplane2.data.model.Node
 import fr.julien.quievreux.droidplane2.helper.FileRegister
+import fr.julien.quievreux.droidplane2.helper.SaveResolution
+import fr.julien.quievreux.droidplane2.helper.SaveTargetResolver
 import fr.julien.quievreux.droidplane2.model.ContentNodeType.Classic
 import fr.julien.quievreux.droidplane2.model.ContentNodeType.RelativeFile
 import fr.julien.quievreux.droidplane2.model.ContentNodeType.RichText
@@ -122,8 +127,15 @@ class MainActivity : FragmentActivity(), FileRegister {
     private val openFileLauncher = registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri: Uri? ->
         uri?.let { u ->
             try {
-                contentResolver.takePersistableUriPermission(u, Intent.FLAG_GRANT_READ_URI_PERMISSION)
-            } catch (_: Exception) {}
+                contentResolver.takePersistableUriPermission(
+                    u,
+                    Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION
+                )
+            } catch (_: Exception) {
+                try {
+                    contentResolver.takePersistableUriPermission(u, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                } catch (_: Exception) {}
+            }
             openSelectedUri(u)
         }
     }
@@ -136,18 +148,76 @@ class MainActivity : FragmentActivity(), FileRegister {
                     Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION
                 )
             } catch (_: Exception) {}
-            contentResolver.openOutputStream(uri)?.use { outputStream ->
-                viewModel.saveFile(outputStream)
-                val fileName = getFileNameFromUri(this@MainActivity, uri)
-                recentFilesRepository.addRecentFile(uri.toString(), fileName)
+
+            val pickerDisplayName = getFileNameFromUri(this@MainActivity, uri)
+            val originalUri = viewModel.getMapUri()
+            val resolution = SaveTargetResolver.resolve(
+                originalUriString = originalUri?.toString(),
+                originalDisplayName = viewModel.getMindmapFileName(),
+                pickedUriString = uri.toString(),
+                pickedDisplayName = pickerDisplayName,
+            )
+
+            when (resolution) {
+                is SaveResolution.WriteNewFile -> {
+                    writeMindMapToUri(Uri.parse(resolution.targetUriString), resolution.displayName)
+                }
+                is SaveResolution.DirectOverwrite -> {
+                    writeMindMapToUri(Uri.parse(resolution.targetUriString), resolution.displayName)
+                }
+                is SaveResolution.ConfirmOverwrite -> {
+                    val targetOriginalUri = originalUri ?: Uri.parse(resolution.originalUriString)
+                    val duplicateUri = Uri.parse(resolution.duplicatePickerUriString)
+                    viewModel.showOverwriteConfirmation(
+                        fileName = resolution.originalDisplayName,
+                        onConfirm = {
+                            val wroteOriginal = writeMindMapToUri(
+                                targetOriginalUri,
+                                resolution.originalDisplayName
+                            )
+                            if (wroteOriginal) {
+                                deleteSafDocument(this@MainActivity, duplicateUri)
+                            } else {
+                                writeMindMapToUri(duplicateUri, resolution.duplicateDisplayName)
+                            }
+                        },
+                        onCancel = {
+                            deleteSafDocument(this@MainActivity, duplicateUri)
+                            viewModel.cancelSaveFile()
+                        }
+                    )
+                }
             }
         }
     )
 
+    private fun writeMindMapToUri(targetUri: Uri, displayName: String): Boolean {
+        return try {
+            val stream = try {
+                contentResolver.openOutputStream(targetUri, "wt")
+            } catch (_: Exception) {
+                contentResolver.openOutputStream(targetUri)
+            }
+            if (stream != null) {
+                stream.use { outputStream ->
+                    viewModel.saveFile(outputStream)
+                }
+                viewModel.setMapUri(targetUri, displayName)
+                recentFilesRepository.addRecentFile(targetUri.toString(), displayName)
+                true
+            } else {
+                false
+            }
+        } catch (e: Exception) {
+            logger.e("Failed to write mindmap to $targetUri: $e")
+            false
+        }
+    }
+
     private fun openSelectedUri(uri: Uri) {
         val fileName = getFileNameFromUri(this, uri)
         recentFilesRepository.addRecentFile(uri.toString(), fileName)
-        viewModel.setMapUri(uri)
+        viewModel.setMapUri(uri, fileName)
         lifecycleScope.launch {
             try {
                 val stream = contentResolver.openInputStream(uri)
@@ -315,6 +385,11 @@ class MainActivity : FragmentActivity(), FileRegister {
                     }
                     is DialogType.DiscardConfirmation -> {
                         DiscardConfirmationDialog(
+                            confirmation = dialog,
+                        )
+                    }
+                    is DialogType.OverwriteConfirmation -> {
+                        OverwriteConfirmationDialog(
                             confirmation = dialog,
                         )
                     }
@@ -567,10 +642,10 @@ class MainActivity : FragmentActivity(), FileRegister {
             if (savedInstanceState == null && getRootNode() == null) {
                 if (isAnExternalMindMapEdit()) {
                     val uri = intent.data
-                    setMapUri(uri)
-                    uri?.let { u ->
-                        val fileName = u.lastPathSegment?.substringAfterLast('/') ?: "mindmap.mm"
-                        recentFilesRepository.addRecentFile(u.toString(), fileName)
+                    val fileName = uri?.let { getFileNameFromUri(this@MainActivity, it) }
+                    setMapUri(uri, fileName)
+                    if (uri != null && fileName != null) {
+                        recentFilesRepository.addRecentFile(uri.toString(), fileName)
                     }
                     lifecycleScope.launch {
                         getDocumentInputStream(true)?.let { loadMindMap(it) }
@@ -608,10 +683,10 @@ class MainActivity : FragmentActivity(), FileRegister {
         setIntent(intent)
         if (isAnExternalMindMapEdit()) {
             val uri = intent.data
-            viewModel.setMapUri(uri)
-            uri?.let { u ->
-                val fileName = u.lastPathSegment?.substringAfterLast('/') ?: "mindmap.mm"
-                recentFilesRepository.addRecentFile(u.toString(), fileName)
+            val fileName = uri?.let { getFileNameFromUri(this@MainActivity, it) }
+            viewModel.setMapUri(uri, fileName)
+            if (uri != null && fileName != null) {
+                recentFilesRepository.addRecentFile(uri.toString(), fileName)
             }
             lifecycleScope.launch {
                 getDocumentInputStream(true)?.let { viewModel.loadMindMap(it) }
@@ -746,13 +821,8 @@ class MainActivity : FragmentActivity(), FileRegister {
         }
     }
 
-    private fun launchFileSavingIntent(filename: String) {
-        val intent = Intent(Intent.ACTION_CREATE_DOCUMENT).apply {
-            addCategory(Intent.CATEGORY_OPENABLE)
-//            type = "text/plain" // Set the MIME type
-            type = "*/*" // Set the MIME type
-            putExtra(Intent.EXTRA_TITLE, filename)
-        }
+    private fun launchFileSavingIntent(filename: String, initialUri: Uri? = null) {
+        val intent = buildCreateDocumentIntent(filename, initialUri)
         saveFileLauncher.launch(intent)
     }
 
@@ -774,7 +844,7 @@ class MainActivity : FragmentActivity(), FileRegister {
                 if (grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
                     // Permission granted, launch file saving intent
                     viewModel.getNameOfFileToSave()?.let { fileName ->
-                        launchFileSavingIntent(fileName)
+                        launchFileSavingIntent(fileName, viewModel.getMapUri())
                     }
 
                 } else {
@@ -788,8 +858,12 @@ class MainActivity : FragmentActivity(), FileRegister {
     }
 
     override fun registerFile(file: File) {
+        registerFile(file, null)
+    }
+
+    override fun registerFile(file: File, initialUri: Uri?) {
         runOnUiThread {
-            launchFileSavingIntent(file.name)
+            launchFileSavingIntent(file.name, initialUri)
         }
     }
 

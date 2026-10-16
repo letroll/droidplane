@@ -40,6 +40,9 @@
     <string name="discard_changes_title">Discard Changes?</string>
     <string name="discard_changes_message">You have unsaved changes that will be lost. Do you want to proceed?</string>
     <string name="discard">Discard</string>
+    <string name="overwrite_file_title">Replace Existing File?</string>
+    <string name="overwrite_file_message">Do you want to replace the existing file \"%1$s\"?</string>
+    <string name="overwrite_replace">Replace</string>
     <string name="default_root_node_title">Central Idea</string>
     <string name="startup_title">Welcome to DroidPlane</string>
     <string name="recent_files">Recent Files</string>
