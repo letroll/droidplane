@@ -55,3 +55,6 @@ Thumbs.db
 .codex/
 .opencode/
 opencode.json
+
+.kotlin/
+.worktrees/
