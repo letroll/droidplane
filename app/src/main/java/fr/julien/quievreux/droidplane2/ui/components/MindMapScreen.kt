@@ -9,6 +9,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import fr.julien.quievreux.droidplane2.MainUiState
 import fr.julien.quievreux.droidplane2.MainViewModel
 import fr.julien.quievreux.droidplane2.data.model.Node
 import fr.julien.quievreux.droidplane2.model.ContextMenuAction
@@ -19,7 +20,27 @@ import fr.julien.quievreux.droidplane2.ui.view.DeleteConfirmationDialog
 @Composable
 fun MindMapScreen(viewModel: MainViewModel = viewModel()) {
     val uiState by viewModel.uiState.collectAsState()
+    val searchResults by viewModel.getSearchResultFlow().collectAsState()
 
+    MindMapScreen(
+        uiState = uiState,
+        fetchText = viewModel::getNodeText,
+        fetchTextForCopy = viewModel::getNodeTextForCopy,
+        onNodeClick = viewModel::onNodeClick,
+        onNodeContextMenuClick = viewModel::onNodeContextMenuClick,
+        searchResults = searchResults,
+    )
+}
+
+@Composable
+fun MindMapScreen(
+    uiState: MainUiState,
+    fetchText: (Node) -> String? = { it.text },
+    fetchTextForCopy: (Node) -> String? = { it.text },
+    onNodeClick: (Node) -> Unit = {},
+    onNodeContextMenuClick: (ContextMenuAction) -> Unit = {},
+    searchResults: List<Node> = emptyList(),
+) {
     val nodeCurrentlyDisplayed = uiState.nodeCurrentlyDisplayed
 
     // Show DeleteConfirmationDialog when dialog state is DeleteConfirmation
@@ -32,13 +53,13 @@ fun MindMapScreen(viewModel: MainViewModel = viewModel()) {
     nodeCurrentlyDisplayed?.let { node ->
         NodeListScreen(
             node = node,
-            fetchText = viewModel::getNodeText,
-            fetchTextForCopy = viewModel::getNodeTextForCopy,
-            onNodeClick = viewModel::onNodeClick,
-            onNodeContextMenuClick = viewModel::onNodeContextMenuClick,
+            fetchText = fetchText,
+            fetchTextForCopy = fetchTextForCopy,
+            onNodeClick = onNodeClick,
+            onNodeContextMenuClick = onNodeContextMenuClick,
             searchUiState = uiState.searchUiState,
-            searchResults = viewModel.getSearchResultFlow().collectAsState().value,
-            currentlyDisplayedNodeId = uiState.nodeCurrentlyDisplayed?.id,
+            searchResults = searchResults,
+            currentlyDisplayedNodeId = node.id,
         )
     }
 }
@@ -50,7 +71,7 @@ private fun NodeListScreen(
     fetchTextForCopy: (Node) -> String?,
     onNodeClick: (Node) -> Unit,
     onNodeContextMenuClick: (ContextMenuAction) -> Unit,
-    searchUiState: fr.julien.quievreux.droidplane2.MainUiState.SearchUiState,
+    searchUiState: MainUiState.SearchUiState,
     searchResults: List<Node>,
     currentlyDisplayedNodeId: String?,
 ) {
@@ -79,7 +100,29 @@ private fun NodeListScreen(
 @Composable
 @androidx.compose.ui.tooling.preview.Preview
 fun PreviewMindMapScreen() {
+    val rootNode = Node(
+        parentNode = null,
+        id = "root",
+        numericId = 1,
+        text = "Root Node",
+        creationDate = 0L,
+        modificationDate = 0L,
+    )
+    val child1 = Node(
+        parentNode = rootNode,
+        id = "child1",
+        numericId = 2,
+        text = "Child Node 1",
+        creationDate = 0L,
+        modificationDate = 0L,
+    )
+    rootNode.childNodes.add(child1)
+
+    val uiState = MainUiState(
+        nodeCurrentlyDisplayed = rootNode,
+    )
+
     ContrastAwareReplyTheme {
-        MindMapScreen()
+        MindMapScreen(uiState = uiState)
     }
 }

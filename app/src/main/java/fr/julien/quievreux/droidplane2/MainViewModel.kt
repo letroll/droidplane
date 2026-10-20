@@ -1479,4 +1479,35 @@ nodeFindList:${nodeManager.getSearchResult().map { getNodeText(it) }.joinToStrin
             hasUnsavedChanges = true
         }
     }
+
+    /**
+     * Reorders a child node within its parent relative to a neighbor node.
+     */
+    fun onReorderChildNode(
+        parentId: String,
+        draggedChildId: String,
+        targetNeighborId: String,
+        insertAfter: Boolean
+    ) {
+        viewModelScope.launch {
+            val success = nodeManager.reorderChildNode(
+                parentId = parentId,
+                draggedChildId = draggedChildId,
+                targetNeighborId = targetNeighborId,
+                insertAfter = insertAfter
+            )
+            if (success) {
+                hasUnsavedChanges = true
+                val updatedParent = nodeManager.getNodeByID(parentId)
+                if (updatedParent != null && _uiState.value.nodeCurrentlyDisplayed?.id == parentId) {
+                    showNode(updatedParent)
+                }
+                updateUiState { currentState ->
+                    currentState.copy(
+                        treeVersion = currentState.treeVersion + 1
+                    )
+                }
+            }
+        }
+    }
 }

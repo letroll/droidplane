@@ -2,7 +2,7 @@ installed:
 - assess
 - bug
 - git
-- worktree
+- worktrees
 settings:
   auto_execute_hooks: true
 hooks:
@@ -105,12 +105,12 @@ hooks:
     prompt: Commit specification changes?
     description: Auto-commit after specification
     condition: null
-  - extension: worktree
-    command: speckit.worktree.create
+  - extension: worktrees
+    command: speckit.worktrees.create
     enabled: true
     optional: false
     priority: 10
-    prompt: Create an isolated worktree for this new feature?
+    prompt: Execute speckit.worktrees.create?
     description: Auto-spawn a worktree after a new feature is specified
     condition: null
   after_clarify:
