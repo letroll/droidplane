@@ -64,6 +64,14 @@ interface NodeManagerContract {
     suspend fun addNodeToMindmap(newValue: String, parentNode: Node? = null): Int?
 
     /**
+     * Creates and attaches a new child node to parentNode using the provided [node] as a template,
+     * preserving all fields (detailsText, noteText, richText, latexEquation, attributes, iconNames, etc.).
+     * The node's id and numericId will be replaced by newly generated values.
+     * Returns the numeric ID of the newly created node, or null if creation failed.
+     */
+    suspend fun addNodeToMindmap(node: Node, parentNode: Node? = null): Int?
+
+    /**
      * Deletes a node by its ID from the tree and indexes.
      * Returns true if node was found and deleted, false otherwise.
      */
