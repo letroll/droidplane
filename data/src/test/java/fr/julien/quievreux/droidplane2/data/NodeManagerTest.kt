@@ -510,6 +510,98 @@ class NodeManagerTest : KStringSpec() {
             nodeManager.addNodeToMindmap("   ", nodeManager.getNodeByID("ID_1001")) shouldBe null
         }
 
+        "addNodeToMindmap(Node) should preserve detailsText when creating from a template" {
+            val nodeManager = loadedNodeManager()
+            val parent = nodeManager.getNodeByID("ID_1001")!!
+            val template = Node(
+                parentNode = parent,
+                id = "temp_ignored",
+                numericId = 0,
+                text = "New node with details",
+                detailsText = "<html><body><p>My details</p></body></html>",
+                creationDate = System.currentTimeMillis(),
+                modificationDate = System.currentTimeMillis(),
+            )
+
+            val newId = nodeManager.addNodeToMindmap(template, parent)
+            newId shouldNotBe null
+
+            val created = nodeManager.getNodeByNumericId(newId!!)
+            created shouldNotBe null
+            created!!.text shouldBe "New node with details"
+            created.detailsText shouldBe "<html><body><p>My details</p></body></html>"
+        }
+
+        "addNodeToMindmap(Node) should preserve noteText when creating from a template" {
+            val nodeManager = loadedNodeManager()
+            val parent = nodeManager.getNodeByID("ID_1001")!!
+            val template = Node(
+                parentNode = parent,
+                id = "temp_ignored",
+                numericId = 0,
+                text = "Node with notes",
+                noteText = "<html><body><p>Extended notes</p></body></html>",
+                creationDate = System.currentTimeMillis(),
+                modificationDate = System.currentTimeMillis(),
+            )
+
+            val newId = nodeManager.addNodeToMindmap(template, parent)
+            newId shouldNotBe null
+            nodeManager.getNodeByNumericId(newId!!)!!.noteText shouldBe "<html><body><p>Extended notes</p></body></html>"
+        }
+
+        "addNodeToMindmap(Node) should preserve richText when creating from a template" {
+            val nodeManager = loadedNodeManager()
+            val parent = nodeManager.getNodeByID("ID_1001")!!
+            val richHtml = "<html><body><p><b>Bold title</b></p></body></html>"
+            val template = Node(
+                parentNode = parent,
+                id = "temp_ignored",
+                numericId = 0,
+                text = "Rich text node",
+                richText = richHtml,
+                creationDate = System.currentTimeMillis(),
+                modificationDate = System.currentTimeMillis(),
+            )
+
+            val newId = nodeManager.addNodeToMindmap(template, parent)
+            newId shouldNotBe null
+            nodeManager.getNodeByNumericId(newId!!)!!.richText shouldBe richHtml
+        }
+
+        "addNodeToMindmap(Node) should preserve latexEquation when creating from a template" {
+            val nodeManager = loadedNodeManager()
+            val parent = nodeManager.getNodeByID("ID_1001")!!
+            val template = Node(
+                parentNode = parent,
+                id = "temp_ignored",
+                numericId = 0,
+                text = "LaTeX node",
+                latexEquation = "\\sum_{i=1}^n x_i",
+                creationDate = System.currentTimeMillis(),
+                modificationDate = System.currentTimeMillis(),
+            )
+
+            val newId = nodeManager.addNodeToMindmap(template, parent)
+            newId shouldNotBe null
+            nodeManager.getNodeByNumericId(newId!!)!!.latexEquation shouldBe "\\sum_{i=1}^n x_i"
+        }
+
+        "addNodeToMindmap(Node) with blank text should return null" {
+            val nodeManager = loadedNodeManager()
+            val parent = nodeManager.getNodeByID("ID_1001")!!
+            val template = Node(
+                parentNode = parent,
+                id = "temp_ignored",
+                numericId = 0,
+                text = "   ",
+                detailsText = "Some details",
+                creationDate = System.currentTimeMillis(),
+                modificationDate = System.currentTimeMillis(),
+            )
+            nodeManager.addNodeToMindmap(template, parent) shouldBe null
+        }
+
         
         "deleteNode should update parentNode references of surviving children" {
             val nodeManager = loadedNodeManager()

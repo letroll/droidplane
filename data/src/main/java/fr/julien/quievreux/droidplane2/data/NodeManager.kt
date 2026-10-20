@@ -795,6 +795,47 @@ class NodeManager(
         return nodeNumericId
     }
 
+    /**
+     * addNode (Node template) : creates a new node using [node] as a template, preserving all content fields
+     * (detailsText, noteText, richText, latexEquation, attributes, iconNames, etc.).
+     * The id and numericId from the template are discarded and replaced by newly generated values.
+     * Returns the numeric ID of the newly created node, or null if creation failed.
+     */
+    override suspend fun addNodeToMindmap(node: Node, parentNode: Node?): Int? {
+        val text = node.text.orEmpty()
+        if (text.isBlank()) return null
+
+        // First create the node with its text (handles tree wiring and index updates)
+        val newNumericId = addNodeToMindmap(text, parentNode) ?: return null
+        val newNodeId = getNodeID(newNumericId)
+
+        // If the template carries extra fields, apply them via updateNode
+        val hasExtraContent = node.detailsText != null
+            || node.noteText != null
+            || node.richText != null
+            || node.latexEquation != null
+            || node.attributes.isNotEmpty()
+            || node.iconNames.isNotEmpty()
+            || node.richTextContents.isNotEmpty()
+
+        if (hasExtraContent) {
+            val created = getNodeByID(newNodeId) ?: return newNumericId
+            val enriched = created.copy(
+                richText = node.richText,
+                detailsText = node.detailsText,
+                noteText = node.noteText,
+                latexEquation = node.latexEquation,
+                richContentType = node.richContentType,
+                attributes = ArrayList(node.attributes),
+                iconNames = ArrayList(node.iconNames),
+                richTextContents = ArrayList(node.richTextContents),
+            )
+            updateNode(enriched)
+        }
+
+        return newNumericId
+    }
+
     override suspend fun updateNodeText(nodeId: String, newText: String): Node? {
         val targetNode = getNodeByID(nodeId) ?: return null
         val time = System.currentTimeMillis()

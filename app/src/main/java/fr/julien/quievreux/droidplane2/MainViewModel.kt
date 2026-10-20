@@ -907,9 +907,8 @@ nodeFindList:${nodeManager.getSearchResult().map { getNodeText(it) }.joinToStrin
     }
 
     fun onAddNodeFromInspector(newNode: Node, parentNode: Node?) {
-        val text = newNode.text.orEmpty()
-            .also { if (it.isBlank()) return }
-        addNode(text, parentNode)
+        if (newNode.text.orEmpty().isBlank()) return
+        addNode(newNode, parentNode)
         setDialogState(DialogType.None)
     }
 
@@ -1399,6 +1398,47 @@ nodeFindList:${nodeManager.getSearchResult().map { getNodeText(it) }.joinToStrin
 
     fun onCancelDelete() {
         setDialogState(DialogType.None)
+    }
+
+    /**
+     * Creates a new child node using [newNode] as a template, preserving all content fields
+     * (detailsText, noteText, richText, latexEquation, attributes, iconNames, etc.).
+     */
+    fun addNode(newNode: Node, parentNode: Node? = _uiState.value.nodeCurrentlyDisplayed) {
+        if (newNode.text.orEmpty().isBlank()) return
+        viewModelScope.launch(Dispatchers.IO) {
+            val currentScreenNode = _uiState.value.nodeCurrentlyDisplayed
+            val targetParent = parentNode ?: currentScreenNode
+            val newNodeId = nodeManager.addNodeToMindmap(newNode, targetParent)
+            newNodeId?.let {
+                if (currentScreenNode != null) {
+                    val refreshedScreenNode = nodeManager.getNodeByID(currentScreenNode.id)
+                    if (refreshedScreenNode != null) {
+                        showNode(refreshedScreenNode)
+                    }
+                } else if (targetParent != null) {
+                    val updatedParent = nodeManager.getNodeByID(targetParent.id)
+                    if (updatedParent != null) {
+                        showNode(updatedParent)
+                    }
+                }
+                val createdNodeId = nodeManager.getNodeID(newNodeId)
+                updateUiState { currentState ->
+                    val newCollapsed = if (targetParent != null) {
+                        currentState.collapsedNodeIds - targetParent.id
+                    } else {
+                        currentState.collapsedNodeIds
+                    }
+                    currentState.copy(
+                        treeVersion = currentState.treeVersion + 1,
+                        collapsedNodeIds = newCollapsed,
+                        selectedNodeId = createdNodeId ?: currentState.selectedNodeId,
+                        leaving = false,
+                    )
+                }
+            }
+            hasUnsavedChanges = true
+        }
     }
 
     fun addNode(newValue: String, parentNode: Node? = _uiState.value.nodeCurrentlyDisplayed) {
