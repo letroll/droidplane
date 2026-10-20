@@ -19,7 +19,7 @@
 
 **Purpose**: Verify development environment and baseline build health
 
-- [ ] T001 Verify project build and test baseline across all modules via `./gradlew test --quiet`
+- [X] T001 Verify project build and test baseline across all modules via `./gradlew test --quiet`
 
 ---
 
@@ -29,11 +29,11 @@
 
 **⚠️ CRITICAL**: Must complete before User Story phases
 
-- [ ] T002 [P] Create `.cliff.toml` configuration for `git cliff` in repository root with commit groups, section order, and template matching data-model.md sections
-- [ ] T003 [P] Create `.commitlintrc.json` extending `@commitlint/config-conventional` with rules from contracts/ui-contracts.md (type-enum, scope-case, subject-max-length, header-max-length)
-- [ ] T004 Add `ReleaseNoteParser` interface and `ConventionalCommit`, `CommitType`, `ReleaseNote` data classes in `core/src/main/java/fr/julien/quievreux/droidplane2/core/util/ReleaseNoteParser.kt`
-- [ ] T005 [P] Extend `GitHubRelease` data class in `app/src/main/java/fr/julien/quievreux/droidplane2/update/GitHubRelease.kt` with `body: String?` field for changelog
-- [ ] T006 [P] Extend `UpdateCheckResult` sealed class in `app/src/main/java/fr/julien/quievreux/droidplane2/update/UpdateCheckResult.kt` with `releaseNotes: String?` in `UpdateAvailable`
+- [X] T002 [P] Create `.cliff.toml` configuration for `git cliff` in repository root with commit groups, section order, and template matching data-model.md sections
+- [X] T003 [P] Create `.commitlintrc.json` extending `@commitlint/config-conventional` with rules from contracts/ui-contracts.md (type-enum, scope-case, subject-max-length, header-max-length)
+- [X] T004 Add `ReleaseNoteParser` interface and `ConventionalCommit`, `CommitType`, `ReleaseNote` data classes in `core/src/main/java/fr/julien/quievreux/droidplane2/core/util/ReleaseNoteParser.kt`
+- [X] T005 [P] Extend `GitHubRelease` data class in `app/src/main/java/fr/julien/quievreux/droidplane2/update/GitHubRelease.kt` with `body: String?` field for changelog
+- [X] T006 [P] Extend `UpdateCheckResult` sealed class in `app/src/main/java/fr/julien/quievreux/droidplane2/update/UpdateCheckResult.kt` with `releaseNotes: String?` in `UpdateAvailable`
 
 **Checkpoint**: Foundation ready — parser interfaces, data models, and CI configs in place
 
@@ -47,15 +47,15 @@
 
 ### Tests for User Story 1
 
-- [ ] T007 [P] [US1] Unit tests for `ReleaseNoteParser.parseCommit` covering all `CommitType` values, scope parsing, subject extraction, and `OTHER` fallback in `core/src/test/java/fr/julien/quievreux/droidplane2/core/util/ReleaseNoteParserTest.kt`
-- [ ] T008 [P] [US1] Unit tests for `ReleaseNoteParser.parseReleaseNotes` verifying section order (FEAT→FIX→PERF→REFACTOR→DOCS→TEST→CI→BUILD→CHORE→REVERT→OTHER), markdown generation, and empty range handling in `core/src/test/java/fr/julien/quievreux/droidplane2/core/util/ReleaseNoteParserTest.kt`
+- [X] T007 [P] [US1] Unit tests for `ReleaseNoteParser.parseCommit` covering all `CommitType` values, scope parsing, subject extraction, and `OTHER` fallback in `core/src/test/java/fr/julien/quievreux/droidplane2/core/util/ReleaseNoteParserTest.kt`
+- [X] T008 [P] [US1] Unit tests for `ReleaseNoteParser.parseReleaseNotes` verifying section order (FEAT→FIX→PERF→REFACTOR→DOCS→TEST→CI→BUILD→CHORE→REVERT→OTHER), markdown generation, and empty range handling in `core/src/test/java/fr/julien/quievreux/droidplane2/core/util/ReleaseNoteParserTest.kt`
 - [ ] T009 [P] [US1] Integration test for `ReleaseNoteParserImpl` against sample git history fixtures in `core/src/test/java/fr/julien/quievreux/droidplane2/core/util/ReleaseNoteParserIntegrationTest.kt`
 
 ### Implementation for User Story 1
 
-- [ ] T010 [P] [US1] Implement `ReleaseNoteParserImpl` pure Kotlin parser in `core/src/main/java/fr/julien/quievreux/droidplane2/core/util/ReleaseNoteParserImpl.kt` with regex-based conventional commit parsing per data-model.md rules
-- [ ] T011 [US1] Create GitHub Actions workflow `.github/workflows/release.yml` with `generate-release-notes` job: checkout (fetch-depth: 0), determine previous tag, install `git cliff` via binary download, run `git cliff`, create/update release via `gh release create`, upload APK from `app/build/outputs/apk/release/*.apk`
-- [ ] T012 [P] [US1] Create GitHub Actions workflow `.github/workflows/commitlint.yml` with `commitlint` job on `pull_request` using `wagoid/commitlint-github-action@v6` to validate conventional commits
+- [X] T010 [P] [US1] Implement `ReleaseNoteParserImpl` pure Kotlin parser in `core/src/main/java/fr/julien/quievreux/droidplane2/core/util/ReleaseNoteParserImpl.kt` with regex-based conventional commit parsing per data-model.md rules
+- [X] T011 [US1] Create GitHub Actions workflow `.github/workflows/release.yml` with `generate-release-notes` job: checkout (fetch-depth: 0), determine previous tag, install `git cliff` via binary download, run `git cliff`, create/update release via `gh release create`, upload APK from `app/build/outputs/apk/release/*.apk`
+- [X] T012 [P] [US1] Create GitHub Actions workflow `.github/workflows/commitlint.yml` with `commitlint` job on `pull_request` using `wagoid/commitlint-github-action@v6` to validate conventional commits
 
 **Checkpoint**: User Story 1 functional — automated release notes generated on tag push with categorized commits
 
@@ -69,16 +69,16 @@
 
 ### Tests for User Story 2
 
-- [ ] T013 [P] [US2] Unit tests for `GitHubUpdateCheckerServiceImpl.checkForUpdate()` mapping GitHub API `body` field to `UpdateCheckResult.UpdateAvailable.releaseNotes` in `app/src/test/java/fr/julien/quievreux/droidplane2/update/GitHubUpdateCheckerServiceImplTest.kt`
-- [ ] T014 [P] [US2] Unit tests for caching behavior (1-hour TTL, fallback on rate limit 403, network error) in `app/src/test/java/fr/julien/quievreux/droidplane2/update/GitHubUpdateCheckerServiceImplTest.kt`
+- [X] T013 [P] [US2] Unit tests for `GitHubUpdateCheckerServiceImpl.checkForUpdate()` mapping GitHub API `body` field to `UpdateCheckResult.UpdateAvailable.releaseNotes` in `app/src/test/java/fr/julien/quievreux/droidplane2/update/GitHubUpdateCheckerServiceImplTest.kt`
+- [X] T014 [P] [US2] Unit tests for caching behavior (1-hour TTL, fallback on rate limit 403, network error) in `app/src/test/java/fr/julien/quievreux/droidplane2/update/GitHubUpdateCheckerServiceImplTest.kt`
 - [ ] T015 [P] [US2] Compose UI tests for `UpdateDialog` in `app/src/androidTest/java/fr/julien/quievreux/droidplane2/ui/components/UpdateDialogTest.kt` covering: loading state, error state with retry, loaded state with changelog scrollable, empty changelog fallback, Update Now/Later button actions, dark/light theme
-- [ ] T016 [P] [US2] Compose previews for `UpdateDialog` in `app/src/main/java/fr/julien/quievreux/droidplane2/ui/components/UpdateDialog.kt` with `@Preview` for normal/long/empty changelog, loading, error, dark/light themes
+- [X] T016 [P] [US2] Compose previews for `UpdateDialog` in `app/src/main/java/fr/julien/quievreux/droidplane2/ui/dialog/UpdateAvailableDialog.kt` with `@Preview` for normal/long/empty changelog, loading, error, dark/light themes
 
 ### Implementation for User Story 2
 
-- [ ] T017 [US2] Update `GitHubUpdateCheckerServiceImpl` in `app/src/main/java/fr/julien/quievreux/droidplane2/update/GitHubUpdateCheckerServiceImpl.kt` to fetch `body` from GitHub API `/releases/latest`, map to `UpdateCheckResult.UpdateAvailable.releaseNotes`, implement in-memory cache with 1-hour TTL, handle 403/404/network errors with fallback
-- [ ] T018 [US2] Create `UpdateDialog` composable in `app/src/main/java/fr/julien/quievreux/droidplane2/ui/components/UpdateDialog.kt` per ui-contracts.md: Material 3 dialog, scrollable changelog (max 60% screen height, min 200dp), fallback message for empty body, Update Now/Later buttons with callbacks, accessibility semantics
-- [ ] T019 [US2] Wire `UpdateDialog` into `MainViewModel`/`MainActivity` update flow: observe `UpdateCheckResult`, show dialog on `UpdateAvailable`, pass changelog and download URL, handle Update Now (launch download intent) and Later (dismiss)
+- [X] T017 [US2] Update `GitHubUpdateCheckerServiceImpl` in `app/src/main/java/fr/julien/quievreux/droidplane2/update/GitHubUpdateCheckerServiceImpl.kt` to fetch `body` from GitHub API `/releases/latest`, map to `UpdateCheckResult.UpdateAvailable.releaseNotes`, implement in-memory cache with 1-hour TTL, handle 403/404/network errors with fallback
+- [X] T018 [US2] Enhanced `UpdateAvailableDialog` in `app/src/main/java/fr/julien/quievreux/droidplane2/ui/dialog/UpdateAvailableDialog.kt` per ui-contracts.md: Material 3 dialog, scrollable changelog (max 60% screen height, min 200dp), fallback message for empty body, Update Now/Later buttons with callbacks, accessibility semantics
+- [X] T019 [US2] Wire `UpdateDialog` into `MainViewModel`/`MainActivity` update flow: observe `UpdateCheckResult`, show dialog on `UpdateAvailable`, pass changelog and download URL, handle Update Now (launch download intent) and Later (dismiss)
 
 **Checkpoint**: User Stories 1 and 2 functional — automated release notes on GitHub + in-app changelog preview with actions
 
@@ -92,12 +92,12 @@
 
 ### Tests for User Story 3
 
-- [ ] T020 [P] [US3] Test `commitlint` configuration locally: valid commits pass, invalid commits fail with descriptive errors (missing type, empty subject, invalid scope case, subject too long)
+- [X] T020 [P] [US3] Test `commitlint` configuration locally: valid commits pass, invalid commits fail with descriptive errors (missing type, empty subject, invalid scope case, subject too long)
 
 ### Implementation for User Story 3
 
-- [ ] T021 [US3] Verify `.commitlintrc.json` from T003 is committed and `.github/workflows/commitlint.yml` from T012 runs on all PRs
-- [ ] T022 [US3] Add commitlint validation to local development docs (README or CONTRIBUTING.md) with commit message format examples
+- [X] T021 [US3] Verify `.commitlintrc.json` from T003 is committed and `.github/workflows/commitlint.yml` from T012 runs on all PRs
+- [X] T022 [US3] Add commitlint validation to local development docs (CONTRIBUTING.md) with commit message format examples
 
 **Checkpoint**: All user stories functional — CI enforces conventional commits, automated release notes generated, in-app changelog displayed
 
@@ -107,11 +107,11 @@
 
 **Purpose**: Quality gates, full test verification, documentation validation
 
-- [ ] T023 [P] Add Compose `@Preview` functions and dark/light theme validation for `UpdateDialog` in `app/src/main/java/fr/julien/quievreux/droidplane2/ui/components/UpdateDialog.kt`
-- [ ] T024 Run full regression test suite across all modules via `./gradlew test --rerun-tasks`
-- [ ] T025 Verify complete application build and APK assembly via `./gradlew assembleDebug`
-- [ ] T026 Execute quickstart validation scenarios from `specs/013-auto-release-changelog/quickstart.md`
-- [ ] T027 [P] Update `README.md` or `CONTRIBUTING.md` with conventional commit format guide and release process documentation
+- [X] T023 [P] Add Compose `@Preview` functions and dark/light theme validation for `UpdateDialog` in `app/src/main/java/fr/julien/quievreux/droidplane2/ui/dialog/UpdateAvailableDialog.kt`
+- [X] T024 Run full regression test suite across all modules via `./gradlew test --rerun-tasks`
+- [X] T025 Verify complete application build and APK assembly via `./gradlew assembleDebug`
+- [X] T026 Execute quickstart validation scenarios from `specs/013-auto-release-changelog/quickstart.md`
+- [X] T027 [P] Update `CONTRIBUTING.md` with conventional commit format guide and release process documentation
 
 ---
 

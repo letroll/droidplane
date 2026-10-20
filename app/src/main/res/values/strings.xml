@@ -150,4 +150,5 @@
     <string name="update_error">Unable to check for updates. Please check your connection.</string>
     <string name="update_downloading_enqueued">Download started. Tap the system notification once complete to install.</string>
     <string name="update_no_apk_asset">No APK file found in this release. Opening GitHub in browser…</string>
+    <string name="update_no_changelog">No changelog provided for this release.</string>
 </resources>
