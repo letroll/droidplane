@@ -3,7 +3,6 @@ package fr.julien.quievreux.droidplane2
 import fr.julien.quievreux.droidplane2.model.ContentNodeType.Classic
 import fr.julien.quievreux.droidplane2.data.model.Node
 import fr.julien.quievreux.droidplane2.model.ContentNodeType
-import fr.julien.quievreux.droidplane2.model.DisplayMode
 import fr.julien.quievreux.droidplane2.model.RecentFile
 import fr.julien.quievreux.droidplane2.model.ViewIntentNode
 import fr.julien.quievreux.droidplane2.update.GitHubRelease
@@ -24,7 +23,6 @@ data class MainUiState(
     val searchUiState: SearchUiState = SearchUiState(),
     val dialogUiState: DialogUiState = DialogUiState(),
     val navigationStack: List<String> = emptyList(),
-    val displayMode: DisplayMode = DisplayMode.MIND_MAP,
     val selectedNodeId: String? = null,
     val collapsedNodeIds: Set<String> = emptySet(),
     val treeVersion: Long = 0L,

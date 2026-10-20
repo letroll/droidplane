@@ -3,7 +3,6 @@ package fr.julien.quievreux.droidplane2
 import app.cash.turbine.test
 import fr.julien.quievreux.droidplane2.model.ContentNodeType.Classic
 import fr.julien.quievreux.droidplane2.model.ContextMenuAction
-import fr.julien.quievreux.droidplane2.model.DisplayMode
 import fr.julien.quievreux.droidplane2.model.RecentFile
 import fr.julien.quievreux.droidplane2.MainUiState.DialogUiState
 import fr.julien.quievreux.droidplane2.MainUiState.SearchUiState
@@ -51,7 +50,6 @@ class MainViewModelTest : KStringSpec() {
                     searchUiState shouldBe SearchUiState()
                     dialogUiState shouldBe DialogUiState()
                     navigationStack shouldBe emptyList()
-                    displayMode shouldBe DisplayMode.MIND_MAP
                     selectedNodeId shouldBe null
                     collapsedNodeIds shouldBe emptySet()
                     treeVersion shouldBe 0L
@@ -458,24 +456,6 @@ class MainViewModelTest : KStringSpec() {
             }
         }
 
-        "toggleDisplayMode toggles between MIND_MAP and LIST preserving state" {
-            val viewModel = initMainViewModelWithLoadedMindmap()
-            val initialTitle = viewModel.uiState.value.title
-            val initialNode = viewModel.uiState.value.nodeCurrentlyDisplayed
-
-            viewModel.uiState.value.displayMode shouldBe DisplayMode.MIND_MAP
-
-            viewModel.toggleDisplayMode()
-            viewModel.uiState.value.displayMode shouldBe DisplayMode.LIST
-            viewModel.uiState.value.title shouldBe initialTitle
-            viewModel.uiState.value.nodeCurrentlyDisplayed shouldBe initialNode
-
-            viewModel.toggleDisplayMode()
-            viewModel.uiState.value.displayMode shouldBe DisplayMode.MIND_MAP
-            viewModel.uiState.value.title shouldBe initialTitle
-            viewModel.uiState.value.nodeCurrentlyDisplayed shouldBe initialNode
-        }
-
         "selectNode and clearNodeSelection updates selectedNodeId in uiState" {
             val viewModel = initMainViewModelWithLoadedMindmap()
             val root = viewModel.uiState.value.nodeCurrentlyDisplayed!!
@@ -501,29 +481,6 @@ class MainViewModelTest : KStringSpec() {
             viewModel.uiState.value.collapsedNodeIds shouldBe emptySet()
         }
 
-        "switching from MIND_MAP to LIST focuses nodeCurrentlyDisplayed on selectedNodeId" {
-            val nodeManager = realNodeManager()
-            val viewModel = MainViewModel(
-                logger = mockk(relaxed = true),
-                injectedNodeManager = nodeManager,
-                recentFilesRepository = mockk(relaxed = true),
-            )
-            val root = nodeManager.rootNode!!
-            viewModel.setInitialStateForTest(root)
-
-            val child = nodeManager.getNodeByID(root.id)!!.childNodes[0]
-
-            // In mindmap mode
-            viewModel.setDisplayMode(DisplayMode.MIND_MAP)
-            viewModel.selectNode(child)
-
-            // Switch to LIST
-            viewModel.toggleDisplayMode()
-            viewModel.uiState.value.displayMode shouldBe DisplayMode.LIST
-            val expectedDisplayed = if (child.childNodes.isNotEmpty()) child else (child.parentNode ?: child)
-            viewModel.uiState.value.nodeCurrentlyDisplayed?.id shouldBe expectedDisplayed.id
-        }
-
         "context menu node operations and node addition work while in MIND_MAP mode" {
             val nodeManager = realNodeManager()
             val viewModel = MainViewModel(
@@ -533,9 +490,6 @@ class MainViewModelTest : KStringSpec() {
             )
             val root = nodeManager.rootNode!!
             viewModel.setInitialStateForTest(root)
-
-            viewModel.setDisplayMode(DisplayMode.MIND_MAP)
-            viewModel.uiState.value.displayMode shouldBe DisplayMode.MIND_MAP
 
             val child = nodeManager.getNodeByID(root.id)!!.childNodes[0]
 
@@ -869,15 +823,6 @@ class MainViewModelTest : KStringSpec() {
                 nodeManager.rootNode?.id shouldBe "ID_DEMO_ROOT"
                 nodeManager.rootNode?.text shouldBe "Demo Mindmap Root"
             }
-
-            // Step 3: Switch between LIST and MIND_MAP, verify the active mindmap remains the loaded one
-            viewModel.setDisplayMode(DisplayMode.LIST)
-            viewModel.uiState.value.displayMode shouldBe DisplayMode.LIST
-
-            viewModel.setDisplayMode(DisplayMode.MIND_MAP)
-            viewModel.uiState.value.displayMode shouldBe DisplayMode.MIND_MAP
-            viewModel.getRootNode()?.id shouldBe "ID_DEMO_ROOT"
-            viewModel.getRootNode()?.text shouldBe "Demo Mindmap Root"
         }
 
         "loadMindMap reads stream asynchronously without error and closes it in finally" {
