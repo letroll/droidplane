@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="app_name">DroidPlane2</string>
     <string name="overwrite_file_title">Remplacer le fichier existant ?</string>
     <string name="overwrite_file_message">Voulez-vous remplacer le fichier existant « %1$s » ?</string>
     <string name="overwrite_replace">Remplacer</string>

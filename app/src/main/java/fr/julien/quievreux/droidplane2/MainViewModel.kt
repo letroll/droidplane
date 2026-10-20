@@ -23,7 +23,6 @@ import fr.julien.quievreux.droidplane2.model.ContextMenuAction.CopyText
 import fr.julien.quievreux.droidplane2.model.ContextMenuAction.NodeLink
 import fr.julien.quievreux.droidplane2.model.ContextMenuAction.AddChildNode
 import fr.julien.quievreux.droidplane2.model.ContextMenuAction.OpenLink
-import fr.julien.quievreux.droidplane2.model.DisplayMode
 import fr.julien.quievreux.droidplane2.data.RecentFilesRepository
 import fr.julien.quievreux.droidplane2.model.RecentFile
 import fr.julien.quievreux.droidplane2.model.ViewIntentNode
@@ -429,54 +428,6 @@ class MainViewModel(
                 canUndoDelete = false,
                 snackbarMessage = null,
                 searchUiState = MainUiState.SearchUiState(),
-            )
-        }
-    }
-
-    /**
-     * Toggles the display mode between [DisplayMode.LIST] and [DisplayMode.MIND_MAP].
-     */
-    fun toggleDisplayMode() {
-        val nextMode = when (_uiState.value.displayMode) {
-            DisplayMode.LIST -> DisplayMode.MIND_MAP
-            DisplayMode.MIND_MAP -> DisplayMode.LIST
-        }
-        setDisplayMode(nextMode)
-    }
-
-    /**
-     * Sets the active display mode, synchronizing node context when switching to List mode.
-     */
-    fun setDisplayMode(mode: DisplayMode) {
-        updateUiState { currentState ->
-            if (currentState.displayMode == mode) return@updateUiState currentState
-
-            val targetNode = if (mode == DisplayMode.LIST && currentState.selectedNodeId != null) {
-                val selected = nodeManager.getNodeByID(currentState.selectedNodeId)
-                if (selected != null) {
-                    if (selected.childNodes.isNotEmpty()) {
-                        selected
-                    } else {
-                        selected.parentNode ?: selected
-                    }
-                } else {
-                    currentState.nodeCurrentlyDisplayed
-                }
-            } else {
-                currentState.nodeCurrentlyDisplayed
-            }
-
-            val newSelectedId = if (mode == DisplayMode.MIND_MAP && currentState.nodeCurrentlyDisplayed != null) {
-                currentState.nodeCurrentlyDisplayed.id
-            } else {
-                currentState.selectedNodeId
-            }
-
-            currentState.copy(
-                displayMode = mode,
-                nodeCurrentlyDisplayed = targetNode,
-                selectedNodeId = newSelectedId,
-                treeVersion = currentState.treeVersion + 1,
             )
         }
     }
@@ -1477,6 +1428,37 @@ nodeFindList:${nodeManager.getSearchResult().map { getNodeText(it) }.joinToStrin
                 }
             }
             hasUnsavedChanges = true
+        }
+    }
+
+    /**
+     * Reorders a child node within its parent relative to a neighbor node.
+     */
+    fun onReorderChildNode(
+        parentId: String,
+        draggedChildId: String,
+        targetNeighborId: String,
+        insertAfter: Boolean
+    ) {
+        viewModelScope.launch {
+            val success = nodeManager.reorderChildNode(
+                parentId = parentId,
+                draggedChildId = draggedChildId,
+                targetNeighborId = targetNeighborId,
+                insertAfter = insertAfter
+            )
+            if (success) {
+                hasUnsavedChanges = true
+                val updatedParent = nodeManager.getNodeByID(parentId)
+                if (updatedParent != null && _uiState.value.nodeCurrentlyDisplayed?.id == parentId) {
+                    showNode(updatedParent)
+                }
+                updateUiState { currentState ->
+                    currentState.copy(
+                        treeVersion = currentState.treeVersion + 1
+                    )
+                }
+            }
         }
     }
 }

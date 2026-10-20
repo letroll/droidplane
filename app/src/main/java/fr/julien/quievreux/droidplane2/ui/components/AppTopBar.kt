@@ -42,22 +42,17 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import fr.julien.quievreux.droidplane2.ui.theme.ContrastAwareReplyTheme
 import fr.julien.quievreux.droidplane2.MainUiState.SearchUiState
-import fr.julien.quievreux.droidplane2.model.DisplayMode
 import fr.julien.quievreux.droidplane2.ui.components.AppTopBarAction.Backpress
 import fr.julien.quievreux.droidplane2.ui.components.AppTopBarAction.Help
 import fr.julien.quievreux.droidplane2.ui.components.AppTopBarAction.Open
 import fr.julien.quievreux.droidplane2.ui.components.AppTopBarAction.SearchNext
 import fr.julien.quievreux.droidplane2.ui.components.AppTopBarAction.SearchPrevious
-import fr.julien.quievreux.droidplane2.ui.components.AppTopBarAction.Top
-import fr.julien.quievreux.droidplane2.ui.components.AppTopBarAction.Up
 import fr.julien.quievreux.droidplane2.R
 import fr.julien.quievreux.droidplane2.ui.components.AppTopBarAction.Save
 
 enum class AppTopBarAction {
     SearchNext,
     SearchPrevious,
-    Up,
-    Top,
     NewMindmap,
     Open,
     Help,
@@ -65,7 +60,6 @@ enum class AppTopBarAction {
     Undo,
     Backpress,
     ExitSearch,
-    ToggleDisplayMode,
     RecentFiles,
     CheckForUpdates,
 }
@@ -81,7 +75,6 @@ fun AppTopBar(
     searchUiState: SearchUiState = SearchUiState(),
     onExitSearch: () -> Unit = {},
     canUndoDelete: Boolean = false,
-    displayMode: DisplayMode = DisplayMode.MIND_MAP,
     modifier: Modifier = Modifier,
 ) {
     var showMenu by remember { mutableStateOf(false) }
@@ -231,27 +224,6 @@ fun AppTopBar(
                 expanded = showMenu,
                 onDismissRequest = { showMenu = false }
             ) {
-                // Up and Top only in List mode
-                if (displayMode == DisplayMode.LIST) {
-                    DropdownMenuItem(
-                        onClick = {
-                            showMenu = false
-                            onBarAction(Up)
-                        },
-                        text = {
-                            Text(stringResource(R.string.up))
-                        },
-                    )
-                    DropdownMenuItem(
-                        onClick = {
-                            showMenu = false
-                            onBarAction(Top)
-                        },
-                        text = {
-                            Text(stringResource(R.string.gototop))
-                        },
-                    )
-                }
                 DropdownMenuItem(
                     onClick = {
                         showMenu = false
@@ -268,20 +240,6 @@ fun AppTopBar(
                     },
                     text = {
                         Text(stringResource(R.string.open))
-                    },
-                )
-                DropdownMenuItem(
-                    onClick = {
-                        showMenu = false
-                        onBarAction(AppTopBarAction.ToggleDisplayMode)
-                    },
-                    text = {
-                        val textRes = if (displayMode == DisplayMode.LIST) {
-                            R.string.switch_to_mindmap_view
-                        } else {
-                            R.string.switch_to_list_view
-                        }
-                        Text(stringResource(textRes))
                     },
                 )
                 DropdownMenuItem(

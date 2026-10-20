@@ -112,4 +112,20 @@ interface NodeManagerContract {
         onError: (Exception) -> Unit,
         onSaveFinished: ((java.io.File) -> Unit)? = null,
     )
+
+    /**
+     * Reorders a child node within its parent's childNodes collection relative to a neighbor node.
+     *
+     * @param parentId ID of the parent node.
+     * @param draggedChildId ID of the child node being repositioned.
+     * @param targetNeighborId ID of the target neighbor node.
+     * @param insertAfter true if the dragged child should be placed immediately after the target; false if before.
+     * @return true if the node was successfully moved to a new position, false if no-op or invalid IDs.
+     */
+    suspend fun reorderChildNode(
+        parentId: String,
+        draggedChildId: String,
+        targetNeighborId: String,
+        insertAfter: Boolean
+    ): Boolean
 }

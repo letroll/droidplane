@@ -34,7 +34,6 @@
     <string name="delete">Delete</string>
     <string name="undo">Undo</string>
     <string name="switch_to_mindmap_view">Mind Map View</string>
-    <string name="switch_to_list_view">List View</string>
     <string name="new_mindmap">New Mindmap</string>
     <string name="help_demo">Help &amp; Demo</string>
     <string name="discard_changes_title">Discard Changes?</string>

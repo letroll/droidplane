@@ -17,7 +17,6 @@ import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material3.MaterialTheme
@@ -63,7 +62,6 @@ import fr.julien.quievreux.droidplane2.model.ContentNodeType.Classic
 import fr.julien.quievreux.droidplane2.model.ContentNodeType.RelativeFile
 import fr.julien.quievreux.droidplane2.model.ContentNodeType.RichText
 import fr.julien.quievreux.droidplane2.model.ContextMenuAction
-import fr.julien.quievreux.droidplane2.model.DisplayMode
 import fr.julien.quievreux.droidplane2.ui.components.AppTopBar
 import fr.julien.quievreux.droidplane2.ui.components.AppTopBarAction.Backpress
 import fr.julien.quievreux.droidplane2.ui.components.AppTopBarAction.ExitSearch
@@ -77,12 +75,8 @@ import fr.julien.quievreux.droidplane2.update.ApkDownloadHelper
 import fr.julien.quievreux.droidplane2.ui.components.AppTopBarAction.Save
 import fr.julien.quievreux.droidplane2.ui.components.AppTopBarAction.SearchNext
 import fr.julien.quievreux.droidplane2.ui.components.AppTopBarAction.SearchPrevious
-import fr.julien.quievreux.droidplane2.ui.components.AppTopBarAction.Top
-import fr.julien.quievreux.droidplane2.ui.components.AppTopBarAction.ToggleDisplayMode
 import fr.julien.quievreux.droidplane2.ui.components.AppTopBarAction.Undo
-import fr.julien.quievreux.droidplane2.ui.components.AppTopBarAction.Up
 import fr.julien.quievreux.droidplane2.core.ui.component.CustomDialog
-import fr.julien.quievreux.droidplane2.ui.components.nodeList
 import fr.julien.quievreux.droidplane2.ui.inspector.NodePropertiesInspector
 import fr.julien.quievreux.droidplane2.ui.mindmap.MindMapCanvasScreen
 import fr.julien.quievreux.droidplane2.ui.theme.ContrastAwareReplyTheme
@@ -459,7 +453,6 @@ class MainActivity : FragmentActivity() {
                             searchUiState = state.value.searchUiState,
                             onExitSearch = { viewModel.onExitSearchMode() },
                             canUndoDelete = state.value.canUndoDelete,
-                            displayMode = state.value.displayMode,
                             onBarAction = { action ->
                                 when (action) {
                                     Backpress -> viewModel.upOrClose(
@@ -490,10 +483,6 @@ class MainActivity : FragmentActivity() {
 
                                     SearchPrevious -> viewModel.searchPrevious()
 
-                                    Up -> viewModel.navigateUp()
-
-                                    Top -> viewModel.navigateToTop()
-
                                     NewMindmap -> {
                                         viewModel.onNewMindmapRequested(getString(R.string.default_root_node_title))
                                     }
@@ -514,8 +503,6 @@ class MainActivity : FragmentActivity() {
                                     Undo -> viewModel.onUndoDelete()
 
                                     ExitSearch -> viewModel.onExitSearchMode()
-
-                                    ToggleDisplayMode -> viewModel.toggleDisplayMode()
 
                                     RecentFiles -> viewModel.showRecentFilesDialog(
                                         fileAccessibilityChecker = createStorageFileChecker(this@MainActivity),
@@ -553,7 +540,7 @@ class MainActivity : FragmentActivity() {
                     floatingActionButton = {
                         AppFloatingActionButton(
                             onClick = {
-                                val targetParent = if (state.value.displayMode == DisplayMode.MIND_MAP && state.value.selectedNodeId != null) {
+                                val targetParent = if (state.value.selectedNodeId != null) {
                                     viewModel.getNodeByID(state.value.selectedNodeId!!)
                                         ?: viewModel.getRootNode()
                                         ?: state.value.nodeCurrentlyDisplayed
@@ -589,59 +576,24 @@ class MainActivity : FragmentActivity() {
                     //                    contentColor =,
                     //                    contentWindowInsets =,
                     content = { innerPadding ->
-                        when (state.value.displayMode) {
-                            DisplayMode.LIST -> {
-                                state.value.nodeCurrentlyDisplayed?.let { node ->
-                                    LazyColumn(
-                                        modifier = Modifier
-                                            .fillMaxSize()
-                                            .background(MaterialTheme.colorScheme.surfaceContainer)
-                                            .padding(innerPadding),
-                                    ) {
-                                        val searchResults = nodeFindList.value
-                                        val searchResultToShow = if (state.value.searchUiState.isSearchActive && state.value.searchUiState.currentResultIndex in searchResults.indices) {
-                                            searchResults[state.value.searchUiState.currentResultIndex]
-                                        } else {
-                                            null
-                                        }
-                                        nodeList(
-                                            node = node,
-                                            searchResultToShow = searchResultToShow,
-                                            fetchText = viewModel::getNodeText,
-                                            fetchTextForCopy = viewModel::getNodeTextForCopy,
-                                            updateClipBoard = ::updateClipboard,
-                                            onNodeClick = viewModel::onNodeClick,
-                                            onNodeContextMenuClick = viewModel::onNodeContextMenuClick,
-                                            currentlyDisplayedNodeId = state.value.nodeCurrentlyDisplayed?.id,
-                                            onNodeDoubleClick = { clickedNode ->
-                                                viewModel.onNodeContextMenuClick(ContextMenuAction.Properties(clickedNode))
-                                            },
-                                        )
-                                    }
-                                }
-                            }
-
-                            DisplayMode.MIND_MAP -> {
-                                val rootNode = viewModel.getRootNode() ?: state.value.nodeCurrentlyDisplayed
-                                rootNode?.let { node ->
-                                    MindMapCanvasScreen(
-                                        rootNode = node,
-                                        selectedNodeId = state.value.selectedNodeId,
-                                        collapsedNodeIds = state.value.collapsedNodeIds,
-                                        treeVersion = state.value.treeVersion,
-                                        onNodeSelect = viewModel::selectNode,
-                                        onNodeToggleCollapse = viewModel::toggleNodeCollapse,
-                                        onNodeDoubleClick = { clickedNode ->
-                                            viewModel.onNodeContextMenuClick(ContextMenuAction.Properties(clickedNode))
-                                        },
-                                        onNodeContextMenuClick = viewModel::onNodeContextMenuClick,
-                                        fetchText = viewModel::getNodeText,
-                                        modifier = Modifier
-                                            .fillMaxSize()
-                                            .padding(innerPadding),
-                                    )
-                                }
-                            }
+                        val rootNode = viewModel.getRootNode() ?: state.value.nodeCurrentlyDisplayed
+                        rootNode?.let { node ->
+                            MindMapCanvasScreen(
+                                rootNode = node,
+                                selectedNodeId = state.value.selectedNodeId,
+                                collapsedNodeIds = state.value.collapsedNodeIds,
+                                treeVersion = state.value.treeVersion,
+                                onNodeSelect = viewModel::selectNode,
+                                onNodeToggleCollapse = viewModel::toggleNodeCollapse,
+                                onNodeDoubleClick = { clickedNode ->
+                                    viewModel.onNodeContextMenuClick(ContextMenuAction.Properties(clickedNode))
+                                },
+                                onNodeContextMenuClick = viewModel::onNodeContextMenuClick,
+                                fetchText = viewModel::getNodeText,
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .padding(innerPadding),
+                            )
                         }
                     }
                 )
