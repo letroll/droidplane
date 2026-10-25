@@ -1,5 +1,6 @@
 package fr.julien.quievreux.droidplane2.update
 
+import fr.julien.quievreux.droidplane2.core.log.Logger
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -34,6 +35,7 @@ sealed interface UpdateCheckResult {
  */
 interface UpdateCheckerService {
     suspend fun checkForUpdates(currentVersion: String): UpdateCheckResult
+    suspend fun checkForUpdates(currentVersion: String, forceRefresh: Boolean): UpdateCheckResult
 }
 
 /**
@@ -43,7 +45,8 @@ class GitHubUpdateCheckerServiceImpl(
     private val repoOwner: String = DEFAULT_OWNER,
     private val repoName: String = DEFAULT_REPO,
     private val dispatcher: CoroutineDispatcher = Dispatchers.IO,
-    private val jsonFetcher: (suspend (url: String) -> String)? = null
+    private val jsonFetcher: (suspend (url: String) -> String)? = null,
+    private val logger: Logger = Logger.Default
 ) : UpdateCheckerService {
 
     companion object {
@@ -63,27 +66,43 @@ class GitHubUpdateCheckerServiceImpl(
     )
 
     override suspend fun checkForUpdates(currentVersion: String): UpdateCheckResult = withContext(dispatcher) {
+        checkForUpdatesInternal(currentVersion, forceRefresh = false)
+    }
+
+    override suspend fun checkForUpdates(currentVersion: String, forceRefresh: Boolean): UpdateCheckResult = withContext(dispatcher) {
+        checkForUpdatesInternal(currentVersion, forceRefresh)
+    }
+
+    private suspend fun checkForUpdatesInternal(currentVersion: String, forceRefresh: Boolean): UpdateCheckResult = withContext(dispatcher) {
         val currentAppVersion = AppVersion.parse(currentVersion)
         val endpointUrl = "https://api.github.com/repos/$repoOwner/$repoName/releases/latest"
 
-        // Try to get cached release data first
-        val cachedEntry = cache["latest-release"]
-        val hasValidCache = cachedEntry?.let {
-            System.currentTimeMillis() - it.timestamp < CACHE_TTL_MS
-        } ?: false
+        logger.d("Checking for updates: current=$currentVersion (parsed=${currentAppVersion.parts}), forceRefresh=$forceRefresh")
 
-        // If cache is valid, return cached data immediately
+        // Try to get cached release data first (unless force refresh)
+        val cachedEntry = cache["latest-release"]
+        val hasValidCache = if (!forceRefresh) {
+            cachedEntry?.let {
+                System.currentTimeMillis() - it.timestamp < CACHE_TTL_MS
+            } ?: false
+        } else false
+
+        // If cache is valid and not forcing refresh, return cached data immediately
         if (hasValidCache) {
             val release = cachedEntry!!.release
             val releaseVersion = AppVersion.parse(release.tagName)
+            logger.d("Using cached release: tag=${release.tagName}, version=$releaseVersion")
             return@withContext if (releaseVersion > currentAppVersion) {
+                logger.d("Update available: $releaseVersion > $currentAppVersion")
                 UpdateCheckResult.UpdateAvailable(currentVersion, release)
             } else {
+                logger.d("Up to date: $releaseVersion <= $currentAppVersion")
                 UpdateCheckResult.UpToDate(currentVersion)
             }
         }
 
-        // Cache expired or not present - fetch fresh data
+        // Cache expired, not present, or force refresh - fetch fresh data
+        logger.d("Fetching fresh release data from GitHub API")
         return@withContext try {
             val jsonBody = if (jsonFetcher != null) {
                 jsonFetcher.invoke(endpointUrl)
@@ -96,22 +115,26 @@ class GitHubUpdateCheckerServiceImpl(
             cache["latest-release"] = CacheEntry(release, System.currentTimeMillis())
 
             val releaseVersion = AppVersion.parse(release.tagName)
+            logger.d("Fetched release: tag=${release.tagName}, parsedVersion=$releaseVersion, current=$currentAppVersion")
 
             if (releaseVersion > currentAppVersion) {
+                logger.d("Update available: $releaseVersion > $currentAppVersion")
                 UpdateCheckResult.UpdateAvailable(currentVersion, release)
             } else {
+                logger.d("Up to date: $releaseVersion <= $currentAppVersion")
                 UpdateCheckResult.UpToDate(currentVersion)
             }
         } catch (e: Exception) {
-            // On error, try to serve stale cache if available and not expired
+            // On error, try to serve stale cache if available (even if expired)
             val staleEntry = cache["latest-release"]
-            val hasValidStaleCache = staleEntry?.let {
-                System.currentTimeMillis() - it.timestamp < CACHE_TTL_MS
-            } ?: false
+            val hasStaleCache = staleEntry != null
 
-            if (hasValidStaleCache) {
+            logger.w("UpdateChecker", "Error checking for updates: ${e.message}, hasStaleCache=$hasStaleCache")
+
+            if (hasStaleCache) {
                 val staleRelease = staleEntry!!.release
                 val staleVersion = AppVersion.parse(staleRelease.tagName)
+                logger.d("Using stale cache: tag=${staleRelease.tagName}, version=$staleVersion")
                 if (staleVersion > currentAppVersion) {
                     UpdateCheckResult.UpdateAvailable(currentVersion, staleRelease)
                 } else {
@@ -147,3 +170,4 @@ class GitHubUpdateCheckerServiceImpl(
         }
     }
 }
+

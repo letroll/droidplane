@@ -58,6 +58,17 @@ jobs:
           echo "Generated changelog:"
           cat CHANGELOG.md
 
+      - name: Validate changelog not empty
+        run: |
+          CHANGELOG=$(cat CHANGELOG.md)
+          if [ -z "$(echo "$CHANGELOG" | grep -v '^#' | grep -v '^---' | grep -v '^$' | grep -v '^\\*' | head -1)" ]; then
+            echo "::warning::Changelog appears to be empty! No conventional commits found in range."
+            echo "::warning::Check that commits follow conventional format: type(scope): subject"
+            echo "::warning::Example: feat(ui): add dark mode toggle"
+          else
+            echo "Changelog validation passed - content found"
+          fi
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v1
         with:

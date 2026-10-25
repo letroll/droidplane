@@ -28,7 +28,7 @@ conventional_commits = true
 # Commit parsing regex - matches conventional commits
 # format: <type>(<scope>): <subject>
 commit_parsers = [
-    { message = "^(?P<type>feat|fix|chore|docs|refactor|perf|test|ci|build|revert)(?:\\((?P<scope>[^)]+)\\))?: (?P<subject>.*)$", group = "Features" },
+    { message = "^(?P<type>feat)(?:\\((?P<scope>[^)]+)\\))?: (?P<subject>.*)$", group = "Features" },
     { message = "^(?P<type>fix)(?:\\((?P<scope>[^)]+)\\))?: (?P<subject>.*)$", group = "Bug Fixes" },
     { message = "^(?P<type>perf)(?:\\((?P<scope>[^)]+)\\))?: (?P<subject>.*)$", group = "Performance" },
     { message = "^(?P<type>refactor)(?:\\((?P<scope>[^)]+)\\))?: (?P<subject>.*)$", group = "Refactoring" },

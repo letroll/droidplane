@@ -1,5 +1,6 @@
 package fr.julien.quievreux.droidplane2.update
 
+import fr.julien.quievreux.droidplane2.core.log.Logger
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.runTest
 import java.io.IOException
@@ -14,6 +15,15 @@ import kotlin.test.assertTrue
 class UpdateCheckerServiceTest {
 
     private val testDispatcher = StandardTestDispatcher()
+
+    private val testLogger = object : Logger {
+        override fun e(message: String) {}
+        override fun e(tag: String, message: String) {}
+        override fun w(message: String) {}
+        override fun w(tag: String, message: String) {}
+        override fun d(message: String) {}
+        override fun d(tag: String, message: String) {}
+    }
 
     private val sampleReleaseJson = """
         {
@@ -61,6 +71,7 @@ class UpdateCheckerServiceTest {
     @Test
     fun `checkForUpdates returns UpdateAvailable when remote release is newer`() = runTest(testDispatcher) {
         val service = GitHubUpdateCheckerServiceImpl(
+            logger = testLogger,
             dispatcher = testDispatcher,
             jsonFetcher = { sampleReleaseJson }
         )
@@ -80,6 +91,7 @@ class UpdateCheckerServiceTest {
     @Test
     fun `checkForUpdates maps release body to releaseNotes property`() = runTest(testDispatcher) {
         val service = GitHubUpdateCheckerServiceImpl(
+            logger = testLogger,
             dispatcher = testDispatcher,
             jsonFetcher = { sampleReleaseJson }
         )
@@ -95,6 +107,7 @@ class UpdateCheckerServiceTest {
     @Test
     fun `checkForUpdates handles empty release body in releaseNotes`() = runTest(testDispatcher) {
         val service = GitHubUpdateCheckerServiceImpl(
+            logger = testLogger,
             dispatcher = testDispatcher,
             jsonFetcher = { sampleReleaseJsonNoBody }
         )
@@ -108,6 +121,7 @@ class UpdateCheckerServiceTest {
     @Test
     fun `checkForUpdates returns UpToDate when remote release matches current app version`() = runTest(testDispatcher) {
         val service = GitHubUpdateCheckerServiceImpl(
+            logger = testLogger,
             dispatcher = testDispatcher,
             jsonFetcher = { sampleReleaseJson }
         )
@@ -120,6 +134,7 @@ class UpdateCheckerServiceTest {
     @Test
     fun `checkForUpdates returns UpToDate when remote release is older than current version`() = runTest(testDispatcher) {
         val service = GitHubUpdateCheckerServiceImpl(
+            logger = testLogger,
             dispatcher = testDispatcher,
             jsonFetcher = { sampleReleaseJson }
         )
@@ -142,6 +157,7 @@ class UpdateCheckerServiceTest {
         """.trimIndent()
 
         val service = GitHubUpdateCheckerServiceImpl(
+            logger = testLogger,
             dispatcher = testDispatcher,
             jsonFetcher = { jsonNoApk }
         )
@@ -154,6 +170,7 @@ class UpdateCheckerServiceTest {
     @Test
     fun `checkForUpdates returns Error on network failure`() = runTest(testDispatcher) {
         val service = GitHubUpdateCheckerServiceImpl(
+            logger = testLogger,
             dispatcher = testDispatcher,
             jsonFetcher = { throw IOException("Connection reset by peer") }
         )
@@ -167,6 +184,7 @@ class UpdateCheckerServiceTest {
     fun `checkForUpdates caches release data for 1 hour`() = runTest(testDispatcher) {
         var fetchCount = 0
         val service = GitHubUpdateCheckerServiceImpl(
+            logger = testLogger,
             dispatcher = testDispatcher,
             jsonFetcher = {
                 fetchCount++
@@ -191,6 +209,7 @@ class UpdateCheckerServiceTest {
     fun `checkForUpdates uses stale cache on network error when cache expired`() = runTest(testDispatcher) {
         var fetchCount = 0
         val service = GitHubUpdateCheckerServiceImpl(
+            logger = testLogger,
             dispatcher = testDispatcher,
             jsonFetcher = {
                 fetchCount++
@@ -208,6 +227,7 @@ class UpdateCheckerServiceTest {
         // For this test, we verify the fallback behavior by testing with a service
         // that has no cache and network fails
         val serviceNoCache = GitHubUpdateCheckerServiceImpl(
+            logger = testLogger,
             dispatcher = testDispatcher,
             jsonFetcher = { throw IOException("Network error") }
         )
@@ -225,6 +245,7 @@ class UpdateCheckerServiceTest {
         // This test documents the expected behavior.
         var fetchCount = 0
         val service = GitHubUpdateCheckerServiceImpl(
+            logger = testLogger,
             dispatcher = testDispatcher,
             jsonFetcher = {
                 fetchCount++
@@ -244,6 +265,7 @@ class UpdateCheckerServiceTest {
     @Test
     fun `checkForUpdates returns Error on network failure with no cache`() = runTest(testDispatcher) {
         val service = GitHubUpdateCheckerServiceImpl(
+            logger = testLogger,
             dispatcher = testDispatcher,
             jsonFetcher = { throw IOException("Connection reset by peer") }
         )
