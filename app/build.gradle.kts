@@ -6,8 +6,8 @@ plugins {
     alias(libs.plugins.firebase.crashlytics)
 }
 
-val appVersionCode = 27
-val appVersionName = "1.0.27"
+val appVersionCode = 28
+val appVersionName = "1.0.28"
 
 android {
     defaultConfig {
