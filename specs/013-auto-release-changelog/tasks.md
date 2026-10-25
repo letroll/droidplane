@@ -49,7 +49,7 @@
 
 - [X] T007 [P] [US1] Unit tests for `ReleaseNoteParser.parseCommit` covering all `CommitType` values, scope parsing, subject extraction, and `OTHER` fallback in `core/src/test/java/fr/julien/quievreux/droidplane2/core/util/ReleaseNoteParserTest.kt`
 - [X] T008 [P] [US1] Unit tests for `ReleaseNoteParser.parseReleaseNotes` verifying section order (FEAT→FIX→PERF→REFACTOR→DOCS→TEST→CI→BUILD→CHORE→REVERT→OTHER), markdown generation, and empty range handling in `core/src/test/java/fr/julien/quievreux/droidplane2/core/util/ReleaseNoteParserTest.kt`
-- [ ] T009 [P] [US1] Integration test for `ReleaseNoteParserImpl` against sample git history fixtures in `core/src/test/java/fr/julien/quievreux/droidplane2/core/util/ReleaseNoteParserIntegrationTest.kt`
+- [X] T009 [P] [US1] Integration test for `ReleaseNoteParserImpl` against sample git history fixtures in `core/src/test/java/fr/julien/quievreux/droidplane2/core/util/ReleaseNoteParserIntegrationTest.kt`
 
 ### Implementation for User Story 1
 
@@ -71,7 +71,7 @@
 
 - [X] T013 [P] [US2] Unit tests for `GitHubUpdateCheckerServiceImpl.checkForUpdate()` mapping GitHub API `body` field to `UpdateCheckResult.UpdateAvailable.releaseNotes` in `app/src/test/java/fr/julien/quievreux/droidplane2/update/GitHubUpdateCheckerServiceImplTest.kt`
 - [X] T014 [P] [US2] Unit tests for caching behavior (1-hour TTL, fallback on rate limit 403, network error) in `app/src/test/java/fr/julien/quievreux/droidplane2/update/GitHubUpdateCheckerServiceImplTest.kt`
-- [ ] T015 [P] [US2] Compose UI tests for `UpdateDialog` in `app/src/androidTest/java/fr/julien/quievreux/droidplane2/ui/components/UpdateDialogTest.kt` covering: loading state, error state with retry, loaded state with changelog scrollable, empty changelog fallback, Update Now/Later button actions, dark/light theme
+- [X] T015 [P] [US2] Compose UI tests for `UpdateDialog` in `app/src/androidTest/java/fr/julien/quievreux/droidplane2/ui/components/UpdateDialogTest.kt` covering: loading state, error state with retry, loaded state with changelog scrollable, empty changelog fallback, Update Now/Later button actions, dark/light theme
 - [X] T016 [P] [US2] Compose previews for `UpdateDialog` in `app/src/main/java/fr/julien/quievreux/droidplane2/ui/dialog/UpdateAvailableDialog.kt` with `@Preview` for normal/long/empty changelog, loading, error, dark/light themes
 
 ### Implementation for User Story 2
