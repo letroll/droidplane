@@ -24,9 +24,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.IntOffset
-import androidx.compose.ui.unit.dp
 import fr.julien.quievreux.droidplane2.data.model.Node
-import fr.julien.quievreux.droidplane2.model.ContextMenuAction
 import fr.julien.quievreux.droidplane2.ui.theme.ContrastAwareReplyTheme
 import kotlin.math.roundToInt
 
@@ -35,13 +33,13 @@ fun MindMapCanvasScreen(
     rootNode: Node,
     selectedNodeId: String?,
     collapsedNodeIds: Set<String>,
+    modifier: Modifier = Modifier,
     treeVersion: Long = 0L,
     onNodeSelect: (Node) -> Unit,
     onNodeToggleCollapse: (Node) -> Unit,
     onNodeDoubleClick: (Node) -> Unit = {},
-    onNodeContextMenuClick: (ContextMenuAction) -> Unit = {},
+    onNodeLongPress: (Node) -> Unit = {},
     fetchText: (Node) -> String? = { it.text },
-    modifier: Modifier = Modifier,
 ) {
     var zoom by remember { mutableFloatStateOf(1.0f) }
     var panOffset by remember { mutableStateOf(Offset.Zero) }
@@ -203,7 +201,7 @@ fun MindMapCanvasScreen(
                     onNodeClick = { onNodeSelect(nodeLayout.node) },
                     onToggleCollapse = { onNodeToggleCollapse(nodeLayout.node) },
                     onNodeDoubleClick = { onNodeDoubleClick(nodeLayout.node) },
-                    onContextMenuAction = onNodeContextMenuClick,
+                    onNodeLongPress = { onNodeLongPress(nodeLayout.node) },
                     fetchText = fetchText,
                     modifier = Modifier
                         .offset {

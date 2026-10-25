@@ -1,8 +1,6 @@
 package fr.julien.quievreux.droidplane2
 
 import android.content.ActivityNotFoundException
-import android.content.ClipData
-import android.content.ClipboardManager
 import android.content.Intent
 import android.content.Intent.ACTION_EDIT
 import android.content.Intent.ACTION_OPEN_DOCUMENT
@@ -14,30 +12,33 @@ import androidx.activity.SystemBarStyle
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.Icons.Filled
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarDuration.Indefinite
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SnackbarResult.ActionPerformed
 import androidx.compose.material3.SnackbarResult.Dismissed
+import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.State
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.res.stringResource
 import androidx.core.content.FileProvider
 import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.lifecycleScope
-import fr.julien.quievreux.droidplane2.MainUiState.DialogType
+import org.koin.androidx.viewmodel.ext.android.viewModel
 import fr.julien.quievreux.droidplane2.MainUiState.DialogType.AddChildNode
 import fr.julien.quievreux.droidplane2.MainUiState.DialogType.None
 import fr.julien.quievreux.droidplane2.ui.view.DeleteConfirmationDialog
@@ -77,6 +78,7 @@ import fr.julien.quievreux.droidplane2.ui.components.AppTopBarAction.SearchNext
 import fr.julien.quievreux.droidplane2.ui.components.AppTopBarAction.SearchPrevious
 import fr.julien.quievreux.droidplane2.ui.components.AppTopBarAction.Undo
 import fr.julien.quievreux.droidplane2.core.ui.component.CustomDialog
+import fr.julien.quievreux.droidplane2.ui.components.NodeBottomToolbar
 import fr.julien.quievreux.droidplane2.ui.inspector.NodePropertiesInspector
 import fr.julien.quievreux.droidplane2.ui.mindmap.MindMapCanvasScreen
 import fr.julien.quievreux.droidplane2.ui.theme.ContrastAwareReplyTheme
@@ -87,9 +89,24 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import org.koin.android.ext.android.inject
-import org.koin.androidx.viewmodel.ext.android.viewModel
 import java.io.File
 import java.io.InputStream
+import androidx.core.net.toUri
+import fr.julien.quievreux.droidplane2.MainUiState.DialogType.DeleteConfirmation
+import fr.julien.quievreux.droidplane2.MainUiState.DialogType.DiscardConfirmation
+import fr.julien.quievreux.droidplane2.MainUiState.DialogType.ExitConfirmation
+import fr.julien.quievreux.droidplane2.MainUiState.DialogType.NodePropertiesInspector
+import fr.julien.quievreux.droidplane2.MainUiState.DialogType.OverwriteConfirmation
+import fr.julien.quievreux.droidplane2.MainUiState.DialogType.RecentFiles
+import fr.julien.quievreux.droidplane2.MainUiState.DialogType.StartupChooser
+import fr.julien.quievreux.droidplane2.MainUiState.DialogType.UpdateAvailable
+import fr.julien.quievreux.droidplane2.model.ContextMenuAction.OpenLink
+import fr.julien.quievreux.droidplane2.model.ContextMenuAction.Properties
+import fr.julien.quievreux.droidplane2.model.NodeToolbarAction.ADD_CHILD
+import fr.julien.quievreux.droidplane2.model.NodeToolbarAction.DELETE
+import fr.julien.quievreux.droidplane2.model.NodeToolbarAction.OPEN_LINK
+import fr.julien.quievreux.droidplane2.model.NodeToolbarAction.PROPERTIES
+import fr.julien.quievreux.droidplane2.ui.components.AppTopBarAction
 
 /**
  * The MainActivity can be started from the App Launcher, or with a File Open intent. If the MainApplication was
@@ -102,14 +119,12 @@ class MainActivity : FragmentActivity() {
 
     private val viewModel: MainViewModel by viewModel()
     private val logger by inject<Logger>()
-
-    private val clipboardManager by lazy {
-        getSystemService(CLIPBOARD_SERVICE) as ClipboardManager
-    }
-
     private val recentFilesRepository: RecentFilesRepository by lazy {
         RecentFilesRepositoryImpl(getSharedPreferences("droidplane_recent_files", MODE_PRIVATE))
     }
+
+    private var showBottomToolbar by mutableStateOf(false)
+    private var selectedNodeForToolbar: String? = null
 
     private val openFileLauncher = registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri: Uri? ->
         uri?.let { u ->
@@ -121,7 +136,8 @@ class MainActivity : FragmentActivity() {
             } catch (_: Exception) {
                 try {
                     contentResolver.takePersistableUriPermission(u, Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                } catch (_: Exception) {}
+                } catch (_: Exception) {
+                }
             }
             openSelectedUri(u)
         }
@@ -134,7 +150,8 @@ class MainActivity : FragmentActivity() {
                     uri,
                     Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION
                 )
-            } catch (_: Exception) {}
+            } catch (_: Exception) {
+            }
 
             val pickerDisplayName = getFileNameFromUri(this@MainActivity, uri)
             val originalUri = viewModel.getMapUri()
@@ -148,17 +165,19 @@ class MainActivity : FragmentActivity() {
             when (resolution) {
                 is SaveResolution.WriteNewFile -> {
                     lifecycleScope.launch(Dispatchers.IO) {
-                        writeMindMapToUri(Uri.parse(resolution.targetUriString), resolution.displayName)
+                        writeMindMapToUri(resolution.targetUriString.toUri(), resolution.displayName)
                     }
                 }
+
                 is SaveResolution.DirectOverwrite -> {
                     lifecycleScope.launch(Dispatchers.IO) {
-                        writeMindMapToUri(Uri.parse(resolution.targetUriString), resolution.displayName)
+                        writeMindMapToUri(resolution.targetUriString.toUri(), resolution.displayName)
                     }
                 }
+
                 is SaveResolution.ConfirmOverwrite -> {
-                    val targetOriginalUri = originalUri ?: Uri.parse(resolution.originalUriString)
-                    val duplicateUri = Uri.parse(resolution.duplicatePickerUriString)
+                    val targetOriginalUri = originalUri ?: resolution.originalUriString.toUri()
+                    val duplicateUri = resolution.duplicatePickerUriString.toUri()
                     viewModel.showOverwriteConfirmation(
                         fileName = resolution.originalDisplayName,
                         onConfirm = {
@@ -248,12 +267,12 @@ class MainActivity : FragmentActivity() {
                     )
                     viewModel.showSnackbarMessage(getString(R.string.update_downloading_enqueued))
                 } catch (_: Exception) {
-                    val browserIntent = Intent(Intent.ACTION_VIEW, Uri.parse(apkUrl))
+                    val browserIntent = Intent(Intent.ACTION_VIEW, apkUrl.toUri())
                     startActivity(browserIntent)
                 }
             },
             onViewOnGitHub = { url ->
-                val browserIntent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
+                val browserIntent = Intent(Intent.ACTION_VIEW, url.toUri())
                 startActivity(browserIntent)
             },
             upToDateMessage = getString(R.string.update_up_to_date, currentVersion),
@@ -281,26 +300,7 @@ class MainActivity : FragmentActivity() {
                 val nodeFindList = viewModel.getSearchResultFlow().collectAsState()
 
                 LaunchedEffect(state.value.leaving) {
-                    if (state.value.leaving) {
-                        if (viewModel.hasUnsavedChangesState && state.value.dialogUiState.dialogType is DialogType.None) {
-                            viewModel.resetLeaving()
-                            viewModel.setDialogState(
-                                DialogType.ExitConfirmation(
-                                    onConfirm = {
-                                        viewModel.resetLeaving()
-                                        finish()
-                                    },
-                                    onCancel = {
-                                        viewModel.resetLeaving()
-                                        viewModel.setDialogState(DialogType.None)
-                                    }
-                                )
-                            )
-                        } else if (!viewModel.hasUnsavedChangesState) {
-                            viewModel.resetLeaving()
-                            finish()
-                        }
-                    }
+                    onLeaving(state)
                 }
 
                 LaunchedEffect(state.value.pendingSaveTempFile) {
@@ -311,29 +311,7 @@ class MainActivity : FragmentActivity() {
                 }
 
                 BackHandler(true) {
-                    viewModel.upOrClose(
-                        fileAccessibilityChecker = createStorageFileChecker(this@MainActivity),
-                        onOpenRecent = { recent ->
-                            openSelectedUri(Uri.parse(recent.uriString))
-                        },
-                        onNewMindmap = {
-                            viewModel.onNewMindmapRequested(getString(R.string.default_root_node_title))
-                        },
-                        onBrowse = {
-                            openFileLauncher.launch(arrayOf("*/*"))
-                        },
-                        onOpenDemo = {
-                            viewModel.onHelpDemoRequested {
-                                viewModel.setMapUri(Uri.parse("android.resource://$packageName/raw/example.mm"))
-                                lifecycleScope.launch {
-                                    resources.openRawResource(R.raw.example).let { viewModel.loadMindMap(it) }
-                                }
-                            }
-                        },
-                        onExitApp = {
-                            finish()
-                        }
-                    )
+                    onBackPress()
                 }
 
                 LaunchedEffect(state.value.error) {
@@ -349,96 +327,10 @@ class MainActivity : FragmentActivity() {
                 }
 
                 LaunchedEffect(state.value.snackbarMessage?.eventId) {
-                    state.value.snackbarMessage?.let { snackbarMsg ->
-                        scope.launch {
-                            val result = snackbarHostState.showSnackbar(
-                                message = snackbarMsg.message,
-                                actionLabel = snackbarMsg.actionLabel?.let { getString(it) },
-                                duration = androidx.compose.material3.SnackbarDuration.Short,
-                            )
-                            when (result) {
-                                ActionPerformed -> {
-                                    snackbarMsg.onAction?.invoke()
-                                }
-                                Dismissed -> {}
-                            }
-                            viewModel.clearSnackbarMessage()
-                        }
-                    }
+                    onSnackBarEvent(state, scope, snackbarHostState)
                 }
 
-                when (val dialog = state.value.dialogUiState.dialogType) {
-                    None -> {}
-                    is AddChildNode -> {
-                        CustomDialog(
-                            titre = stringResource(R.string.add_child),
-                            value = "",
-                            onDismiss = {
-                                viewModel.setDialogState(None)
-                            }
-                        ) { newValue ->
-                            viewModel.addNode(newValue, dialog.parentNode)
-                        }
-                    }
-                    is DialogType.DeleteConfirmation -> {
-                        DeleteConfirmationDialog(confirmation = dialog)
-                    }
-                    is DialogType.ExitConfirmation -> {
-                        ExitConfirmationDialog(
-                            confirmation = dialog,
-                        )
-                    }
-                    is DialogType.DiscardConfirmation -> {
-                        DiscardConfirmationDialog(
-                            confirmation = dialog,
-                        )
-                    }
-                    is DialogType.OverwriteConfirmation -> {
-                        OverwriteConfirmationDialog(
-                            confirmation = dialog,
-                        )
-                    }
-                    is DialogType.StartupChooser -> {
-                        StartupChooserDialog(
-                            chooser = dialog,
-                        )
-                    }
-                    is DialogType.RecentFiles -> {
-                        RecentFilesDialog(
-                            recentFilesDialog = dialog,
-                        )
-                    }
-                    is DialogType.NodePropertiesInspector -> {
-                        NodePropertiesInspector(
-                            node = dialog.node,
-                            initialTab = dialog.initialTab,
-                            parentNode = dialog.parentNode,
-                            isNewNode = dialog.isNewNode,
-                            onSave = { updatedNode ->
-                                viewModel.onSaveNodeProperties(updatedNode)
-                            },
-                            onAddNode = { newNode, parentNode ->
-                                viewModel.onAddNodeFromInspector(newNode, parentNode)
-                            },
-                            onDismiss = {
-                                viewModel.onDismissNodeInspector()
-                            },
-                            onMoveCloudToParent = { targetNode ->
-                                viewModel.onMoveCloudToParent(targetNode)
-                            }
-                        )
-                    }
-                    is DialogType.UpdateAvailable -> {
-                        UpdateAvailableDialog(
-                            currentVersion = dialog.currentVersion,
-                            release = dialog.release,
-                            onDownloadAndInstall = dialog.onDownloadAndInstall,
-                            onViewOnGitHub = dialog.onViewOnGitHub,
-                            onDismiss = dialog.onDismiss
-                        )
-                    }
-                    is DialogType.None -> {}
-                }
+                OnDialogEvent(state)
 
                 Scaffold(
                     modifier = Modifier,
@@ -454,127 +346,19 @@ class MainActivity : FragmentActivity() {
                             onExitSearch = { viewModel.onExitSearchMode() },
                             canUndoDelete = state.value.canUndoDelete,
                             onBarAction = { action ->
-                                when (action) {
-                                    Backpress -> viewModel.upOrClose(
-                                        fileAccessibilityChecker = createStorageFileChecker(this@MainActivity),
-                                        onOpenRecent = { recent ->
-                                            openSelectedUri(Uri.parse(recent.uriString))
-                                        },
-                                        onNewMindmap = {
-                                            viewModel.onNewMindmapRequested(getString(R.string.default_root_node_title))
-                                        },
-                                        onBrowse = {
-                                            openFileLauncher.launch(arrayOf("*/*"))
-                                        },
-                                        onOpenDemo = {
-                                            viewModel.onHelpDemoRequested {
-                                                viewModel.setMapUri(Uri.parse("android.resource://$packageName/raw/example.mm"))
-                                                lifecycleScope.launch {
-                                                    resources.openRawResource(R.raw.example).let { viewModel.loadMindMap(it) }
-                                                }
-                                            }
-                                        },
-                                        onExitApp = {
-                                            finish()
-                                        }
-                                    )
-
-                                    SearchNext -> viewModel.searchNext()
-
-                                    SearchPrevious -> viewModel.searchPrevious()
-
-                                    NewMindmap -> {
-                                        viewModel.onNewMindmapRequested(getString(R.string.default_root_node_title))
-                                    }
-
-                                    Open -> openFileLauncher.launch(arrayOf("*/*"))
-
-                                    Help -> {
-                                        viewModel.onHelpDemoRequested {
-                                            viewModel.setMapUri(Uri.parse("android.resource://$packageName/raw/example.mm"))
-                                            lifecycleScope.launch {
-                                                resources.openRawResource(R.raw.example).let { viewModel.loadMindMap(it) }
-                                            }
-                                        }
-                                    }
-
-                                    Save -> viewModel.launchSaveFile(filesDir.path)
-
-                                    Undo -> viewModel.onUndoDelete()
-
-                                    ExitSearch -> viewModel.onExitSearchMode()
-
-                                    RecentFiles -> viewModel.showRecentFilesDialog(
-                                        fileAccessibilityChecker = createStorageFileChecker(this@MainActivity),
-                                        onOpenRecent = { recent ->
-                                            openSelectedUri(Uri.parse(recent.uriString))
-                                        },
-                                        onNewMindmap = {
-                                            viewModel.onNewMindmapRequested(getString(R.string.default_root_node_title))
-                                        },
-                                        onBrowse = {
-                                            openFileLauncher.launch(arrayOf("*/*"))
-                                        },
-                                        onOpenDemo = {
-                                            viewModel.onHelpDemoRequested {
-                                                viewModel.setMapUri(Uri.parse("android.resource://$packageName/raw/example.mm"))
-                                                lifecycleScope.launch {
-                                                    resources.openRawResource(R.raw.example).let { viewModel.loadMindMap(it) }
-                                                }
-                                            }
-                                        },
-                                        onExitApp = {
-                                            finish()
-                                        }
-                                    )
-
-                                    CheckForUpdates -> triggerUpdateCheck(isManual = true)
-                                }
+                                onBarAction(action)
                             },
                         )
                     },
-                    //                    bottomBar = {},
+                    bottomBar = {
+                        BottomBar()
+                    },
                     snackbarHost = {
                         SnackbarHost(hostState = snackbarHostState)
                     },
                     floatingActionButton = {
-                        AppFloatingActionButton(
-                            onClick = {
-                                val targetParent = if (state.value.selectedNodeId != null) {
-                                    viewModel.getNodeByID(state.value.selectedNodeId!!)
-                                        ?: viewModel.getRootNode()
-                                        ?: state.value.nodeCurrentlyDisplayed
-                                } else {
-                                    state.value.nodeCurrentlyDisplayed
-                                }
-                                targetParent?.let { parentNode ->
-                                    val timestamp = System.currentTimeMillis()
-                                    val newNode = Node(
-                                        parentNode = parentNode,
-                                        id = "temp_$timestamp",
-                                        numericId = 0,
-                                        text = "",
-                                        creationDate = timestamp,
-                                        modificationDate = timestamp
-                                    )
-                                    viewModel.setDialogState(
-                                        DialogType.NodePropertiesInspector(
-                                            node = newNode,
-                                            initialTab = InspectorTab.CONTENT,
-                                            parentNode = parentNode,
-                                            isNewNode = true,
-                                        )
-                                    )
-                                }
-                            },
-                            iconContentDsc = "Add",
-                            icon = Icons.Filled.Add
-                        )
+                        FloatingActionButton(state)
                     },
-                    //                    floatingActionButtonPosition =,
-                    //                    containerColor =,
-                    //                    contentColor =,
-                    //                    contentWindowInsets =,
                     content = { innerPadding ->
                         val rootNode = viewModel.getRootNode() ?: state.value.nodeCurrentlyDisplayed
                         rootNode?.let { node ->
@@ -583,12 +367,19 @@ class MainActivity : FragmentActivity() {
                                 selectedNodeId = state.value.selectedNodeId,
                                 collapsedNodeIds = state.value.collapsedNodeIds,
                                 treeVersion = state.value.treeVersion,
-                                onNodeSelect = viewModel::selectNode,
+                                onNodeSelect = { node ->
+                                    viewModel.selectNode(node)
+                                    showBottomToolbar = false
+                                    selectedNodeForToolbar = null
+                                },
                                 onNodeToggleCollapse = viewModel::toggleNodeCollapse,
                                 onNodeDoubleClick = { clickedNode ->
                                     viewModel.onNodeContextMenuClick(ContextMenuAction.Properties(clickedNode))
                                 },
-                                onNodeContextMenuClick = viewModel::onNodeContextMenuClick,
+                                onNodeLongPress = { node ->
+                                    selectedNodeForToolbar = node.id
+                                    showBottomToolbar = true
+                                },
                                 fetchText = viewModel::getNodeText,
                                 modifier = Modifier
                                     .fillMaxSize()
@@ -603,38 +394,236 @@ class MainActivity : FragmentActivity() {
         viewModel.apply {
             if (savedInstanceState == null && getRootNode() == null) {
                 if (isAnExternalMindMapEdit()) {
-                    val uri = intent.data
-                    val fileName = uri?.let { getFileNameFromUri(this@MainActivity, it) }
-                    setMapUri(uri, fileName)
-                    if (uri != null && fileName != null) {
-                        recentFilesRepository.addRecentFile(uri.toString(), fileName)
-                    }
-                    lifecycleScope.launch {
-                        getDocumentInputStream(true)?.let { loadMindMap(it) }
-                    }
+                    openMindMapFromIntent()
                 } else {
-                    // Initialize an empty mindmap by default
-                    createEmptyMindmap(getString(R.string.default_root_node_title))
-
-                    // Query accessible recent files off the main thread and show Startup Chooser Dialog
-                    showStartupChooser(
-                        fileAccessibilityChecker = createStorageFileChecker(this@MainActivity),
-                        onOpenRecent = { recent ->
-                            openSelectedUri(Uri.parse(recent.uriString))
-                        },
-                        onBrowse = {
-                            openFileLauncher.launch(arrayOf("*/*"))
-                        },
-                        onOpenDemo = {
-                            setMapUri(Uri.parse("android.resource://$packageName/raw/example.mm"))
-                            lifecycleScope.launch {
-                                resources.openRawResource(R.raw.example).let { loadMindMap(it) }
-                            }
-                        }
-                    )
+                    openStartupChooser()
                 }
             }
         }
+    }
+
+    private fun onSnackBarEvent(state: State<MainUiState>, scope: CoroutineScope, snackbarHostState: SnackbarHostState) {
+        state.value.snackbarMessage?.let { snackbarMsg ->
+            scope.launch {
+                val result = snackbarHostState.showSnackbar(
+                    message = snackbarMsg.message,
+                    actionLabel = snackbarMsg.actionLabel?.let { getString(it) },
+                    duration = SnackbarDuration.Short,
+                )
+                when (result) {
+                    ActionPerformed -> {
+                        snackbarMsg.onAction?.invoke()
+                    }
+
+                    Dismissed -> {}
+                }
+                viewModel.clearSnackbarMessage()
+            }
+        }
+    }
+
+    private fun onLeaving(state: State<MainUiState>) {
+        if (state.value.leaving) {
+            if (viewModel.hasUnsavedChangesState && state.value.dialogUiState.dialogType is None) {
+                viewModel.resetLeaving()
+                viewModel.setDialogState(
+                    ExitConfirmation(
+                        onConfirm = {
+                            viewModel.resetLeaving()
+                            finish()
+                        },
+                        onCancel = {
+                            viewModel.resetLeaving()
+                            viewModel.setDialogState(None)
+                        }
+                    )
+                )
+            } else if (!viewModel.hasUnsavedChangesState) {
+                viewModel.resetLeaving()
+                finish()
+            }
+        }
+    }
+
+    private fun onBarAction(action: AppTopBarAction) {
+        when (action) {
+            Backpress -> viewModel.upOrClose(
+                fileAccessibilityChecker = createStorageFileChecker(this@MainActivity),
+                onOpenRecent = { recent ->
+                    openSelectedUri(recent.uriString.toUri())
+                },
+                onNewMindmap = {
+                    viewModel.onNewMindmapRequested(getString(R.string.default_root_node_title))
+                },
+                onBrowse = {
+                    openFileLauncher.launch(arrayOf("*/*"))
+                },
+                onOpenDemo = {
+                    viewModel.onHelpDemoRequested {
+                        viewModel.setMapUri("android.resource://$packageName/raw/example.mm".toUri())
+                        lifecycleScope.launch {
+                            resources.openRawResource(R.raw.example).let { viewModel.loadMindMap(it) }
+                        }
+                    }
+                },
+                onExitApp = {
+                    finish()
+                }
+            )
+
+            SearchNext -> viewModel.searchNext()
+
+            SearchPrevious -> viewModel.searchPrevious()
+
+            NewMindmap -> {
+                viewModel.onNewMindmapRequested(getString(R.string.default_root_node_title))
+            }
+
+            Open -> openFileLauncher.launch(arrayOf("*/*"))
+
+            Help -> {
+                viewModel.onHelpDemoRequested {
+                    viewModel.setMapUri("android.resource://$packageName/raw/example.mm".toUri())
+                    lifecycleScope.launch {
+                        resources.openRawResource(R.raw.example).let { viewModel.loadMindMap(it) }
+                    }
+                }
+            }
+
+            Save -> viewModel.launchSaveFile(filesDir.path)
+
+            Undo -> viewModel.onUndoDelete()
+
+            ExitSearch -> viewModel.onExitSearchMode()
+
+            RecentFiles -> viewModel.showRecentFilesDialog(
+                fileAccessibilityChecker = createStorageFileChecker(this@MainActivity),
+                onOpenRecent = { recent ->
+                    openSelectedUri(recent.uriString.toUri())
+                },
+                onNewMindmap = {
+                    viewModel.onNewMindmapRequested(getString(R.string.default_root_node_title))
+                },
+                onBrowse = {
+                    openFileLauncher.launch(arrayOf("*/*"))
+                },
+                onOpenDemo = {
+                    viewModel.onHelpDemoRequested {
+                        viewModel.setMapUri("android.resource://$packageName/raw/example.mm".toUri())
+                        lifecycleScope.launch {
+                            resources.openRawResource(R.raw.example).let { viewModel.loadMindMap(it) }
+                        }
+                    }
+                },
+                onExitApp = {
+                    finish()
+                }
+            )
+
+            CheckForUpdates -> triggerUpdateCheck(isManual = true)
+        }
+    }
+
+    private fun onBackPress() {
+        viewModel.upOrClose(
+            fileAccessibilityChecker = createStorageFileChecker(this@MainActivity),
+            onOpenRecent = { recent ->
+                openSelectedUri(recent.uriString.toUri())
+            },
+            onNewMindmap = {
+                viewModel.onNewMindmapRequested(getString(R.string.default_root_node_title))
+            },
+            onBrowse = {
+                openFileLauncher.launch(arrayOf("*/*"))
+            },
+            onOpenDemo = {
+                viewModel.onHelpDemoRequested {
+                    viewModel.setMapUri("android.resource://$packageName/raw/example.mm".toUri())
+                    lifecycleScope.launch {
+                        resources.openRawResource(R.raw.example).let { viewModel.loadMindMap(it) }
+                    }
+                }
+            },
+            onExitApp = {
+                finish()
+            }
+        )
+    }
+
+    @Composable
+    private fun BottomBar() {
+        if (showBottomToolbar && selectedNodeForToolbar != null) {
+            val nodeId = selectedNodeForToolbar!!
+            val node = viewModel.getNodeByID(nodeId)
+            if (node != null) {
+                NodeBottomToolbar(
+                    node = node,
+                    onDismiss = { showBottomToolbar = false; selectedNodeForToolbar = null },
+                    onAction = { action ->
+                        when (action) {
+                            PROPERTIES -> {
+                                viewModel.onNodeContextMenuClick(
+                                    Properties(node = node)
+                                )
+                            }
+
+                            OPEN_LINK -> {
+                                viewModel.onNodeContextMenuClick(
+                                    OpenLink(node = node)
+                                )
+                            }
+
+                            ADD_CHILD -> {
+                                viewModel.onNodeContextMenuClick(
+                                    ContextMenuAction.AddChildNode(parentNode = node)
+                                )
+                            }
+
+                            DELETE -> {
+                                viewModel.onDeleteNode(node)
+                            }
+                        }
+                    }
+                )
+            }
+        }
+    }
+
+    @Composable
+    private fun FloatingActionButton(state: State<MainUiState>) {
+        AppFloatingActionButton(
+            onClick = {
+                getTargetParent(state)?.let { parentNode ->
+                    val timestamp = System.currentTimeMillis()
+                    val newNode = Node(
+                        parentNode = parentNode,
+                        id = "temp_$timestamp",
+                        numericId = 0,
+                        text = "",
+                        creationDate = timestamp,
+                        modificationDate = timestamp
+                    )
+                    viewModel.setDialogState(
+                        NodePropertiesInspector(
+                            node = newNode,
+                            initialTab = InspectorTab.CONTENT,
+                            parentNode = parentNode,
+                            isNewNode = true,
+                        )
+                    )
+                }
+            },
+            iconContentDsc = "Add",
+            icon = Filled.Add
+        )
+    }
+
+    private fun getTargetParent(state: State<MainUiState>): Node? = state.value.selectedNodeId?.let { selectedNodeId ->
+        viewModel.getNodeByID(selectedNodeId)
+            ?: viewModel.getRootNode()
+            ?: state.value.nodeCurrentlyDisplayed
+    } ?: run {
+        state.value.nodeCurrentlyDisplayed
     }
 
     override fun onNewIntent(intent: Intent) {
@@ -648,8 +637,127 @@ class MainActivity : FragmentActivity() {
                 recentFilesRepository.addRecentFile(uri.toString(), fileName)
             }
             lifecycleScope.launch {
-                getDocumentInputStream(true)?.let { viewModel.loadMindMap(it) }
+                getDocumentInputStream()?.let { viewModel.loadMindMap(it) }
             }
+        }
+    }
+
+    @Composable
+    private fun OnDialogEvent(state: State<MainUiState>) {
+        when (val dialog = state.value.dialogUiState.dialogType) {
+            None -> {}
+            is AddChildNode -> {
+                CustomDialog(
+                    titre = stringResource(R.string.add_child),
+                    value = "",
+                    onDismiss = {
+                        viewModel.setDialogState(None)
+                    }
+                ) { newValue ->
+                    viewModel.addNode(newValue, dialog.parentNode)
+                }
+            }
+
+            is DeleteConfirmation -> {
+                DeleteConfirmationDialog(confirmation = dialog)
+            }
+
+            is ExitConfirmation -> {
+                ExitConfirmationDialog(
+                    confirmation = dialog,
+                )
+            }
+
+            is DiscardConfirmation -> {
+                DiscardConfirmationDialog(
+                    confirmation = dialog,
+                )
+            }
+
+            is OverwriteConfirmation -> {
+                OverwriteConfirmationDialog(
+                    confirmation = dialog,
+                )
+            }
+
+            is StartupChooser -> {
+                StartupChooserDialog(
+                    chooser = dialog,
+                )
+            }
+
+            is RecentFiles -> {
+                RecentFilesDialog(
+                    recentFilesDialog = dialog,
+                )
+            }
+
+            is NodePropertiesInspector -> {
+                NodePropertiesInspector(
+                    node = dialog.node,
+                    initialTab = dialog.initialTab,
+                    parentNode = dialog.parentNode,
+                    isNewNode = dialog.isNewNode,
+                    onSave = { updatedNode ->
+                        viewModel.onSaveNodeProperties(updatedNode)
+                    },
+                    onAddNode = { newNode, parentNode ->
+                        viewModel.onAddNodeFromInspector(newNode, parentNode)
+                    },
+                    onDismiss = {
+                        viewModel.onDismissNodeInspector()
+                    },
+                    onMoveCloudToParent = { targetNode ->
+                        viewModel.onMoveCloudToParent(targetNode)
+                    }
+                )
+            }
+
+            is UpdateAvailable -> {
+                UpdateAvailableDialog(
+                    currentVersion = dialog.currentVersion,
+                    release = dialog.release,
+                    onDownloadAndInstall = dialog.onDownloadAndInstall,
+                    onViewOnGitHub = dialog.onViewOnGitHub,
+                    onDismiss = dialog.onDismiss
+                )
+            }
+
+            is None -> {}
+        }
+    }
+
+    private fun MainViewModel.openStartupChooser() {
+        // Initialize an empty mindmap by default
+        createEmptyMindmap(getString(R.string.default_root_node_title))
+
+        // Query accessible recent files off the main thread and show Startup Chooser Dialog
+        showStartupChooser(
+            fileAccessibilityChecker = createStorageFileChecker(this@MainActivity),
+            onOpenRecent = { recent ->
+                openSelectedUri(recent.uriString.toUri())
+            },
+            onBrowse = {
+                openFileLauncher.launch(arrayOf("*/*"))
+            },
+            onOpenDemo = {
+                setMapUri("android.resource://$packageName/raw/example.mm".toUri())
+                lifecycleScope.launch {
+                    resources.openRawResource(R.raw.example).let { loadMindMap(it) }
+                }
+            }
+        )
+    }
+
+    private fun MainViewModel.openMindMapFromIntent() {
+        val uri = intent.data
+        val fileName = uri?.let { getFileNameFromUri(this@MainActivity, it) }
+        setMapUri(uri, fileName)
+        if (uri != null && fileName != null) {
+            recentFilesRepository.addRecentFile(uri.toString(), fileName)
+        }
+        lifecycleScope.launch {
+            getDocumentInputStream()?.let { loadMindMap(it) }
         }
     }
 
@@ -760,22 +868,11 @@ class MainActivity : FragmentActivity() {
         }
     }
 
-    private fun getDocumentInputStream(isAnExternalMindMapEdit: Boolean): InputStream? {
-        return if (isAnExternalMindMapEdit) {
-            intent.data?.let { contentResolver.openInputStream(it) }
-        } else {
-            resources.openRawResource(R.raw.example)
-        }
-    }
+    private fun getDocumentInputStream(): InputStream? = intent.data?.let { contentResolver.openInputStream(it) }
 
     // determine whether we are started from the EDIT or VIEW intent, or whether we are started from the
 // launcher started from ACTION_EDIT/VIEW intent
     private fun isAnExternalMindMapEdit(): Boolean = ACTION_EDIT == intent.action || ACTION_VIEW == intent.action || ACTION_OPEN_DOCUMENT == intent.action
-
-    private fun updateClipboard(text: String) {
-        val clipData = ClipData.newPlainText("node", text)
-        clipboardManager.setPrimaryClip(clipData)
-    }
 
     private fun openRichText(
         node: Node,

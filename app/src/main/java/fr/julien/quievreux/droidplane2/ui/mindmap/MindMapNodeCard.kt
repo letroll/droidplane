@@ -12,21 +12,14 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -40,12 +33,6 @@ import compose.icons.fontawesomeicons.solid.Link
 import fr.julien.quievreux.droidplane2.ui.components.NodeIconsRow
 import fr.julien.quievreux.droidplane2.R
 import fr.julien.quievreux.droidplane2.data.model.Node
-import fr.julien.quievreux.droidplane2.model.ContextMenuAction
-import fr.julien.quievreux.droidplane2.model.ContextMenuAction.AddChildNode
-import fr.julien.quievreux.droidplane2.model.ContextMenuAction.CopyText
-import fr.julien.quievreux.droidplane2.model.ContextMenuAction.DeleteNode
-import fr.julien.quievreux.droidplane2.model.ContextMenuAction.OpenLink
-import fr.julien.quievreux.droidplane2.model.ContextMenuAction.Properties
 import fr.julien.quievreux.droidplane2.ui.theme.ContrastAwareReplyTheme
 
 @OptIn(ExperimentalFoundationApi::class)
@@ -59,10 +46,9 @@ fun MindMapNodeCard(
     onToggleCollapse: () -> Unit,
     modifier: Modifier = Modifier,
     onNodeDoubleClick: (() -> Unit)? = null,
-    onContextMenuAction: (ContextMenuAction) -> Unit = {},
+    onNodeLongPress: (Node) -> Unit = {},
     fetchText: (Node) -> String? = { it.text },
 ) {
-    var showMenu by remember { mutableStateOf(false) }
 
     val hasChildren = node.childNodes.isNotEmpty()
     val isRoot = branchDirection == BranchDirection.ROOT
@@ -107,7 +93,7 @@ fun MindMapNodeCard(
                 .combinedClickable(
                     onClick = onNodeClick,
                     onDoubleClick = onNodeDoubleClick,
-                    onLongClick = { showMenu = true },
+                    onLongClick = { onNodeLongPress(node) },
                 ),
             shape = shape,
             color = containerColor,
@@ -190,54 +176,8 @@ fun MindMapNodeCard(
                 }
             }
         }
-
-        DropdownMenu(
-            expanded = showMenu,
-            onDismissRequest = { showMenu = false },
-        ) {
-            DropdownMenuItem(
-                text = { Text(stringResource(R.string.node_properties)) },
-                onClick = {
-                    showMenu = false
-                    onContextMenuAction(Properties(node))
-                },
-            )
-            if (node.link != null) {
-                DropdownMenuItem(
-                    text = { Text(stringResource(R.string.open_link)) },
-                    onClick = {
-                        showMenu = false
-                        onContextMenuAction(OpenLink(node))
-                    },
-                )
-            }
-            DropdownMenuItem(
-                text = { Text(stringResource(R.string.add_child_node)) },
-                onClick = {
-                    showMenu = false
-                    onContextMenuAction(AddChildNode(node))
-                },
-            )
-            DropdownMenuItem(
-                text = { Text(stringResource(R.string.copynodetext)) },
-                onClick = {
-                    showMenu = false
-                    onContextMenuAction(CopyText(node.text.orEmpty()))
-                },
-            )
-            if (!isRoot) {
-                DropdownMenuItem(
-                    text = { Text(stringResource(R.string.delete)) },
-                    onClick = {
-                        showMenu = false
-                        onContextMenuAction(DeleteNode(node))
-                    },
-                )
-            }
-        }
     }
 }
-
 @Composable
 private fun FoldIndicator(
     isCollapsed: Boolean,

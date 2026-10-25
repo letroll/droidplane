@@ -1,6 +1,5 @@
 package fr.julien.quievreux.droidplane2.ui.components
 
-import android.annotation.SuppressLint
 import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.indication
@@ -29,35 +28,28 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
-import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.semantics.semantics
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.graphics.vector.ImageVector
 
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.DpOffset
-import androidx.compose.ui.unit.dp
 import compose.icons.FontAwesomeIcons
 import compose.icons.fontawesomeicons.Regular
 import compose.icons.fontawesomeicons.Solid
 import compose.icons.fontawesomeicons.regular.Clipboard
 import compose.icons.fontawesomeicons.regular.Edit
 import compose.icons.fontawesomeicons.solid.Link
-import compose.icons.fontawesomeicons.solid.Minus
 import compose.icons.fontawesomeicons.solid.Plus
 import compose.icons.fontawesomeicons.solid.Trash
 import fr.julien.quievreux.droidplane2.R
@@ -69,6 +61,8 @@ import fr.julien.quievreux.droidplane2.model.ContextMenuAction.AddChildNode
 import fr.julien.quievreux.droidplane2.model.ContextMenuAction.DeleteNode
 import fr.julien.quievreux.droidplane2.model.ContextMenuDropDownItem
 import fr.julien.quievreux.droidplane2.data.model.Node
+import fr.julien.quievreux.droidplane2.model.ContextMenuAction.OpenLink
+import fr.julien.quievreux.droidplane2.model.ContextMenuAction.Properties
 import fr.julien.quievreux.droidplane2.model.NodeIcons.Link
 import fr.julien.quievreux.droidplane2.model.NodeIcons.RicheText
 import fr.julien.quievreux.droidplane2.ui.theme.ContrastAwareReplyTheme
@@ -115,10 +109,6 @@ fun LazyListScope.nodeList(
             )
         }
     }
-    //TODO create bug fix it
-//    if (!isFoundInList && searchResultToShow != null) {
-//        onNodeClick(searchResultToShow)
-//    }
 }
 
 @Composable
@@ -144,7 +134,6 @@ fun EmptyNodeItem() {
     }
 }
 
-@SuppressLint("DiscouragedApi")
 @Composable
 fun NodeItem(
     fetchText: (Node) -> String?,
@@ -159,54 +148,11 @@ fun NodeItem(
 ) {
     val text = fetchText(node) ?: ""
     val copyText = fetchTextForCopy(node) ?: text
-    val contextMenuDropDownItems = mutableListOf(
-        ContextMenuDropDownItem(
-            text = "copy $text",
-            action = CopyText(copyText)
-        ),
-        ContextMenuDropDownItem(
-            text = stringResource(
-                id = R.string.node_information,
-                node.creationDate?.let { DateUtils.formatDate(it) }.orEmpty(),
-                node.modificationDate?.let { DateUtils.formatDate(it) }.orEmpty(),
-            ),
-            action = CopyText(
-                stringResource(
-                    id = R.string.node_information,
-                    node.creationDate?.let { DateUtils.formatDate(it) }.orEmpty(),
-                    node.modificationDate?.let { DateUtils.formatDate(it) }.orEmpty(),
-                )
-            )
-        ),
-        ContextMenuDropDownItem(
-            text = stringResource(id = R.string.node_properties),
-            action = ContextMenuAction.Properties(node = node)
-        ),
-        ContextMenuDropDownItem(
-            text = stringResource(id = R.string.add_child_node),
-            action = AddChildNode(parentNode = node)
-        ),
-    )
+    val contextMenuDropDownItems = getContextMenuDropDownItems(text, copyText, node)
 
-    // Only show Delete for non-root nodes
-    if (node.parentNode != null) {
-        contextMenuDropDownItems.add(
-            ContextMenuDropDownItem(
-                text = stringResource(id = R.string.delete),
-                action = DeleteNode(node = node)
-            )
-        )
-    }
+    AddDeleteMenuIfNeeded(node, contextMenuDropDownItems)
 
-    // Add "Open link" action if node has a link
-    node.link?.let { link ->
-        contextMenuDropDownItems.add(
-            ContextMenuDropDownItem(
-                text = stringResource(id = R.string.open_link),
-                action = ContextMenuAction.OpenLink(node = node)
-            )
-        )
-    }
+    AddLinkMenuIfNeeded(node, contextMenuDropDownItems)
 
     node.arrowLinks.forEach { link ->
         fetchText(link)?.let { text ->
@@ -242,7 +188,6 @@ fun NodeItem(
 
     Card(
         modifier = Modifier
-//TODO use it when available            .animateItem()
             .onSizeChanged {
                 itemHeight = with(density) { it.height.toDp() }
             }
@@ -282,39 +227,12 @@ fun NodeItem(
             horizontalArrangement = Arrangement.SpaceAround,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Display assigned Freeplane icons (up to 3 inline with +N overflow)
-            if (node.iconNames.isNotEmpty()) {
-                NodeIconsRow(
-                    iconNames = node.iconNames,
-                    maxInlineIcons = 3,
-                    iconSize = 18.dp,
-                    modifier = Modifier.padding(start = 8.dp)
-                )
-            }
+            AddIconsIfNeeded(node)
 
-            // Display link indicator badge
-            if (node.link != null) {
-                Icon(
-                    imageVector = Link.imageVector,
-                    tint = MaterialTheme.colorScheme.primary,
-                    contentDescription = stringResource(R.string.hyperlink),
-                    modifier = Modifier
-                        .padding(start = 6.dp)
-                        .size(16.dp)
-                )
-            }
+            DisplayLinkIfNeeded(node)
 
-            // Display rich text indicator badge
-            if (node.richTextContents.isNotEmpty()) {
-                Icon(
-                    imageVector = RicheText.imageVector,
-                    tint = MaterialTheme.colorScheme.secondary,
-                    contentDescription = null,
-                    modifier = Modifier
-                        .padding(start = 6.dp)
-                        .size(16.dp)
-                )
-            }
+            DisplayRichTextIndicatorIfNeeded(node)
+
             Text(
                 modifier = Modifier
                     .weight(1f)
@@ -326,7 +244,7 @@ fun NodeItem(
                 style = applyTextStyle(node),
                 color = MaterialTheme.colorScheme.primary
             )
-            if (node.childNodes.size > 0) {
+            if (node.childNodes.isNotEmpty()) {
                 ToggleIcon(
                     isOpen = node.id == currentlyDisplayedNodeId,
                     modifier = Modifier.padding(end = 8.dp)
@@ -364,6 +282,101 @@ fun NodeItem(
         }
     }
 }
+
+@Composable
+private fun DisplayRichTextIndicatorIfNeeded(node: Node) {
+    if (node.richTextContents.isNotEmpty()) {
+        Icon(
+            imageVector = RicheText.imageVector,
+            tint = MaterialTheme.colorScheme.secondary,
+            contentDescription = null,
+            modifier = Modifier
+                .padding(start = 6.dp)
+                .size(16.dp)
+        )
+    }
+}
+
+@Composable
+private fun DisplayLinkIfNeeded(node: Node) {
+    if (node.link != null) {
+        Icon(
+            imageVector = Link.imageVector,
+            tint = MaterialTheme.colorScheme.primary,
+            contentDescription = stringResource(R.string.hyperlink),
+            modifier = Modifier
+                .padding(start = 6.dp)
+                .size(16.dp)
+        )
+    }
+}
+
+@Composable
+private fun AddIconsIfNeeded(node: Node) {
+    // Display assigned Freeplane icons (up to 3 inline with +N overflow)
+    if (node.iconNames.isNotEmpty()) {
+        NodeIconsRow(
+            iconNames = node.iconNames,
+            maxInlineIcons = 3,
+            iconSize = 18.dp,
+            modifier = Modifier.padding(start = 8.dp)
+        )
+    }
+}
+
+@Composable
+private fun AddDeleteMenuIfNeeded(node: Node, contextMenuDropDownItems: MutableList<ContextMenuDropDownItem>) {
+    if (node.parentNode != null) {
+        contextMenuDropDownItems.add(
+            ContextMenuDropDownItem(
+                text = stringResource(id = R.string.delete),
+                action = DeleteNode(node = node)
+            )
+        )
+    }
+}
+
+@Composable
+private fun AddLinkMenuIfNeeded(node: Node, contextMenuDropDownItems: MutableList<ContextMenuDropDownItem>) {
+    node.link?.let {
+        contextMenuDropDownItems.add(
+            ContextMenuDropDownItem(
+                text = stringResource(id = R.string.open_link),
+                action = OpenLink(node = node)
+            )
+        )
+    }
+}
+
+@Composable
+private fun getContextMenuDropDownItems(text: String, copyText: String, node: Node): MutableList<ContextMenuDropDownItem> = mutableListOf(
+    ContextMenuDropDownItem(
+        text = "copy $text",
+        action = CopyText(copyText)
+    ),
+    ContextMenuDropDownItem(
+        text = stringResource(
+            id = R.string.node_information,
+            node.creationDate?.let { DateUtils.formatDate(it) }.orEmpty(),
+            node.modificationDate?.let { DateUtils.formatDate(it) }.orEmpty(),
+        ),
+        action = CopyText(
+            stringResource(
+                id = R.string.node_information,
+                node.creationDate?.let { DateUtils.formatDate(it) }.orEmpty(),
+                node.modificationDate?.let { DateUtils.formatDate(it) }.orEmpty(),
+            )
+        )
+    ),
+    ContextMenuDropDownItem(
+        text = stringResource(id = R.string.node_properties),
+        action = Properties(node = node)
+    ),
+    ContextMenuDropDownItem(
+        text = stringResource(id = R.string.add_child_node),
+        action = AddChildNode(parentNode = node)
+    ),
+)
 
 @Composable fun GetLeadingIcon(action: ContextMenuAction) =
     Icon(

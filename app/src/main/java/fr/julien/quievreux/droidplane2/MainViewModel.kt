@@ -4,6 +4,7 @@ import android.content.Intent
 import android.content.Intent.ACTION_VIEW
 import android.net.Uri
 import android.webkit.MimeTypeMap
+import androidx.compose.runtime.mutableStateOf
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import fr.julien.quievreux.droidplane2.MainUiState.DialogType
@@ -88,6 +89,25 @@ class MainViewModel(
         get() = undoStack.isNotEmpty()
     val isLeaving: Boolean
         get() = _uiState.value.leaving
+
+    // Toolbar state for bottom toolbar
+    private val _showBottomToolbar = mutableStateOf(false)
+    private val _selectedNodeForToolbar = mutableStateOf<String?>(null)
+
+    val showBottomToolbar: Boolean
+        get() = _showBottomToolbar.value
+    val selectedNodeForToolbar: String?
+        get() = _selectedNodeForToolbar.value
+
+    fun showBottomToolbar(nodeId: String) {
+        _selectedNodeForToolbar.value = nodeId
+        _showBottomToolbar.value = true
+    }
+
+    fun dismissBottomToolbar() {
+        _showBottomToolbar.value = false
+        _selectedNodeForToolbar.value = null
+    }
 
     override fun onCleared() {
         super.onCleared()
