@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -19,14 +20,22 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.zIndex
 import fr.julien.quievreux.droidplane2.data.model.Node
 import fr.julien.quievreux.droidplane2.ui.theme.ContrastAwareReplyTheme
+import kotlinx.coroutines.delay
 import kotlin.math.roundToInt
+
+private val AUTO_PAN_EDGE_THRESHOLD = 56.dp
+private val AUTO_PAN_STEP_PER_FRAME = 8.dp
+private const val AUTO_PAN_FRAME_DELAY_MS = 16L
 
 @Composable
 fun MindMapCanvasScreen(
@@ -39,12 +48,23 @@ fun MindMapCanvasScreen(
     onNodeToggleCollapse: (Node) -> Unit,
     onNodeDoubleClick: (Node) -> Unit = {},
     onNodeLongPress: (Node) -> Unit = {},
+    onMoveNode: (
+        draggedNodeId: String,
+        targetParentId: String,
+        targetSiblingId: String?,
+        insertAfter: Boolean,
+        targetPosition: String?,
+    ) -> Unit = { _, _, _, _, _ -> },
     fetchText: (Node) -> String? = { it.text },
 ) {
     var zoom by remember { mutableFloatStateOf(1.0f) }
     var panOffset by remember { mutableStateOf(Offset.Zero) }
 
     val density = LocalDensity.current
+    val dragState = rememberMindMapCanvasDragState(
+        onNodeLongPress = onNodeLongPress,
+        onMoveNode = onMoveNode,
+    )
 
     val layoutResult = remember(rootNode, treeVersion, collapsedNodeIds, density.density) {
         MindMapLayoutEngine.computeLayout(
@@ -63,7 +83,6 @@ fun MindMapCanvasScreen(
             .pointerInput(Unit) {
                 detectTapGestures(
                     onDoubleTap = {
-                        // Reset zoom and pan on double tap
                         zoom = 1.0f
                         panOffset = Offset.Zero
                     }
@@ -71,69 +90,64 @@ fun MindMapCanvasScreen(
             }
             .pointerInput(Unit) {
                 detectTransformGestures { _, pan, zoomChange, _ ->
-                    zoom = (zoom * zoomChange).coerceIn(0.25f, 3.0f)
-                    panOffset += pan
+                    if (dragState.phase == CanvasDragPhase.Idle) {
+                        zoom = (zoom * zoomChange).coerceIn(0.25f, 3.0f)
+                        panOffset += pan
+                    }
                 }
             }
     ) {
-        val centerX = constraints.maxWidth / 2f
-        val centerY = constraints.maxHeight / 2f
+        val viewportWidthPx = constraints.maxWidth.toFloat()
+        val viewportHeightPx = constraints.maxHeight.toFloat()
+        val centerX = viewportWidthPx / 2f
+        val centerY = viewportHeightPx / 2f
+        val edgeThresholdPx = with(density) { AUTO_PAN_EDGE_THRESHOLD.toPx() }
+        val stepPx = with(density) { AUTO_PAN_STEP_PER_FRAME.toPx() }
+
+        LaunchedEffect(dragState.phase) {
+            while (dragState.phase == CanvasDragPhase.Dragging) {
+                val pointerPos = dragState.pointerViewportPx
+                if (pointerPos != null) {
+                    val panStep = computeEdgeAutoPanStep(
+                        pointerViewportPx = pointerPos,
+                        viewportWidthPx = viewportWidthPx,
+                        viewportHeightPx = viewportHeightPx,
+                        edgeThresholdPx = edgeThresholdPx,
+                        stepPx = stepPx,
+                    )
+                    if (panStep != Offset.Zero) {
+                        panOffset += panStep
+                        dragState.onDragMove(
+                            deltaCanvasPx = -panStep / zoom,
+                            viewportPointerPx = pointerPos,
+                            layoutNodes = layoutResult.nodes,
+                        )
+                    }
+                }
+                delay(AUTO_PAN_FRAME_DELAY_MS)
+            }
+        }
 
         Box(
             modifier = Modifier
                 .fillMaxSize()
                 .graphicsLayer {
+                    transformOrigin = TransformOrigin(0.5f, 0.5f)
                     scaleX = zoom
                     scaleY = zoom
                     translationX = panOffset.x
                     translationY = panOffset.y
                 }
         ) {
-            // Compute cloud enclosures enclosing nodes and their subtrees
             val centeredClouds = remember(layoutResult.nodes, centerX, centerY, density.density) {
-                val cloudsList = mutableListOf<CloudEnclosure>()
-                val padding = 12f * density.density
-
-                layoutResult.nodes.forEach { nodeLayout ->
-                    val cloud = nodeLayout.node.cloud
-                    if (cloud != null) {
-                        val descendantIds = mutableSetOf<String>()
-                        fun collectDescendants(n: Node) {
-                            descendantIds.add(n.id)
-                            n.childNodes.forEach { collectDescendants(it) }
-                        }
-                        collectDescendants(nodeLayout.node)
-
-                        val subtreeLayouts = layoutResult.nodes.filter { descendantIds.contains(it.node.id) }
-                        if (subtreeLayouts.isNotEmpty()) {
-                            val minX = subtreeLayouts.minOf { it.x - it.width / 2f }
-                            val maxX = subtreeLayouts.maxOf { it.x + it.width / 2f }
-                            val minY = subtreeLayouts.minOf { it.y - it.height / 2f }
-                            val maxY = subtreeLayouts.maxOf { it.y + it.height / 2f }
-
-                            cloudsList.add(
-                                CloudEnclosure(
-                                    node = nodeLayout.node,
-                                    cloud = cloud,
-                                    left = centerX + minX - padding,
-                                    top = centerY + minY - padding,
-                                    right = centerX + maxX + padding,
-                                    bottom = centerY + maxY + padding,
-                                )
-                            )
-                        }
-                    }
-                }
-                cloudsList
+                computeCenteredClouds(layoutResult.nodes, centerX, centerY, density.density)
             }
 
-            // 1. Draw Clouds Layer (behind branches and nodes)
             MindMapCloudLayer(
                 clouds = centeredClouds,
                 modifier = Modifier.fillMaxSize(),
             )
 
-            // 2. Draw branch connectors with coordinates offset from canvas center
             val centeredConnectors = remember(layoutResult.connectors, centerX, centerY) {
                 layoutResult.connectors.map { c ->
                     c.copy(
@@ -151,33 +165,8 @@ fun MindMapCanvasScreen(
                 modifier = Modifier.fillMaxSize(),
             )
 
-            // 3. Compute and draw cross-node directional arrow link connectors
             val centeredArrowLinks = remember(layoutResult.nodes, centerX, centerY) {
-                val links = mutableListOf<ArrowLinkConnector>()
-                val nodeLayoutsById = layoutResult.nodes.associateBy { it.node.id }
-
-                layoutResult.nodes.forEach { srcLayout ->
-                    srcLayout.node.connectors.forEach { connector ->
-                        val destLayout = nodeLayoutsById[connector.destinationId]
-                        if (destLayout != null) {
-                            links.add(
-                                ArrowLinkConnector(
-                                    sourceId = srcLayout.node.id,
-                                    destinationId = connector.destinationId,
-                                    startX = centerX + srcLayout.x,
-                                    startY = centerY + srcLayout.y,
-                                    endX = centerX + destLayout.x,
-                                    endY = centerY + destLayout.y,
-                                    color = connector.color,
-                                    middleLabel = connector.middleLabel,
-                                    startArrow = connector.startArrow != null && connector.startArrow != "None",
-                                    endArrow = connector.endArrow != "None",
-                                )
-                            )
-                        }
-                    }
-                }
-                links
+                computeCenteredArrowLinks(layoutResult.nodes, centerX, centerY)
             }
 
             MindMapArrowLinkLayer(
@@ -185,13 +174,22 @@ fun MindMapCanvasScreen(
                 modifier = Modifier.fillMaxSize(),
             )
 
-            // 4. Render positioned nodes
+            val activeDropTarget = dragState.activeDropTarget
+            val activeDraggedId = dragState.activeNodeId
+
             layoutResult.nodes.forEach { nodeLayout ->
-                val nodeLeftPx = centerX + nodeLayout.x - (nodeLayout.width / 2f)
-                val nodeTopPx = centerY + nodeLayout.y - (nodeLayout.height / 2f)
+                val isCurrentActiveNode = nodeLayout.node.id == activeDraggedId
+                val dragDelta = if (isCurrentActiveNode && !dragState.isActiveNodeRoot) {
+                    dragState.dragOffsetPx
+                } else {
+                    Offset.Zero
+                }
+                val nodeLeftPx = centerX + nodeLayout.x - (nodeLayout.width / 2f) + dragDelta.x
+                val nodeTopPx = centerY + nodeLayout.y - (nodeLayout.height / 2f) + dragDelta.y
 
                 val nodeWidthDp = with(density) { nodeLayout.width.toDp() }
                 val nodeHeightDp = with(density) { nodeLayout.height.toDp() }
+                val isHoveredTarget = activeDropTarget?.hoveredNodeId == nodeLayout.node.id
 
                 MindMapNodeCard(
                     node = nodeLayout.node,
@@ -202,8 +200,34 @@ fun MindMapCanvasScreen(
                     onToggleCollapse = { onNodeToggleCollapse(nodeLayout.node) },
                     onNodeDoubleClick = { onNodeDoubleClick(nodeLayout.node) },
                     onNodeLongPress = { onNodeLongPress(nodeLayout.node) },
+                    onLongPressConfirmed = {
+                        dragState.onLongPressConfirmed(
+                            node = nodeLayout.node,
+                            initialCenter = Offset(nodeLayout.x, nodeLayout.y),
+                        )
+                    },
+                    onDragMove = { deltaLocalPx, pointerLocalPx ->
+                        val currentDragOffset = dragState.dragOffsetPx + deltaLocalPx
+                        val unscaledCardX = centerX + nodeLayout.x - (nodeLayout.width / 2f) + currentDragOffset.x + pointerLocalPx.x
+                        val unscaledCardY = centerY + nodeLayout.y - (nodeLayout.height / 2f) + currentDragOffset.y + pointerLocalPx.y
+                        val viewportPos = Offset(
+                            x = centerX + (unscaledCardX - centerX) * zoom + panOffset.x,
+                            y = centerY + (unscaledCardY - centerY) * zoom + panOffset.y,
+                        )
+                        dragState.onDragMove(
+                            deltaCanvasPx = deltaLocalPx,
+                            viewportPointerPx = viewportPos,
+                            layoutNodes = layoutResult.nodes,
+                        )
+                    },
+                    onGestureRelease = { dragState.onRelease() },
+                    onGestureCancel = { dragState.onCancel() },
+                    isDraggingOrReady = isCurrentActiveNode && dragState.phase != CanvasDragPhase.Idle,
+                    activeDropZone = if (isHoveredTarget) activeDropTarget?.zoneType else null,
+                    dropTargetPosition = if (isHoveredTarget) activeDropTarget?.targetPosition else null,
                     fetchText = fetchText,
                     modifier = Modifier
+                        .zIndex(if (isCurrentActiveNode && dragState.phase != CanvasDragPhase.Idle) 10f else 0f)
                         .offset {
                             IntOffset(nodeLeftPx.roundToInt(), nodeTopPx.roundToInt())
                         }
@@ -212,6 +236,94 @@ fun MindMapCanvasScreen(
             }
         }
     }
+}
+
+internal fun computeEdgeAutoPanStep(
+    pointerViewportPx: Offset,
+    viewportWidthPx: Float,
+    viewportHeightPx: Float,
+    edgeThresholdPx: Float,
+    stepPx: Float,
+): Offset {
+    val dx = when {
+        pointerViewportPx.x < edgeThresholdPx -> stepPx
+        pointerViewportPx.x > viewportWidthPx - edgeThresholdPx -> -stepPx
+        else -> 0f
+    }
+    val dy = when {
+        pointerViewportPx.y < edgeThresholdPx -> stepPx
+        pointerViewportPx.y > viewportHeightPx - edgeThresholdPx -> -stepPx
+        else -> 0f
+    }
+    return Offset(dx, dy)
+}
+
+private fun computeCenteredClouds(
+    nodes: List<MindMapNodeLayout>,
+    centerX: Float,
+    centerY: Float,
+    density: Float,
+): List<CloudEnclosure> {
+    val cloudsList = mutableListOf<CloudEnclosure>()
+    val padding = 12f * density
+
+    nodes.forEach { nodeLayout ->
+        val cloud = nodeLayout.node.cloud
+        if (cloud != null) {
+            val descendantIds = collectSubtreeIds(nodeLayout.node)
+            val subtreeLayouts = nodes.filter { descendantIds.contains(it.node.id) }
+            if (subtreeLayouts.isNotEmpty()) {
+                val minX = subtreeLayouts.minOf { it.x - it.width / 2f }
+                val maxX = subtreeLayouts.maxOf { it.x + it.width / 2f }
+                val minY = subtreeLayouts.minOf { it.y - it.height / 2f }
+                val maxY = subtreeLayouts.maxOf { it.y + it.height / 2f }
+
+                cloudsList.add(
+                    CloudEnclosure(
+                        node = nodeLayout.node,
+                        cloud = cloud,
+                        left = centerX + minX - padding,
+                        top = centerY + minY - padding,
+                        right = centerX + maxX + padding,
+                        bottom = centerY + maxY + padding,
+                    )
+                )
+            }
+        }
+    }
+    return cloudsList
+}
+
+private fun computeCenteredArrowLinks(
+    nodes: List<MindMapNodeLayout>,
+    centerX: Float,
+    centerY: Float,
+): List<ArrowLinkConnector> {
+    val links = mutableListOf<ArrowLinkConnector>()
+    val nodeLayoutsById = nodes.associateBy { it.node.id }
+
+    nodes.forEach { srcLayout ->
+        srcLayout.node.connectors.forEach { connector ->
+            val destLayout = nodeLayoutsById[connector.destinationId]
+            if (destLayout != null) {
+                links.add(
+                    ArrowLinkConnector(
+                        sourceId = srcLayout.node.id,
+                        destinationId = connector.destinationId,
+                        startX = centerX + srcLayout.x,
+                        startY = centerY + srcLayout.y,
+                        endX = centerX + destLayout.x,
+                        endY = centerY + destLayout.y,
+                        color = connector.color,
+                        middleLabel = connector.middleLabel,
+                        startArrow = connector.startArrow != null && connector.startArrow != "None",
+                        endArrow = connector.endArrow != "None",
+                    )
+                )
+            }
+        }
+    }
+    return links
 }
 
 @Preview(name = "MindMap Canvas Preview - Light")

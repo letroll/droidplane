@@ -957,7 +957,7 @@ class NodeManager(
         }
 
         var currentChild = updatedParent
-        var currentParent = currentChild.parentNode?.id?.let { getNodeByID(it) }
+        var currentParent = currentChild.parentNode?.id?.let { updatedNodesMap[it] ?: getNodeByID(it) }
 
         while (currentParent != null) {
             val newAncestorChildren = currentParent.childNodes.toMutableList()
@@ -997,7 +997,7 @@ class NodeManager(
                 break
             }
             currentChild = updatedAncestor
-            currentParent = currentChild.parentNode?.id?.let { getNodeByID(it) }
+            currentParent = currentChild.parentNode?.id?.let { updatedNodesMap[it] ?: getNodeByID(it) }
         }
     }
 
@@ -1222,57 +1222,210 @@ class NodeManager(
         targetNeighborId: String,
         insertAfter: Boolean
     ): Boolean {
-        if (draggedChildId == targetNeighborId) {
+        val draggedNode = getNodeByID(draggedChildId) ?: return false
+        if (draggedNode.parentNode?.id != parentId) {
             return false
         }
-
-        val parent = getNodeByID(parentId) ?: return false
-        val children = parent.childNodes.toMutableList()
-
-        val draggedIndex = children.indexOfFirst { it.id == draggedChildId }
-        val targetIndex = children.indexOfFirst { it.id == targetNeighborId }
-
-        if (draggedIndex == -1 || targetIndex == -1) {
-            return false
-        }
-
-        // Check if destination relative position is actually different from current position
-        // If dragged is right before target and insertAfter == false -> no change
-        if (draggedIndex == targetIndex - 1 && !insertAfter) {
-            return false
-        }
-        // If dragged is right after target and insertAfter == true -> no change
-        if (draggedIndex == targetIndex + 1 && insertAfter) {
-            return false
-        }
-
-        val draggedNode = children.removeAt(draggedIndex)
-        val newTargetIndex = children.indexOfFirst { it.id == targetNeighborId }
-        val insertIndex = if (insertAfter) newTargetIndex + 1 else newTargetIndex
-        children.add(insertIndex, draggedNode)
-
-        val updatedParent = parent.copy(
-            childNodes = children,
-            modificationDate = System.currentTimeMillis()
+        return moveNode(
+            draggedNodeId = draggedChildId,
+            targetParentId = parentId,
+            targetSiblingId = targetNeighborId,
+            insertAfter = insertAfter,
+            targetPosition = draggedNode.position
         )
+    }
 
+    override suspend fun moveNode(
+        draggedNodeId: String,
+        targetParentId: String,
+        targetSiblingId: String?,
+        insertAfter: Boolean,
+        targetPosition: String?,
+    ): Boolean {
+        val draggedNode = getNodeByID(draggedNodeId) ?: return false
+        val oldParentId = draggedNode.parentNode?.id ?: return false // Root node cannot be moved
+        val oldParent = getNodeByID(oldParentId) ?: return false
+        val targetParent = getNodeByID(targetParentId) ?: return false
+
+        if (isInvalidMoveTarget(draggedNode, targetParent, targetSiblingId)) {
+            return false
+        }
+
+        val effectivePosition = resolveEffectivePosition(targetParent, draggedNode, targetPosition)
+        val now = System.currentTimeMillis()
         val updatedNodesMap = mutableMapOf<String, Node>()
-        updatedNodesMap[updatedParent.id] = updatedParent
-        propagateUpdatedParentToRoot(updatedParent, updatedNodesMap)
+
+        if (oldParent.id == targetParent.id) {
+            val updatedParent = buildSameParentMove(
+                parent = targetParent,
+                draggedNode = draggedNode,
+                targetSiblingId = targetSiblingId,
+                insertAfter = insertAfter,
+                targetPosition = targetPosition,
+                effectivePosition = effectivePosition,
+                timestamp = now,
+                updatedNodesMap = updatedNodesMap,
+            ) ?: return false
+            propagateUpdatedParentToRoot(updatedParent, updatedNodesMap)
+        } else {
+            val updatedOldParent = buildOldParentAfterRemoval(
+                oldParent = oldParent,
+                draggedNodeId = draggedNode.id,
+                timestamp = now,
+            ) ?: return false
+            updatedNodesMap[updatedOldParent.id] = updatedOldParent
+            propagateUpdatedParentToRoot(updatedOldParent, updatedNodesMap)
+
+            val freshTargetParent = updatedNodesMap[targetParentId] ?: getNodeByID(targetParentId) ?: targetParent
+            val updatedTargetParent = buildTargetParentAfterInsertion(
+                targetParent = freshTargetParent,
+                draggedNode = draggedNode,
+                targetSiblingId = targetSiblingId,
+                insertAfter = insertAfter,
+                effectivePosition = effectivePosition,
+                timestamp = now,
+                updatedNodesMap = updatedNodesMap,
+            )
+            propagateUpdatedParentToRoot(updatedTargetParent, updatedNodesMap)
+        }
 
         _allNodes.update { currentNodes ->
             currentNodes.map { node -> updatedNodesMap[node.id] ?: node }
         }
-
-        val allNodesList = _allNodes.value
-        updatemMindmapIndexes(
-            MindmapIndexes(
-                nodesByIdIndex = allNodesList.associateBy { it.id },
-                nodesByNumericIndex = allNodesList.associateBy { it.numericId }
-            )
-        )
+        updatemMindmapIndexes(nodeUtils.loadAndIndexNodesByIds(rootNode))
 
         return true
+    }
+
+    private fun isInvalidMoveTarget(
+        draggedNode: Node,
+        targetParent: Node,
+        targetSiblingId: String?,
+    ): Boolean {
+        if (draggedNode.id == targetParent.id) return true
+        if (targetSiblingId != null && targetSiblingId == draggedNode.id) return true
+        if (isDescendantOf(candidate = targetParent, ancestorId = draggedNode.id)) return true
+        if (targetSiblingId != null && targetParent.childNodes.none { it.id == targetSiblingId }) {
+            return true
+        }
+        return false
+    }
+
+    private fun isDescendantOf(candidate: Node, ancestorId: String): Boolean {
+        var cursor: Node? = candidate.parentNode?.id?.let { getNodeByID(it) } ?: candidate.parentNode
+        while (cursor != null) {
+            if (cursor.id == ancestorId) return true
+            cursor = cursor.parentNode?.id?.let { getNodeByID(it) } ?: cursor.parentNode
+        }
+        return false
+    }
+
+    private fun resolveEffectivePosition(
+        targetParent: Node,
+        draggedNode: Node,
+        targetPosition: String?,
+    ): String? {
+        return if (targetParent.parentNode == null) {
+            targetPosition ?: draggedNode.position ?: "right"
+        } else {
+            null
+        }
+    }
+
+    private fun buildSameParentMove(
+        parent: Node,
+        draggedNode: Node,
+        targetSiblingId: String?,
+        insertAfter: Boolean,
+        targetPosition: String?,
+        effectivePosition: String?,
+        timestamp: Long,
+        updatedNodesMap: MutableMap<String, Node>,
+    ): Node? {
+        val children = parent.childNodes.toMutableList()
+        val oldIndex = children.indexOfFirst { it.id == draggedNode.id }
+        if (oldIndex == -1) return null
+
+        val positionChanged = targetPosition != null && draggedNode.position != effectivePosition
+        val wouldStayInPlace = if (targetSiblingId == null) {
+            oldIndex == children.lastIndex
+        } else {
+            val targetIdx = children.indexOfFirst { it.id == targetSiblingId }
+            (oldIndex == targetIdx - 1 && !insertAfter) || (oldIndex == targetIdx + 1 && insertAfter)
+        }
+
+        if (wouldStayInPlace && !positionChanged) {
+            return null
+        }
+
+        children.removeAt(oldIndex)
+        val insertIndex = computeInsertIndex(children, targetSiblingId, insertAfter)
+        val updatedDragged = draggedNode.copy(
+            position = effectivePosition,
+            modificationDate = timestamp,
+            childNodes = draggedNode.childNodes.toMutableList(),
+        )
+        children.add(insertIndex, updatedDragged)
+
+        val updatedParent = parent.copy(
+            childNodes = children,
+            isFolded = false,
+            modificationDate = timestamp,
+        )
+        updatedNodesMap[updatedParent.id] = updatedParent
+        return updatedParent
+    }
+
+    private fun buildOldParentAfterRemoval(
+        oldParent: Node,
+        draggedNodeId: String,
+        timestamp: Long,
+    ): Node? {
+        val children = oldParent.childNodes.toMutableList()
+        val oldIndex = children.indexOfFirst { it.id == draggedNodeId }
+        if (oldIndex == -1) return null
+        children.removeAt(oldIndex)
+        return oldParent.copy(
+            childNodes = children,
+            modificationDate = timestamp,
+        )
+    }
+
+    private fun buildTargetParentAfterInsertion(
+        targetParent: Node,
+        draggedNode: Node,
+        targetSiblingId: String?,
+        insertAfter: Boolean,
+        effectivePosition: String?,
+        timestamp: Long,
+        updatedNodesMap: MutableMap<String, Node>,
+    ): Node {
+        val children = targetParent.childNodes.toMutableList()
+        val insertIndex = computeInsertIndex(children, targetSiblingId, insertAfter)
+        val updatedDragged = draggedNode.copy(
+            position = effectivePosition,
+            modificationDate = timestamp,
+            childNodes = draggedNode.childNodes.toMutableList(),
+        )
+        children.add(insertIndex, updatedDragged)
+        val updatedTargetParent = targetParent.copy(
+            childNodes = children,
+            isFolded = false,
+            modificationDate = timestamp,
+        )
+        updatedNodesMap[updatedTargetParent.id] = updatedTargetParent
+        return updatedTargetParent
+    }
+
+    private fun computeInsertIndex(
+        children: List<Node>,
+        targetSiblingId: String?,
+        insertAfter: Boolean,
+    ): Int {
+        if (targetSiblingId == null) return children.size
+        val siblingIndex = children.indexOfFirst { it.id == targetSiblingId }
+        if (siblingIndex == -1) return children.size
+        return if (insertAfter) siblingIndex + 1 else siblingIndex
     }
 
     suspend fun generateNodeNumericID(): Int {
