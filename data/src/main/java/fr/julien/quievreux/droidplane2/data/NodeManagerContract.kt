@@ -128,4 +128,25 @@ interface NodeManagerContract {
         targetNeighborId: String,
         insertAfter: Boolean
     ): Boolean
+
+    /**
+     * Moves [draggedNodeId] to [targetParentId], either as a sibling relative to [targetSiblingId]
+     * (when [targetSiblingId] != null) or as the last child of [targetParentId] (when [targetSiblingId] == null).
+     *
+     * @param draggedNodeId ID of the non-root node being moved.
+     * @param targetParentId ID of the target parent node.
+     * @param targetSiblingId Optional ID of an existing child of [targetParentId] to insert before/after.
+     * @param insertAfter When [targetSiblingId] is provided, true inserts immediately after [targetSiblingId],
+     *                    false inserts immediately before [targetSiblingId].
+     * @param targetPosition Optional branch side ("left" or "right") when [targetParentId] is the root node;
+     *                       cleared to null automatically when [targetParentId] is a non-root node.
+     * @return true if the tree structure, sibling order, or branch position changed; false if invalid or no-op.
+     */
+    suspend fun moveNode(
+        draggedNodeId: String,
+        targetParentId: String,
+        targetSiblingId: String? = null,
+        insertAfter: Boolean = true,
+        targetPosition: String? = null,
+    ): Boolean
 }

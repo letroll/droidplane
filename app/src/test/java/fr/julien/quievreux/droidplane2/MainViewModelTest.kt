@@ -1304,6 +1304,124 @@ class MainViewModelTest : KStringSpec() {
             // Because scheme is android.resource, getSaveFilename derives from root node title ("root node")
             assertEquals("root_node.mm", viewModel.getSaveFilename())
         }
+
+        // ===== 2D CANVAS DRAG AND DROP (014-nodelist-drag-drop) =====
+
+        "onMoveNode reorders sibling, marks unsaved changes, and increments treeVersion (T008)" {
+            val nodeManager = realNodeManager()
+            val root = nodeManager.rootNode!!
+            nodeManager.addNodeToMindmap("second child", root)
+            val updatedRoot = nodeManager.rootNode!!
+            val firstChild = updatedRoot.childNodes[0]
+            val secondChild = updatedRoot.childNodes[1]
+
+            val viewModel = MainViewModel(
+                logger = mockk(relaxed = true),
+                injectedNodeManager = nodeManager,
+                recentFilesRepository = mockk(relaxed = true),
+            )
+            viewModel.setInitialStateForTest(updatedRoot)
+
+            val initialVersion = viewModel.uiState.value.treeVersion
+            assertFalse(viewModel.hasUnsavedChangesState)
+
+            viewModel.onMoveNode(
+                draggedNodeId = firstChild.id,
+                targetParentId = updatedRoot.id,
+                targetSiblingId = secondChild.id,
+                insertAfter = true,
+            )
+
+            eventually {
+                assertTrue(viewModel.hasUnsavedChangesState)
+                assertEquals(initialVersion + 1, viewModel.uiState.value.treeVersion)
+                val newChildrenIds = nodeManager.rootNode!!.childNodes.map { it.id }
+                assertEquals(listOf(secondChild.id, firstChild.id), newChildrenIds)
+            }
+        }
+
+        "onMoveNode reparents node under collapsed target parent and unfolds target parent in collapsedNodeIds (T008)" {
+            val nodeManager = realNodeManager()
+            val root = nodeManager.rootNode!!
+            nodeManager.addNodeToMindmap("branch B", root)
+            val updatedRoot = nodeManager.rootNode!!
+            val childA = updatedRoot.childNodes[0]
+            val branchB = updatedRoot.childNodes[1]
+            nodeManager.addNodeToMindmap("sub B", branchB)
+            val refreshedRoot = nodeManager.rootNode!!
+
+            val viewModel = MainViewModel(
+                logger = mockk(relaxed = true),
+                injectedNodeManager = nodeManager,
+                recentFilesRepository = mockk(relaxed = true),
+            )
+            viewModel.setInitialStateForTest(refreshedRoot)
+
+            // Collapse branchB first
+            viewModel.toggleNodeCollapse(nodeManager.getNodeByID(branchB.id)!!)
+            assertTrue(branchB.id in viewModel.uiState.value.collapsedNodeIds)
+
+            val initialVersion = viewModel.uiState.value.treeVersion
+
+            // Drop childA as child of collapsed branchB
+            viewModel.onMoveNode(
+                draggedNodeId = childA.id,
+                targetParentId = branchB.id,
+                targetSiblingId = null,
+                insertAfter = true,
+            )
+
+            eventually {
+                assertFalse(branchB.id in viewModel.uiState.value.collapsedNodeIds)
+                assertEquals(initialVersion + 1, viewModel.uiState.value.treeVersion)
+                assertTrue(viewModel.hasUnsavedChangesState)
+                val updatedBranchB = nodeManager.getNodeByID(branchB.id)!!
+                assertTrue(updatedBranchB.childNodes.any { it.id == childA.id })
+            }
+        }
+
+        "onMoveNode updates direct root child position and ignores no-op moves (T008)" {
+            val nodeManager = realNodeManager()
+            val root = nodeManager.rootNode!!
+            val childA = root.childNodes[0]
+
+            val viewModel = MainViewModel(
+                logger = mockk(relaxed = true),
+                injectedNodeManager = nodeManager,
+                recentFilesRepository = mockk(relaxed = true),
+            )
+            viewModel.setInitialStateForTest(root)
+
+            val versionBeforeMove = viewModel.uiState.value.treeVersion
+
+            // Move childA to left side of root
+            viewModel.onMoveNode(
+                draggedNodeId = childA.id,
+                targetParentId = root.id,
+                targetSiblingId = null,
+                insertAfter = true,
+                targetPosition = "left",
+            )
+
+            eventually {
+                assertEquals("left", nodeManager.getNodeByID(childA.id)!!.position)
+                assertEquals(versionBeforeMove + 1, viewModel.uiState.value.treeVersion)
+            }
+
+            // Now perform a no-op move (already only child at "left")
+            val versionAfterFirstMove = viewModel.uiState.value.treeVersion
+            viewModel.onMoveNode(
+                draggedNodeId = childA.id,
+                targetParentId = root.id,
+                targetSiblingId = null,
+                insertAfter = true,
+                targetPosition = "left",
+            )
+
+            // Wait briefly and verify treeVersion does not increment on no-op
+            delay(100)
+            assertEquals(versionAfterFirstMove, viewModel.uiState.value.treeVersion)
+        }
     }
 
     /** Polls [condition] until it stops throwing, or fails after ~2s. */

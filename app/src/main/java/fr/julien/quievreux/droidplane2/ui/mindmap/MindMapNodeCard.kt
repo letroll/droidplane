@@ -2,12 +2,17 @@ package fr.julien.quievreux.droidplane2.ui.mindmap
 
 import android.content.res.Configuration
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.awaitLongPressOrCancellation
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
@@ -17,9 +22,19 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.AwaitPointerEventScope
+import androidx.compose.ui.input.pointer.PointerId
+import androidx.compose.ui.input.pointer.positionChange
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -30,12 +45,12 @@ import androidx.compose.ui.unit.sp
 import compose.icons.FontAwesomeIcons
 import compose.icons.fontawesomeicons.Solid
 import compose.icons.fontawesomeicons.solid.Link
-import fr.julien.quievreux.droidplane2.ui.components.NodeIconsRow
 import fr.julien.quievreux.droidplane2.R
 import fr.julien.quievreux.droidplane2.data.model.Node
+import fr.julien.quievreux.droidplane2.ui.components.NodeIconsRow
 import fr.julien.quievreux.droidplane2.ui.theme.ContrastAwareReplyTheme
+import kotlinx.coroutines.withTimeoutOrNull
 
-@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun MindMapNodeCard(
     node: Node,
@@ -47,25 +62,27 @@ fun MindMapNodeCard(
     modifier: Modifier = Modifier,
     onNodeDoubleClick: (() -> Unit)? = null,
     onNodeLongPress: (Node) -> Unit = {},
+    onLongPressConfirmed: () -> Unit = {},
+    onDragMove: (deltaLocalPx: Offset, pointerLocalPx: Offset) -> Unit = { _, _ -> },
+    onGestureRelease: (() -> Unit)? = null,
+    onGestureCancel: () -> Unit = {},
+    isDraggingOrReady: Boolean = false,
+    activeDropZone: DropZoneType? = null,
+    dropTargetPosition: String? = null,
     fetchText: (Node) -> String? = { it.text },
 ) {
-
     val hasChildren = node.childNodes.isNotEmpty()
     val isRoot = branchDirection == BranchDirection.ROOT
     val displayText = fetchText(node)?.ifEmpty { " " } ?: node.text.orEmpty().ifEmpty { " " }
-
-    val shape = when (node.style) {
-        "bubble", "oval" -> CircleShape
-        "rectangle" -> RoundedCornerShape(2.dp)
-        "fork" -> RoundedCornerShape(topStart = 0.dp, bottomStart = 0.dp, topEnd = 8.dp, bottomEnd = 8.dp)
-        else -> if (isRoot) RoundedCornerShape(16.dp) else RoundedCornerShape(8.dp)
-    }
+    val shape = resolveNodeCardShape(node.style, isRoot)
 
     val customBgColor: Color? = node.backgroundColor?.let { parseHexColor(it) }
     val customTextColor: Color? = node.color?.let { parseHexColor(it) }
     val cloudColor: Color? = node.cloud?.color?.let { parseHexColor(it) }
 
     val containerColor: Color = when {
+        activeDropZone == DropZoneType.AS_CHILD -> MaterialTheme.colorScheme.tertiaryContainer
+        isDraggingOrReady && !isRoot -> MaterialTheme.colorScheme.secondaryContainer
         isSelected -> MaterialTheme.colorScheme.primaryContainer
         customBgColor != null -> customBgColor
         isRoot -> MaterialTheme.colorScheme.secondaryContainer
@@ -73,6 +90,8 @@ fun MindMapNodeCard(
     }
 
     val contentColor: Color = when {
+        activeDropZone == DropZoneType.AS_CHILD -> MaterialTheme.colorScheme.onTertiaryContainer
+        isDraggingOrReady && !isRoot -> MaterialTheme.colorScheme.onSecondaryContainer
         isSelected -> MaterialTheme.colorScheme.onPrimaryContainer
         customTextColor != null -> customTextColor
         isRoot -> MaterialTheme.colorScheme.onSecondaryContainer
@@ -80,104 +99,299 @@ fun MindMapNodeCard(
     }
 
     val border = when {
+        activeDropZone == DropZoneType.AS_CHILD -> BorderStroke(2.5.dp, MaterialTheme.colorScheme.tertiary)
+        isDraggingOrReady && !isRoot -> BorderStroke(2.dp, MaterialTheme.colorScheme.primary)
         isSelected -> BorderStroke(2.dp, MaterialTheme.colorScheme.primary)
         cloudColor != null -> BorderStroke(2.dp, cloudColor)
         isRoot -> BorderStroke(1.5.dp, MaterialTheme.colorScheme.secondary)
         else -> BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
     }
 
-    Box(modifier = modifier) {
+    val currentNode by rememberUpdatedState(node)
+    val currentOnClick by rememberUpdatedState(onNodeClick)
+    val currentOnDoubleClick by rememberUpdatedState(onNodeDoubleClick)
+    val currentOnLongPress by rememberUpdatedState(onNodeLongPress)
+    val currentOnLongPressConfirmed by rememberUpdatedState(onLongPressConfirmed)
+    val currentOnDragMove by rememberUpdatedState(onDragMove)
+    val currentOnRelease by rememberUpdatedState(onGestureRelease)
+    val currentOnCancel by rememberUpdatedState(onGestureCancel)
+
+    Box(
+        modifier = modifier.graphicsLayer {
+            val scale = if (isDraggingOrReady && !isRoot) 1.05f else 1.0f
+            scaleX = scale
+            scaleY = scale
+            alpha = if (isDraggingOrReady && !isRoot) 0.94f else 1.0f
+        }
+    ) {
         Surface(
             modifier = Modifier
                 .fillMaxSize()
-                .combinedClickable(
-                    onClick = onNodeClick,
-                    onDoubleClick = onNodeDoubleClick,
-                    onLongClick = { onNodeLongPress(node) },
-                ),
+                .pointerInput(Unit) {
+                    awaitEachGesture {
+                        handleNodeCardGesture(
+                            onTap = { currentOnClick() },
+                            onDoubleTap = currentOnDoubleClick,
+                            onLongPressStart = { currentOnLongPressConfirmed() },
+                            onDrag = { delta, pos -> currentOnDragMove(delta, pos) },
+                            onLongPressRelease = {
+                                val releaseHandler = currentOnRelease
+                                if (releaseHandler != null) {
+                                    releaseHandler()
+                                } else {
+                                    currentOnLongPress(currentNode)
+                                }
+                            },
+                            onCancel = { currentOnCancel() },
+                        )
+                    }
+                },
             shape = shape,
             color = containerColor,
             contentColor = contentColor,
             border = border,
-            shadowElevation = if (isSelected) 4.dp else 1.dp,
+            shadowElevation = when {
+                isDraggingOrReady && !isRoot -> 8.dp
+                isSelected -> 4.dp
+                else -> 1.dp
+            },
         ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(horizontal = 12.dp, vertical = 6.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween,
-            ) {
-                Row(
-                    modifier = Modifier.weight(1f, fill = false),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(4.dp)
-                ) {
-                    if (node.cloud != null) {
-                        Text(
-                            text = "☁",
-                            fontSize = 12.sp,
-                            color = cloudColor ?: MaterialTheme.colorScheme.primary
-                        )
-                    }
-
-                    // Display assigned icons
-                    NodeIconsRow(
-                        iconNames = node.iconNames,
-                        maxInlineIcons = Int.MAX_VALUE,
-                        iconSize = 16.dp
-                    )
-
-                    // Display link indicator badge
-                    if (node.link != null) {
-                        Icon(
-                            imageVector = FontAwesomeIcons.Solid.Link,
-                            contentDescription = stringResource(R.string.hyperlink),
-                            tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(14.dp)
-                        )
-                    }
-
-                    // Display note indicator
-                    if (!node.noteText.isNullOrBlank()) {
-                        Text(
-                            text = "📝",
-                            fontSize = 12.sp,
-                        )
-                    }
-
-                    // Display details indicator
-                    if (!node.detailsText.isNullOrBlank()) {
-                        Text(
-                            text = "💬",
-                            fontSize = 12.sp,
-                        )
-                    }
-
-                    Text(
-                        text = displayText,
-                        style = MaterialTheme.typography.bodyMedium.copy(
-                            fontSize = node.fontSize?.sp ?: (if (isRoot) 15.sp else 13.sp),
-                            fontWeight = if (node.isBold || isRoot) FontWeight.Bold else FontWeight.Normal,
-                            fontStyle = if (node.isItalic) FontStyle.Italic else FontStyle.Normal,
-                            lineHeight = (node.fontSize?.let { (it * 1.35f).sp }) ?: (if (isRoot) 19.sp else 16.sp),
-                        ),
-                        maxLines = 100,
-                        overflow = TextOverflow.Ellipsis,
+            Box(modifier = Modifier.fillMaxSize()) {
+                if (activeDropZone == DropZoneType.AS_CHILD && isRoot && dropTargetPosition != null) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxHeight()
+                            .fillMaxWidth(0.5f)
+                            .align(
+                                if (dropTargetPosition == "left") Alignment.CenterStart else Alignment.CenterEnd
+                            )
+                            .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.22f))
                     )
                 }
 
-                if (hasChildren && !isRoot) {
-                    FoldIndicator(
-                        isCollapsed = isCollapsed,
-                        onClick = onToggleCollapse,
-                        modifier = Modifier.padding(start = 6.dp),
+                NodeCardContentRow(
+                    node = node,
+                    displayText = displayText,
+                    isRoot = isRoot,
+                    hasChildren = hasChildren,
+                    isCollapsed = isCollapsed,
+                    cloudColor = cloudColor,
+                    onToggleCollapse = onToggleCollapse,
+                )
+
+                if (activeDropZone == DropZoneType.BEFORE_SIBLING) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(4.dp)
+                            .align(Alignment.TopCenter)
+                            .clip(RoundedCornerShape(2.dp))
+                            .background(MaterialTheme.colorScheme.primary)
+                    )
+                } else if (activeDropZone == DropZoneType.AFTER_SIBLING) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(4.dp)
+                            .align(Alignment.BottomCenter)
+                            .clip(RoundedCornerShape(2.dp))
+                            .background(MaterialTheme.colorScheme.primary)
                     )
                 }
             }
         }
     }
 }
+
+private suspend fun AwaitPointerEventScope.handleNodeCardGesture(
+    onTap: () -> Unit,
+    onDoubleTap: (() -> Unit)?,
+    onLongPressStart: () -> Unit,
+    onDrag: (deltaLocalPx: Offset, pointerLocalPx: Offset) -> Unit,
+    onLongPressRelease: () -> Unit,
+    onCancel: () -> Unit,
+) {
+    val down = awaitFirstDown(requireUnconsumed = false)
+    val longPressChange = awaitLongPressOrCancellation(down.id)
+    if (longPressChange != null) {
+        longPressChange.consume()
+        onLongPressStart()
+        trackPostLongPressGesture(
+            pointerId = longPressChange.id,
+            initialPos = longPressChange.position,
+            onDrag = onDrag,
+            onRelease = onLongPressRelease,
+            onCancel = onCancel,
+        )
+        return
+    }
+
+    val firstUp = currentEvent.changes.firstOrNull { it.id == down.id }
+    if (firstUp == null || firstUp.pressed) {
+        return
+    }
+    firstUp.consume()
+
+    if (onDoubleTap == null) {
+        onTap()
+        return
+    }
+
+    val secondDown = withTimeoutOrNull(viewConfiguration.doubleTapTimeoutMillis) {
+        awaitFirstDown(requireUnconsumed = false)
+    }
+    if (secondDown == null) {
+        onTap()
+        return
+    }
+
+    val secondLongPress = awaitLongPressOrCancellation(secondDown.id)
+    if (secondLongPress != null) {
+        secondLongPress.consume()
+        onLongPressStart()
+        trackPostLongPressGesture(
+            pointerId = secondLongPress.id,
+            initialPos = secondLongPress.position,
+            onDrag = onDrag,
+            onRelease = onLongPressRelease,
+            onCancel = onCancel,
+        )
+    } else {
+        val secondUp = currentEvent.changes.firstOrNull { it.id == secondDown.id }
+        if (secondUp != null && !secondUp.pressed) {
+            secondUp.consume()
+            onDoubleTap()
+        }
+    }
+}
+
+private suspend fun AwaitPointerEventScope.trackPostLongPressGesture(
+    pointerId: PointerId,
+    initialPos: Offset,
+    onDrag: (deltaLocalPx: Offset, pointerLocalPx: Offset) -> Unit,
+    onRelease: () -> Unit,
+    onCancel: () -> Unit,
+) {
+    val touchSlop = viewConfiguration.touchSlop
+    var hasExceededSlop = false
+    var accumulatedDelta = Offset.Zero
+
+    while (true) {
+        val event = awaitPointerEvent()
+        val change = event.changes.firstOrNull { it.id == pointerId } ?: run {
+            onCancel()
+            return
+        }
+        if (!change.pressed) {
+            change.consume()
+            onRelease()
+            return
+        }
+        val posDelta = change.positionChange()
+        if (posDelta != Offset.Zero) {
+            change.consume()
+            if (!hasExceededSlop) {
+                accumulatedDelta += posDelta
+                if ((change.position - initialPos).getDistance() > touchSlop) {
+                    hasExceededSlop = true
+                    onDrag(accumulatedDelta, change.position)
+                }
+            } else {
+                onDrag(posDelta, change.position)
+            }
+        }
+    }
+}
+
+private fun resolveNodeCardShape(style: String?, isRoot: Boolean): Shape = when (style) {
+    "bubble", "oval" -> CircleShape
+    "rectangle" -> RoundedCornerShape(2.dp)
+    "fork" -> RoundedCornerShape(topStart = 0.dp, bottomStart = 0.dp, topEnd = 8.dp, bottomEnd = 8.dp)
+    else -> if (isRoot) RoundedCornerShape(16.dp) else RoundedCornerShape(8.dp)
+}
+
+@Composable
+private fun NodeCardContentRow(
+    node: Node,
+    displayText: String,
+    isRoot: Boolean,
+    hasChildren: Boolean,
+    isCollapsed: Boolean,
+    cloudColor: Color?,
+    onToggleCollapse: () -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(horizontal = 12.dp, vertical = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween,
+    ) {
+        Row(
+            modifier = Modifier.weight(1f, fill = false),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+            if (node.cloud != null) {
+                Text(
+                    text = "☁",
+                    fontSize = 12.sp,
+                    color = cloudColor ?: MaterialTheme.colorScheme.primary
+                )
+            }
+
+            NodeIconsRow(
+                iconNames = node.iconNames,
+                maxInlineIcons = Int.MAX_VALUE,
+                iconSize = 16.dp
+            )
+
+            if (node.link != null) {
+                Icon(
+                    imageVector = FontAwesomeIcons.Solid.Link,
+                    contentDescription = stringResource(R.string.hyperlink),
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(14.dp)
+                )
+            }
+
+            if (!node.noteText.isNullOrBlank()) {
+                Text(
+                    text = "📝",
+                    fontSize = 12.sp,
+                )
+            }
+
+            if (!node.detailsText.isNullOrBlank()) {
+                Text(
+                    text = "💬",
+                    fontSize = 12.sp,
+                )
+            }
+
+            Text(
+                text = displayText,
+                style = MaterialTheme.typography.bodyMedium.copy(
+                    fontSize = node.fontSize?.sp ?: (if (isRoot) 15.sp else 13.sp),
+                    fontWeight = if (node.isBold || isRoot) FontWeight.Bold else FontWeight.Normal,
+                    fontStyle = if (node.isItalic) FontStyle.Italic else FontStyle.Normal,
+                    lineHeight = (node.fontSize?.let { (it * 1.35f).sp }) ?: (if (isRoot) 19.sp else 16.sp),
+                ),
+                maxLines = 100,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+
+        if (hasChildren && !isRoot) {
+            FoldIndicator(
+                isCollapsed = isCollapsed,
+                onClick = onToggleCollapse,
+                modifier = Modifier.padding(start = 6.dp),
+            )
+        }
+    }
+}
+
 @Composable
 private fun FoldIndicator(
     isCollapsed: Boolean,
@@ -256,6 +470,58 @@ fun PreviewMindMapNodeCardRoot() {
     }
 }
 
+@Preview(name = "Drop Zone Before Sibling Preview")
+@Composable
+fun PreviewMindMapNodeCardDropBefore() {
+    ContrastAwareReplyTheme {
+        val node = Node(
+            parentNode = null,
+            id = "preview_drop",
+            numericId = 1,
+            text = "Target Sibling Node",
+            creationDate = 0L,
+            modificationDate = 0L,
+        )
+
+        MindMapNodeCard(
+            node = node,
+            isSelected = false,
+            isCollapsed = false,
+            branchDirection = BranchDirection.RIGHT,
+            activeDropZone = DropZoneType.BEFORE_SIBLING,
+            onNodeClick = {},
+            onToggleCollapse = {},
+            modifier = Modifier.size(width = 180.dp, height = 44.dp),
+        )
+    }
+}
+
+@Preview(name = "Drop Zone As Child Preview")
+@Composable
+fun PreviewMindMapNodeCardDropAsChild() {
+    ContrastAwareReplyTheme {
+        val node = Node(
+            parentNode = null,
+            id = "preview_drop_child",
+            numericId = 1,
+            text = "Target Parent Node",
+            creationDate = 0L,
+            modificationDate = 0L,
+        )
+
+        MindMapNodeCard(
+            node = node,
+            isSelected = false,
+            isCollapsed = false,
+            branchDirection = BranchDirection.RIGHT,
+            activeDropZone = DropZoneType.AS_CHILD,
+            onNodeClick = {},
+            onToggleCollapse = {},
+            modifier = Modifier.size(width = 180.dp, height = 44.dp),
+        )
+    }
+}
+
 private fun parseHexColor(hex: String): Color? {
     return try {
         val clean = hex.removePrefix("#")
@@ -269,4 +535,3 @@ private fun parseHexColor(hex: String): Color? {
         null
     }
 }
-

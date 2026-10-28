@@ -25,7 +25,10 @@ import org.xmlpull.v1.XmlPullParser
 import java.io.InputStream
 import kotlin.io.path.createTempDirectory
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
+import kotlin.test.assertNotNull
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 class NodeManagerTest : KStringSpec() {
 
@@ -876,6 +879,211 @@ class NodeManagerTest : KStringSpec() {
 
             assertNull(nodeManager.getMapUri())
             assertNull(nodeManager.getMindmapFileName())
+        }
+
+        "moveNode reorders sibling before and after target sibling within same parent" {
+            val nodeManager = initNodeManager()
+            val root = nodeManager.createNewMindmap("Root")
+            val idA = nodeManager.addNodeToMindmap("Node A", root)!!
+            val idB = nodeManager.addNodeToMindmap("Node B", root)!!
+            val idC = nodeManager.addNodeToMindmap("Node C", root)!!
+            val nodeA = nodeManager.getNodeByNumericId(idA)!!
+            val nodeB = nodeManager.getNodeByNumericId(idB)!!
+            val nodeC = nodeManager.getNodeByNumericId(idC)!!
+
+            // Move A after C -> [B, C, A]
+            val movedAfter = nodeManager.moveNode(
+                draggedNodeId = nodeA.id,
+                targetParentId = root.id,
+                targetSiblingId = nodeC.id,
+                insertAfter = true,
+            )
+            assertTrue(movedAfter)
+            assertEquals(
+                listOf(nodeB.id, nodeC.id, nodeA.id),
+                nodeManager.rootNode!!.childNodes.map { it.id },
+            )
+
+            // Move A before B -> [A, B, C]
+            val movedBefore = nodeManager.moveNode(
+                draggedNodeId = nodeA.id,
+                targetParentId = root.id,
+                targetSiblingId = nodeB.id,
+                insertAfter = false,
+            )
+            assertTrue(movedBefore)
+            assertEquals(
+                listOf(nodeA.id, nodeB.id, nodeC.id),
+                nodeManager.rootNode!!.childNodes.map { it.id },
+            )
+        }
+
+        "moveNode re-parents node onto another parent and unfolds folded target parent" {
+            val nodeManager = initNodeManager()
+            val root = nodeManager.createNewMindmap("Root")
+            val idA = nodeManager.addNodeToMindmap("Branch A", root)!!
+            val idB = nodeManager.addNodeToMindmap("Branch B", root)!!
+            val branchA = nodeManager.getNodeByNumericId(idA)!!
+            val branchB = nodeManager.getNodeByNumericId(idB)!!
+            val subId = nodeManager.addNodeToMindmap("Sub A1", branchA)!!
+            val subA1 = nodeManager.getNodeByNumericId(subId)!!
+
+            // Fold branchB before moving branchA into it
+            nodeManager.updateNode(branchB.copy(isFolded = true))
+            assertTrue(nodeManager.getNodeByID(branchB.id)!!.isFolded)
+
+            val moved = nodeManager.moveNode(
+                draggedNodeId = branchA.id,
+                targetParentId = branchB.id,
+                targetSiblingId = null,
+                insertAfter = true,
+                targetPosition = null,
+            )
+            assertTrue(moved)
+
+            val updatedRoot = nodeManager.rootNode!!
+            assertEquals(listOf(branchB.id), updatedRoot.childNodes.map { it.id })
+
+            val updatedBranchB = nodeManager.getNodeByID(branchB.id)!!
+            assertFalse(updatedBranchB.isFolded)
+            assertEquals(listOf(branchA.id), updatedBranchB.childNodes.map { it.id })
+
+            val updatedBranchA = nodeManager.getNodeByID(branchA.id)!!
+            assertEquals(branchB.id, updatedBranchA.parentNode?.id)
+            assertNull(updatedBranchA.position)
+            assertEquals(listOf(subA1.id), updatedBranchA.childNodes.map { it.id })
+        }
+
+        "moveNode updates root child position between left and right and clears position on non-root parent" {
+            val nodeManager = initNodeManager()
+            val root = nodeManager.createNewMindmap("Root")
+            val idA = nodeManager.addNodeToMindmap("Branch A", root)!!
+            val idB = nodeManager.addNodeToMindmap("Branch B", root)!!
+            val branchA = nodeManager.getNodeByNumericId(idA)!!
+            val branchB = nodeManager.getNodeByNumericId(idB)!!
+
+            // Switch branchA to left side of root
+            val switchedToLeft = nodeManager.moveNode(
+                draggedNodeId = branchA.id,
+                targetParentId = root.id,
+                targetSiblingId = null,
+                insertAfter = true,
+                targetPosition = "left",
+            )
+            assertTrue(switchedToLeft)
+            assertEquals("left", nodeManager.getNodeByID(branchA.id)!!.position)
+
+            // Re-parent branchA under non-root branchB -> position must be cleared to null
+            val reparentedToNonRoot = nodeManager.moveNode(
+                draggedNodeId = branchA.id,
+                targetParentId = branchB.id,
+                targetSiblingId = null,
+                insertAfter = true,
+                targetPosition = "left",
+            )
+            assertTrue(reparentedToNonRoot)
+            assertNull(nodeManager.getNodeByID(branchA.id)!!.position)
+        }
+
+        "moveNode rejects root node drag, self-drop, descendant cycle drop, and no-op moves" {
+            val nodeManager = initNodeManager()
+            val root = nodeManager.createNewMindmap("Root")
+            val idA = nodeManager.addNodeToMindmap("Branch A", root)!!
+            val branchA = nodeManager.getNodeByNumericId(idA)!!
+            val idChild = nodeManager.addNodeToMindmap("Child A1", branchA)!!
+            val childA1 = nodeManager.getNodeByNumericId(idChild)!!
+            val idGrandChild = nodeManager.addNodeToMindmap("GrandChild A1a", childA1)!!
+            val grandChild = nodeManager.getNodeByNumericId(idGrandChild)!!
+
+            // 1. Root cannot be dragged
+            assertFalse(
+                nodeManager.moveNode(
+                    draggedNodeId = root.id,
+                    targetParentId = branchA.id,
+                )
+            )
+
+            // 2. Self-drop as parent rejected
+            assertFalse(
+                nodeManager.moveNode(
+                    draggedNodeId = branchA.id,
+                    targetParentId = branchA.id,
+                )
+            )
+
+            // 3. Self-drop as sibling rejected
+            assertFalse(
+                nodeManager.moveNode(
+                    draggedNodeId = branchA.id,
+                    targetParentId = root.id,
+                    targetSiblingId = branchA.id,
+                )
+            )
+
+            // 4. Descendant drop (cycle) rejected
+            assertFalse(
+                nodeManager.moveNode(
+                    draggedNodeId = branchA.id,
+                    targetParentId = grandChild.id,
+                )
+            )
+
+            // 5. No-op move (only child of root, same position) returns false
+            val currentPos = nodeManager.getNodeByID(branchA.id)!!.position
+            assertFalse(
+                nodeManager.moveNode(
+                    draggedNodeId = branchA.id,
+                    targetParentId = root.id,
+                    targetSiblingId = null,
+                    insertAfter = true,
+                    targetPosition = currentPos,
+                )
+            )
+        }
+
+        "moveNode preserves updated hierarchy and sibling order across XML serialization round-trip" {
+            val nodeManager = initNodeManager()
+            val root = nodeManager.createNewMindmap("Root")
+            val idA = nodeManager.addNodeToMindmap("Node A", root)!!
+            val idB = nodeManager.addNodeToMindmap("Node B", root)!!
+            val nodeA = nodeManager.getNodeByNumericId(idA)!!
+            val nodeB = nodeManager.getNodeByNumericId(idB)!!
+
+            assertTrue(
+                nodeManager.moveNode(
+                    draggedNodeId = nodeA.id,
+                    targetParentId = nodeB.id,
+                    targetSiblingId = null,
+                    insertAfter = true,
+                )
+            )
+
+            val tempDir = createTempDirectory("move_node_test").toFile()
+            var serializeError: Exception? = null
+            var savedFile: java.io.File? = null
+            nodeManager.serializeMindmap(
+                filePath = tempDir.absolutePath + java.io.File.separator,
+                filename = "reordered.mm",
+                onError = { serializeError = it },
+                onSaveFinished = { savedFile = it },
+            )
+            assertNull(serializeError)
+            assertNotNull(savedFile)
+
+            val reloadedManager = initNodeManager()
+            var loadError: Exception? = null
+            reloadedManager.loadMindMapFromInputStream(
+                inputStream = savedFile!!.inputStream(),
+                onError = { loadError = it },
+                onParentNodeUpdate = {},
+                onLoadFinished = {},
+            )
+            tempDir.deleteRecursively()
+            assertNull(loadError)
+            val reloadedRoot = reloadedManager.rootNode
+            assertNotNull(reloadedRoot)
+            assertEquals(listOf("Node B"), reloadedRoot.childNodes.map { it.text })
+            assertEquals(listOf("Node A"), reloadedRoot.childNodes.first().childNodes.map { it.text })
         }
     }
 

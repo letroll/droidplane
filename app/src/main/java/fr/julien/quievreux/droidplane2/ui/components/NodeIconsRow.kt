@@ -90,7 +90,7 @@ fun PreviewNodeIconsRow() {
                     maxInlineIcons = 3
                 )
 
-                Text("5 Icons with Overflow in NodeList (max 3):")
+                Text("5 Icons with Overflow (max 3):")
                 NodeIconsRow(
                     iconNames = listOf("button_ok", "flag-red", "full-1", "idea", "attach"),
                     maxInlineIcons = 3

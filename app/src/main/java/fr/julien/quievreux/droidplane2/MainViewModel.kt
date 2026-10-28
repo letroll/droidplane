@@ -1452,30 +1452,37 @@ nodeFindList:${nodeManager.getSearchResult().map { getNodeText(it) }.joinToStrin
     }
 
     /**
-     * Reorders a child node within its parent relative to a neighbor node.
+     * Moves a node (and its entire subtree) to a new parent and/or sibling position.
      */
-    fun onReorderChildNode(
-        parentId: String,
-        draggedChildId: String,
-        targetNeighborId: String,
-        insertAfter: Boolean
+    fun onMoveNode(
+        draggedNodeId: String,
+        targetParentId: String,
+        targetSiblingId: String? = null,
+        insertAfter: Boolean = true,
+        targetPosition: String? = null,
     ) {
         viewModelScope.launch {
-            val success = nodeManager.reorderChildNode(
-                parentId = parentId,
-                draggedChildId = draggedChildId,
-                targetNeighborId = targetNeighborId,
-                insertAfter = insertAfter
+            val success = nodeManager.moveNode(
+                draggedNodeId = draggedNodeId,
+                targetParentId = targetParentId,
+                targetSiblingId = targetSiblingId,
+                insertAfter = insertAfter,
+                targetPosition = targetPosition,
             )
             if (success) {
                 hasUnsavedChanges = true
-                val updatedParent = nodeManager.getNodeByID(parentId)
-                if (updatedParent != null && _uiState.value.nodeCurrentlyDisplayed?.id == parentId) {
-                    showNode(updatedParent)
+                val displayedId = _uiState.value.nodeCurrentlyDisplayed?.id
+                if (displayedId != null) {
+                    val updatedDisplayed = nodeManager.getNodeByID(displayedId)
+                    if (updatedDisplayed != null) {
+                        showNode(updatedDisplayed)
+                    }
                 }
                 updateUiState { currentState ->
                     currentState.copy(
-                        treeVersion = currentState.treeVersion + 1
+                        treeVersion = currentState.treeVersion + 1,
+                        collapsedNodeIds = currentState.collapsedNodeIds - targetParentId,
+                        leaving = false,
                     )
                 }
             }

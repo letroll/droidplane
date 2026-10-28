@@ -380,6 +380,7 @@ class MainActivity : FragmentActivity() {
                                     selectedNodeForToolbar = node.id
                                     showBottomToolbar = true
                                 },
+                                onMoveNode = viewModel::onMoveNode,
                                 fetchText = viewModel::getNodeText,
                                 modifier = Modifier
                                     .fillMaxSize()
