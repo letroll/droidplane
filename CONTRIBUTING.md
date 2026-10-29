@@ -119,13 +119,13 @@ commitlint --from HEAD~1 --to HEAD
 
 ## Release Process
 
-Releases are automated via GitHub Actions on tag push (`v*.*.*`):
+Releases are automated via GitHub Actions on push to `master`:
 
-1. Create a version tag: `git tag v1.0.23`
-2. Push tag: `git push origin v1.0.23`
-3. GitHub Actions workflow:
-   - Generates changelog from conventional commits using `git cliff`
-   - Creates GitHub Release with changelog
-   - Builds and uploads release APK
+1. Merge or push changes to `master`
+2. GitHub Actions workflow (`.github/workflows/android_release.yml`):
+   - Determines the previous release tag (`v*.*.*`)
+   - Auto-increments the app version and commits with `[skip ci]`
+   - Generates the changelog from commits since the previous tag using `git-cliff` (`.cliff.toml`)
+   - Builds the signed release APK and publishes the GitHub Release with the generated changelog
 
-See `.github/workflows/release.yml` for details.
+See `.github/workflows/android_release.yml` for details.

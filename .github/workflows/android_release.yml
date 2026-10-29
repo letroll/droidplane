@@ -14,10 +14,19 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: 📥 Cloner le dépôt
+      - name: 📥 Cloner le dépôt (historique complet et tags)
         uses: actions/checkout@v4
         with:
           ref: master
+          fetch-depth: 0
+
+      - name: 🏷️ Déterminer le tag précédent
+        id: previous_tag
+        run: |
+          git fetch --tags --force
+          PREV_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
+          echo "tag=${PREV_TAG}" >> $GITHUB_OUTPUT
+          echo "Previous tag: ${PREV_TAG:-<none>}"
 
       - name: ☕ Configurer le JDK (Java 21)
         uses: actions/setup-java@v4
@@ -47,6 +56,29 @@ jobs:
           git commit -m "chore(release): bump version to ${NEW_NAME} (code ${NEW_CODE}) [skip ci]"
           git push origin master
 
+      - name: 🛠️ Installer git-cliff
+        uses: taiki-e/install-action@v2
+        with:
+          tool: git-cliff
+
+      - name: 📝 Générer le changelog
+        run: |
+          CURRENT_TAG="v${APP_VERSION_NAME}"
+          PREV_TAG="${{ steps.previous_tag.outputs.tag }}"
+
+          if [ -z "$PREV_TAG" ]; then
+            git-cliff --config .cliff.toml --tag "$CURRENT_TAG" --unreleased --output CHANGELOG.md
+          else
+            git-cliff --config .cliff.toml --tag "$CURRENT_TAG" "${PREV_TAG}..HEAD" --output CHANGELOG.md
+          fi
+
+          if [ ! -s CHANGELOG.md ] || [ -z "$(grep -v '^[[:space:]]*$' CHANGELOG.md)" ]; then
+            echo "No changes since ${PREV_TAG:-previous release}." > CHANGELOG.md
+          fi
+
+          echo "Generated changelog for ${CURRENT_TAG} (since ${PREV_TAG:-beginning}):"
+          cat CHANGELOG.md
+
       # 1. Restauration du Keystore à partir du secret Base64
       - name: 🔓 Restaurer le Keystore
         run: |
@@ -70,13 +102,13 @@ jobs:
           GRADLE_OPTS: "-Xmx4096m -XX:MaxMetaspaceSize=1024m"
         run: ./gradlew assembleRelease --no-daemon
 
-      # 4. Publication de l'APK sur GitHub Releases
+      # 4. Publication de l'APK sur GitHub Releases avec le changelog généré
       - name: 🚀 Publier sur GitHub Releases
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v${{ env.APP_VERSION_NAME }}
           name: "Release v${{ env.APP_VERSION_NAME }}"
-          body: "APK de release signé généré automatiquement suite au push sur master."
+          body_path: CHANGELOG.md
           draft: false
           prerelease: false
           files: app/build/outputs/apk/release/*.apk
