@@ -84,13 +84,8 @@ jobs:
         run: |
           echo "${{ secrets.SIGNING_KEY_STORE_BASE64 }}" | base64 --decode > app/release-key.jks
 
-      # 2. Restaurer le google-services.json
-      - name: 🔓 Restaurer Google Services JSON
-        run: |
-          echo "${{ secrets.GOOGLE_SERVICES_JSON_BASE64 }}" | base64 --decode > app/google-services.json
-
-      - name: 🧪 Lancer les tests unitaires
-        run: ./gradlew testDebugUnitTest
+      - name: 🧪 Lancer les tests unitaires (Android & Desktop KMP)
+        run: ./gradlew testDebugUnitTest :core:desktopTest :data:desktopTest :app:desktopTest
 
       # 3. Compilation de l'APK Release (avec ajustement de la mémoire JVM)
       - name: 📦 Compiler l'APK Release Signé
