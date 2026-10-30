@@ -793,36 +793,24 @@ class MainViewModelTest : KStringSpec() {
             initialRoot.text shouldBe "Empty Initial"
 
             // Step 2: Now load a new mindmap with different root
-            val secondRoot = Node(
-                parentNode = null,
-                id = "ID_DEMO_ROOT",
-                numericId = 99,
-                text = "Demo Mindmap Root",
-                creationDate = 0L,
-                modificationDate = 0L,
-            )
-            val demoChild = Node(
-                parentNode = secondRoot,
-                id = "ID_DEMO_CHILD",
-                numericId = 100,
-                text = "Demo Guide",
-                creationDate = 0L,
-                modificationDate = 0L,
-            )
-            secondRoot.childNodes.add(demoChild)
+            val demoXml = """
+                <map version="freeplane 1.11.5">
+                    <node ID="ID_DEMO_ROOT" TEXT="Demo Mindmap Root" CREATED="0" MODIFIED="0">
+                        <node ID="ID_DEMO_CHILD" TEXT="Demo Guide" CREATED="0" MODIFIED="0"/>
+                    </node>
+                </map>
+            """.trimIndent()
 
             // Simulate loading new mindmap
-            nodeManager.updateRootNode(secondRoot)
             viewModel.loadMindMap(
-                inputStream = "".byteInputStream(),
-                onLoadFinished = {
-                    nodeManager.updateRootNode(secondRoot)
-                }
+                inputStream = demoXml.byteInputStream(),
             )
 
             eventually {
                 nodeManager.rootNode?.id shouldBe "ID_DEMO_ROOT"
                 nodeManager.rootNode?.text shouldBe "Demo Mindmap Root"
+                viewModel.uiState.value.title shouldBe "Demo Mindmap Root"
+                viewModel.uiState.value.nodeCurrentlyDisplayed?.id shouldBe "ID_DEMO_ROOT"
             }
         }
 
