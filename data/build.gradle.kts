@@ -79,3 +79,10 @@ android {
 tasks.withType<Test>().configureEach {
     useJUnitPlatform()
 }
+
+configurations.matching {
+    it.name == "releaseRuntimeClasspath"
+}.configureEach {
+    exclude(group = "xpp3")
+    exclude(group = "xmlpull")
+}

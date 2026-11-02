@@ -8,5 +8,6 @@
 
 # Keep XMLPullParser & Freeplane domain models
 -dontwarn org.xmlpull.v1.**
+-dontwarn reactor.blockhound.**
 -keep class org.xmlpull.v1.** { *; }
 -keep class fr.julien.quievreux.droidplane2.data.model.** { *; }

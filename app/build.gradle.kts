@@ -115,6 +115,7 @@ kotlin {
         }
         val androidMain by getting {
             dependencies {
+                implementation(project.dependencies.platform(libs.androidx.compose.bom))
                 implementation(libs.androidx.activity.compose)
                 implementation(libs.androidx.lifecycle.viewmodel.ktx)
                 implementation(libs.koin.android)
@@ -129,6 +130,13 @@ kotlin {
             }
         }
     }
+}
+
+configurations.matching {
+    it.name == "releaseRuntimeClasspath"
+}.configureEach {
+    exclude(group = "xpp3")
+    exclude(group = "xmlpull")
 }
 
 compose.desktop {

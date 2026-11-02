@@ -41,6 +41,7 @@ kotlin {
         }
         val androidMain by getting {
             dependencies {
+                implementation(project.dependencies.platform(libs.androidx.compose.bom))
                 implementation(libs.androidx.core.ktx)
                 implementation(libs.androidx.appcompat)
                 implementation(libs.androidx.activity.compose)

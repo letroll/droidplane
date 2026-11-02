@@ -49,12 +49,6 @@ jobs:
           
           echo "APP_VERSION_NAME=${NEW_NAME}" >> $GITHUB_ENV
           echo "APP_VERSION_CODE=${NEW_CODE}" >> $GITHUB_ENV
-          
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add app/build.gradle.kts
-          git commit -m "chore(release): bump version to ${NEW_NAME} (code ${NEW_CODE}) [skip ci]"
-          git push origin master
 
       - name: 🛠️ Installer git-cliff
         uses: taiki-e/install-action@v2
@@ -90,12 +84,21 @@ jobs:
       # 3. Compilation de l'APK Release (avec ajustement de la mémoire JVM)
       - name: 📦 Compiler l'APK Release Signé
         env:
+          KEYSTORE_PATH: "release-key.jks"
           KEYSTORE_FILE: "release-key.jks"
           KEYSTORE_PASSWORD: ${{ secrets.KEY_STORE_PASSWORD }}
           KEYSTORE_ALIAS: ${{ secrets.KEY_ALIAS }}
           KEYSTORE_ALIAS_PASSWORD: ${{ secrets.KEY_PASSWORD }}
           GRADLE_OPTS: "-Xmx4096m -XX:MaxMetaspaceSize=1024m"
         run: ./gradlew assembleRelease --no-daemon
+
+      - name: 💾 Committer et pousser la nouvelle version
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add app/build.gradle.kts
+          git commit -m "chore(release): bump version to ${APP_VERSION_NAME} (code ${APP_VERSION_CODE}) [skip ci]"
+          git push origin master
 
       # 4. Publication de l'APK sur GitHub Releases avec le changelog généré
       - name: 🚀 Publier sur GitHub Releases
