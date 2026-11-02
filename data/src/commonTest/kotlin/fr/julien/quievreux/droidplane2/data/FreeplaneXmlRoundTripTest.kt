@@ -6,6 +6,7 @@ import fr.julien.quievreux.droidplane2.data.model.GenericHookElement
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.shouldNotBe
 import io.kotest.matchers.string.shouldContain
+import io.kotest.matchers.string.shouldNotContain
 import io.mockk.mockk
 import kotlinx.coroutines.test.TestScope
 import java.io.ByteArrayInputStream
@@ -60,6 +61,9 @@ class FreeplaneXmlRoundTripTest : KStringSpec() {
             val scriptHook = root.genericHooks.firstOrNull { it.name == "ScriptHook" }
             scriptHook shouldNotBe null
             scriptHook!!.attributes["SCRIPT_NAME"] shouldBe "auto_calc.groovy"
+            root.genericHooks.forEach { hook ->
+                hook.attributes.containsKey("NAME") shouldBe false
+            }
 
             // Edit child item via nodeManager.updateNode
             val child = nodeManager.getNodeByID("ID_CHILD")
@@ -94,6 +98,14 @@ class FreeplaneXmlRoundTripTest : KStringSpec() {
             savedXml shouldContain "NAME=\"MapStyle\""
             savedXml shouldContain "NAME=\"ScriptHook\""
             savedXml shouldContain "SCRIPT_NAME=\"auto_calc.groovy\""
+
+            // Verify no hook element has a duplicated NAME attribute
+            val hookTagRegex = Regex("<hook\\b[^>]*>")
+            val hookTags = hookTagRegex.findAll(savedXml).map { it.value }.toList()
+            hookTags.size shouldBe 3
+            hookTags.forEach { tag ->
+                Regex("\\bNAME=").findAll(tag).count() shouldBe 1
+            }
 
             // Verify edited child updates are present
             savedXml shouldContain "Edited Child Item"

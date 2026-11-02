@@ -172,7 +172,10 @@ class XmlParseUtilsDefaultImpl(
             else -> {
                 val attrs = mutableMapOf<String, String>()
                 for (i in 0 until xpp.attributeCount) {
-                    attrs[xpp.getAttributeName(i)] = xpp.getAttributeValue(i)
+                    val attrName = xpp.getAttributeName(i)
+                    if (!attrName.equals(NodeAttribute.NAME.text, ignoreCase = true)) {
+                        attrs[attrName] = xpp.getAttributeValue(i)
+                    }
                 }
                 parent.addGenericHook(GenericHookElement(name = name, attributes = attrs))
             }

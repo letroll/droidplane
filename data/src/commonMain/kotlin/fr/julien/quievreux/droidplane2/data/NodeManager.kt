@@ -640,7 +640,9 @@ class NodeManager(
                     serializer.startNodeTag(NodeTag.HOOK)
                     serializer.nodeAttribute(NAME, hook.name)
                     hook.attributes.forEach { (k, v) ->
-                        serializer.attribute(null, k, v)
+                        if (!k.equals(NAME.text, ignoreCase = true)) {
+                            serializer.attribute(null, k, v)
+                        }
                     }
                     hook.textContent?.let { text -> serializer.text(text) }
                     serializer.endNodeTag(NodeTag.HOOK)

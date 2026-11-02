@@ -95,6 +95,7 @@ data class Node(
         if (edge != other.edge) return false
         if (latexEquation != other.latexEquation) return false
         if (externalObject != other.externalObject) return false
+        if (genericHooks != other.genericHooks) return false
         if (attributes != other.attributes) return false
         if (iconNames != other.iconNames) return false
         if (modificationDate != other.modificationDate) return false
@@ -134,6 +135,7 @@ data class Node(
         result = 31 * result + edge.hashCode()
         result = 31 * result + latexEquation.hashCode()
         result = 31 * result + externalObject.hashCode()
+        result = 31 * result + genericHooks.hashCode()
         result = 31 * result + attributes.hashCode()
         result = 31 * result + iconNames.hashCode()
         result = 31 * result + connectors.hashCode()
