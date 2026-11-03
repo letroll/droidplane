@@ -48,7 +48,8 @@ data class MainUiState(
     )
 
     data class DialogUiState(
-        val dialogType: DialogType = DialogType.None
+        val dialogType: DialogType = DialogType.None,
+        val deferredDialogType: DialogType = DialogType.None,
     )
 
     sealed class DialogType {

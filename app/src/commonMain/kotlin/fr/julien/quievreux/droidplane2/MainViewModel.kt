@@ -865,9 +865,9 @@ nodeFindList:${nodeManager.getSearchResult().map { getNodeText(it) }.joinToStrin
                 updateUiState { currentState ->
                     currentState.copy(
                         treeVersion = currentState.treeVersion + 1,
-                        dialogUiState = DialogUiState(dialogType = DialogType.None),
                     )
                 }
+                setDialogState(DialogType.None)
             } else {
                 setDialogState(DialogType.None)
             }
@@ -908,14 +908,14 @@ nodeFindList:${nodeManager.getSearchResult().map { getNodeText(it) }.joinToStrin
                 updateUiState { currentState ->
                     currentState.copy(
                         treeVersion = currentState.treeVersion + 1,
-                        dialogUiState = DialogUiState(
-                            dialogType = DialogType.NodePropertiesInspector(
-                                node = updatedParent,
-                                initialTab = InspectorTab.STYLING_CLOUD,
-                            )
-                        )
                     )
                 }
+                setDialogState(
+                    DialogType.NodePropertiesInspector(
+                        node = updatedParent,
+                        initialTab = InspectorTab.STYLING_CLOUD,
+                    )
+                )
             }
             setMindmapIsLoading(false)
         }
@@ -1062,7 +1062,39 @@ nodeFindList:${nodeManager.getSearchResult().map { getNodeText(it) }.joinToStrin
     }
 
     fun setDialogState(dialogType: DialogType) {
-        updateDialogState { it.copy(dialogType = dialogType) }
+        updateDialogState { current ->
+            when {
+                // Dismissing the current dialog restores any deferred dialog waiting behind it
+                dialogType is DialogType.None -> {
+                    DialogUiState(
+                        dialogType = current.deferredDialogType,
+                        deferredDialogType = DialogType.None,
+                    )
+                }
+                // UpdateAvailable takes visual priority and preserves an active StartupChooser or RecentFiles dialog
+                dialogType is DialogType.UpdateAvailable -> {
+                    val dialogToDefer = when (current.dialogType) {
+                        is DialogType.StartupChooser, is DialogType.RecentFiles -> current.dialogType
+                        else -> current.deferredDialogType
+                    }
+                    DialogUiState(
+                        dialogType = dialogType,
+                        deferredDialogType = dialogToDefer,
+                    )
+                }
+                // StartupChooser or RecentFiles finishing while UpdateAvailable is shown should wait until UpdateAvailable is dismissed
+                (dialogType is DialogType.StartupChooser || dialogType is DialogType.RecentFiles) &&
+                    current.dialogType is DialogType.UpdateAvailable -> {
+                    current.copy(deferredDialogType = dialogType)
+                }
+                else -> {
+                    DialogUiState(
+                        dialogType = dialogType,
+                        deferredDialogType = DialogType.None,
+                    )
+                }
+            }
+        }
     }
 
     private fun updateNodeInMindMapIndexes(node: Node) {

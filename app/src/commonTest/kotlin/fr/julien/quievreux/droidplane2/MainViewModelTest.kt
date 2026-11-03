@@ -17,6 +17,9 @@ import fr.julien.quievreux.droidplane2.data.XmlParseUtilsDefaultImpl
 import fr.julien.quievreux.droidplane2.data.model.MindMapUri
 import fr.julien.quievreux.droidplane2.data.model.Node
 import fr.julien.quievreux.droidplane2.res.AppRes as R
+import fr.julien.quievreux.droidplane2.update.GitHubRelease
+import fr.julien.quievreux.droidplane2.update.UpdateCheckResult
+import fr.julien.quievreux.droidplane2.update.UpdateCheckerService
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.shouldNotBe
 import io.kotest.matchers.string.shouldContain
@@ -1406,6 +1409,135 @@ class MainViewModelTest : KStringSpec() {
             // Wait briefly and verify treeVersion does not increment on no-op
             delay(100)
             assertEquals(versionAfterFirstMove, viewModel.uiState.value.treeVersion)
+        }
+
+        // ===== UPDATE DIALOG VS STARTUP CHOOSER / RECENT FILES CONFLICT =====
+
+        "StartupChooser arriving while UpdateAvailable is displayed keeps UpdateAvailable visible and restores StartupChooser on dismiss" {
+            val nodeManager = realNodeManager()
+            val updateCheckerService = mockk<UpdateCheckerService>()
+            val sampleRelease = GitHubRelease(
+                tagName = "v1.1.0",
+                name = "Release 1.1.0",
+                publishedAt = "2026-11-03",
+                body = "Bug fixes",
+                htmlUrl = "https://github.com/letroll/droidplane/releases/tag/v1.1.0",
+                apkDownloadUrl = "https://github.com/letroll/droidplane/releases/download/v1.1.0/app-release.apk",
+                apkFileName = "app-release.apk",
+            )
+            coEvery { updateCheckerService.checkForUpdates("1.0.0") } returns UpdateCheckResult.UpdateAvailable(
+                currentVersion = "1.0.0",
+                release = sampleRelease,
+            )
+
+            val viewModel = MainViewModel(
+                logger = mockk(relaxed = true),
+                injectedNodeManager = nodeManager,
+                recentFilesRepository = mockk(relaxed = true),
+                updateCheckerService = updateCheckerService,
+            )
+
+            // 1. Update check finishes first and shows UpdateAvailable
+            viewModel.checkForUpdates(
+                currentVersion = "1.0.0",
+                isManual = false,
+                onDownloadAndInstall = { _, _ -> },
+                onViewOnGitHub = {},
+            )
+
+            eventually {
+                assertIs<MainUiState.DialogType.UpdateAvailable>(viewModel.uiState.value.dialogUiState.dialogType)
+            }
+
+            // 2. StartupChooser finishes loading recent files afterwards
+            val sampleRecents = listOf(RecentFile("content://test/map.mm", "map.mm", 1000L))
+            viewModel.showStartupChooser(
+                recentFiles = sampleRecents,
+                onOpenRecent = {},
+                onBrowse = {},
+                onOpenDemo = {},
+            )
+
+            // UpdateAvailable must remain on screen and not be overwritten by StartupChooser
+            val updateDialog = assertIs<MainUiState.DialogType.UpdateAvailable>(
+                viewModel.uiState.value.dialogUiState.dialogType
+            )
+            assertEquals("v1.1.0", updateDialog.release.tagName)
+
+            // 3. When user dismisses UpdateAvailable, StartupChooser is restored
+            updateDialog.onDismiss()
+            val restoredDialog = assertIs<MainUiState.DialogType.StartupChooser>(
+                viewModel.uiState.value.dialogUiState.dialogType
+            )
+            assertEquals(sampleRecents, restoredDialog.recentFiles)
+
+            // 4. Dismissing StartupChooser clears dialog state to None
+            restoredDialog.onDismiss()
+            assertEquals(MainUiState.DialogType.None, viewModel.uiState.value.dialogUiState.dialogType)
+        }
+
+        "UpdateAvailable arriving while StartupChooser or RecentFiles is displayed shows UpdateAvailable and restores previous dialog on dismiss" {
+            val nodeManager = realNodeManager()
+            val updateCheckerService = mockk<UpdateCheckerService>()
+            val sampleRelease = GitHubRelease(
+                tagName = "v1.1.0",
+                name = "Release 1.1.0",
+                publishedAt = "2026-11-03",
+                body = "Bug fixes",
+                htmlUrl = "https://github.com/letroll/droidplane/releases/tag/v1.1.0",
+                apkDownloadUrl = null,
+                apkFileName = null,
+            )
+            coEvery { updateCheckerService.checkForUpdates("1.0.0") } returns UpdateCheckResult.UpdateAvailable(
+                currentVersion = "1.0.0",
+                release = sampleRelease,
+            )
+
+            val recentFilesRepository = mockk<RecentFilesRepository>(relaxed = true)
+            val sampleRecents = listOf(RecentFile("content://test/map.mm", "map.mm", 1000L))
+            coEvery { recentFilesRepository.getRecentFiles(any()) } returns sampleRecents
+
+            val viewModel = MainViewModel(
+                logger = mockk(relaxed = true),
+                injectedNodeManager = nodeManager,
+                recentFilesRepository = recentFilesRepository,
+                updateCheckerService = updateCheckerService,
+            )
+
+            // 1. RecentFiles dialog is shown first
+            viewModel.showRecentFilesDialog(
+                fileAccessibilityChecker = { true },
+                onOpenRecent = {},
+                onNewMindmap = {},
+                onBrowse = {},
+                onOpenDemo = {},
+                onExitApp = {},
+            )
+
+            eventually {
+                assertIs<MainUiState.DialogType.RecentFiles>(viewModel.uiState.value.dialogUiState.dialogType)
+            }
+
+            // 2. Update check finishes afterwards and presents UpdateAvailable on top
+            viewModel.checkForUpdates(
+                currentVersion = "1.0.0",
+                isManual = false,
+                onDownloadAndInstall = { _, _ -> },
+                onViewOnGitHub = {},
+            )
+
+            eventually {
+                assertIs<MainUiState.DialogType.UpdateAvailable>(viewModel.uiState.value.dialogUiState.dialogType)
+            }
+
+            // 3. Dismissing UpdateAvailable restores the RecentFiles dialog
+            val updateDialog = viewModel.uiState.value.dialogUiState.dialogType as MainUiState.DialogType.UpdateAvailable
+            updateDialog.onDismiss()
+
+            val restoredRecentFiles = assertIs<MainUiState.DialogType.RecentFiles>(
+                viewModel.uiState.value.dialogUiState.dialogType
+            )
+            assertEquals(sampleRecents, restoredRecentFiles.recentFiles)
         }
     }
 
