@@ -58,6 +58,16 @@ interface NodeManagerContract {
     suspend fun updateNode(updatedNode: Node): Boolean
 
     /**
+     * Updates the folded state of the non-root node identified by [nodeId].
+     *
+     * - Returns `false` if [nodeId] does not exist, is the root node (`parentNode == null`),
+     *   or has no child nodes (`childNodes.isEmpty()`) when [isFolded] is `true`.
+     * - Propagates the updated `isFolded` property to `rootNode`, `allNodes`, and internal indexes.
+     * - Returns `true` when the node state was updated.
+     */
+    suspend fun setNodeFolded(nodeId: String, isFolded: Boolean): Boolean
+
+    /**
      * Creates and attaches a new child node to parentNode with the provided text.
      * Returns the numeric ID of the newly created node, or null if creation failed.
      */

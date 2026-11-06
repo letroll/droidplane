@@ -113,9 +113,7 @@ fun DesktopDroidplaneApp(
         viewModel.setMapUri(MindMapUri.parse(uriString), file.name)
         scope.launch(Dispatchers.IO) {
             try {
-                FileInputStream(file).use { stream ->
-                    viewModel.loadMindMap(stream)
-                }
+                viewModel.loadMindMap(FileInputStream(file))
             } catch (e: Exception) {
                 logger.e("Error opening file on Desktop: $e")
             }
@@ -277,9 +275,10 @@ fun DesktopDroidplaneApp(
                         val targetUri = viewIntentNode.uriString
                         if (targetUri != null) {
                             val parsed = MindMapUri.parse(targetUri)
-                            if (parsed.scheme == "file" && parsed.path != null) {
+                            val filePath = parsed.path
+                            if (parsed.scheme == "file" && filePath != null) {
                                 try {
-                                    Desktop.getDesktop().open(File(parsed.path!!))
+                                    Desktop.getDesktop().open(File(filePath))
                                 } catch (_: Exception) {
                                     openUrlInBrowser(targetUri)
                                 }
@@ -369,8 +368,9 @@ fun DesktopDroidplaneApp(
                 )
             },
             bottomBar = {
-                if (showBottomToolbar && selectedNodeForToolbar != null) {
-                    val node = viewModel.getNodeByID(selectedNodeForToolbar!!)
+                val toolbarNodeId = selectedNodeForToolbar
+                if (showBottomToolbar && toolbarNodeId != null) {
+                    val node = viewModel.getNodeByID(toolbarNodeId)
                     if (node != null) {
                         NodeBottomToolbar(
                             node = node,

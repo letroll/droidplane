@@ -17,6 +17,7 @@ import fr.julien.quievreux.droidplane2.data.XmlParseUtilsDefaultImpl
 import fr.julien.quievreux.droidplane2.data.model.MindMapUri
 import fr.julien.quievreux.droidplane2.data.model.Node
 import fr.julien.quievreux.droidplane2.res.AppRes as R
+import fr.julien.quievreux.droidplane2.ui.mindmap.MindMapLayoutEngine
 import fr.julien.quievreux.droidplane2.update.GitHubRelease
 import fr.julien.quievreux.droidplane2.update.UpdateCheckResult
 import fr.julien.quievreux.droidplane2.update.UpdateCheckerService
@@ -25,13 +26,17 @@ import io.kotest.matchers.shouldNotBe
 import io.kotest.matchers.string.shouldContain
 import io.mockk.coEvery
 import io.mockk.mockk
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.TestScope
 import java.lang.System.currentTimeMillis
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertIs
+import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class MainViewModelTest : KStringSpec() {
@@ -1539,6 +1544,173 @@ class MainViewModelTest : KStringSpec() {
             )
             assertEquals(sampleRecents, restoredRecentFiles.recentFiles)
         }
+
+        // ===== NODE FOLDED STATE (016-node-folded-state) =====
+
+        "loadMindMap initializes collapsedNodeIds from FOLDED XML attribute and MindMapLayoutEngine hides folded children (T005)" {
+            val nodeManager = realNodeManager()
+            val viewModel = MainViewModel(
+                logger = mockk(relaxed = true),
+                injectedNodeManager = nodeManager,
+                recentFilesRepository = mockk(relaxed = true),
+            )
+
+            viewModel.loadMindMap(FEATURE_TEST_MM_XML.byteInputStream())
+
+            eventually {
+                assertFalse(viewModel.uiState.value.loading)
+                assertEquals(setOf("ID_1478696366"), viewModel.uiState.value.collapsedNodeIds)
+
+                val rootNode = assertNotNull(nodeManager.rootNode)
+                assertEquals("ID_1090958577", rootNode.id)
+                assertFalse(rootNode.isFolded)
+
+                val testNode = assertNotNull(nodeManager.getNodeByID("ID_1478696366"))
+                assertTrue(testNode.isFolded)
+
+                val layout = MindMapLayoutEngine.computeLayout(
+                    rootNode = rootNode,
+                    collapsedNodeIds = viewModel.uiState.value.collapsedNodeIds,
+                )
+                val laidOutIds = layout.nodes.map { it.node.id }.toSet()
+                assertTrue("ID_1478696366" in laidOutIds)
+                val testNodeLayout = assertNotNull(layout.nodes.find { it.node.id == "ID_1478696366" })
+                assertTrue(testNodeLayout.isCollapsed)
+                assertFalse("ID_1128035855" in laidOutIds)
+                assertFalse("ID_22398760" in laidOutIds)
+            }
+        }
+
+        "toggleNodeCollapse updates collapsedNodeIds, synchronizes node isFolded in NodeManager, and marks hasUnsavedChangesState (T009)" {
+            val nodeManager = realNodeManager()
+            val viewModel = MainViewModel(
+                logger = mockk(relaxed = true),
+                injectedNodeManager = nodeManager,
+                recentFilesRepository = mockk(relaxed = true),
+            )
+
+            viewModel.loadMindMap(FEATURE_TEST_MM_XML.byteInputStream())
+
+            eventually {
+                assertFalse(viewModel.uiState.value.loading)
+                assertEquals(setOf("ID_1478696366"), viewModel.uiState.value.collapsedNodeIds)
+            }
+            assertFalse(viewModel.hasUnsavedChangesState)
+
+            // First toggle unfolds "test" (ID_1478696366)
+            val testNode = assertNotNull(nodeManager.getNodeByID("ID_1478696366"))
+            viewModel.toggleNodeCollapse(testNode)
+
+            eventually {
+                assertFalse("ID_1478696366" in viewModel.uiState.value.collapsedNodeIds)
+                assertEquals(false, nodeManager.getNodeByID("ID_1478696366")?.isFolded)
+                assertTrue(viewModel.hasUnsavedChangesState)
+            }
+
+            // Second toggle folds "test" (ID_1478696366) back
+            val unfoldedTestNode = assertNotNull(nodeManager.getNodeByID("ID_1478696366"))
+            viewModel.toggleNodeCollapse(unfoldedTestNode)
+
+            eventually {
+                assertTrue("ID_1478696366" in viewModel.uiState.value.collapsedNodeIds)
+                assertEquals(true, nodeManager.getNodeByID("ID_1478696366")?.isFolded)
+                assertTrue(viewModel.hasUnsavedChangesState)
+            }
+        }
+
+        "search matching a node inside a folded branch automatically unfolds the ancestor branch (T013)" {
+            val logger = mockk<Logger>(relaxed = true)
+            val nodeUtils = NodeUtilsDefaultImpl()
+            val nodeManager = NodeManager(
+                logger = logger,
+                nodeUtils = nodeUtils,
+                xmlParseUtils = XmlParseUtilsDefaultImpl(nodeUtils, logger),
+                coroutineScope = CoroutineScope(Dispatchers.Unconfined),
+            )
+            val viewModel = MainViewModel(
+                logger = logger,
+                injectedNodeManager = nodeManager,
+                recentFilesRepository = mockk(relaxed = true),
+            )
+
+            val collectJob = launch(Dispatchers.Unconfined) {
+                viewModel.getSearchResultFlow().collect {}
+            }
+
+            try {
+                viewModel.loadMindMap(FEATURE_TEST_MM_XML.byteInputStream())
+
+                eventually {
+                    assertFalse(viewModel.uiState.value.loading)
+                    assertEquals(setOf("ID_1478696366"), viewModel.uiState.value.collapsedNodeIds)
+                }
+
+                viewModel.search("enfant 1")
+
+                eventually {
+                    assertFalse("ID_1478696366" in viewModel.uiState.value.collapsedNodeIds)
+                    assertEquals(false, nodeManager.getNodeByID("ID_1478696366")?.isFolded)
+                    assertEquals("ID_1128035855", viewModel.uiState.value.selectedNodeId)
+                    assertTrue(viewModel.hasUnsavedChangesState)
+                }
+            } finally {
+                collectJob.cancel()
+            }
+        }
+
+        "navigating via internal link to a node inside a folded branch automatically unfolds the ancestor and selects the target node (T013)" {
+            val nodeManager = realNodeManager()
+            val viewModel = MainViewModel(
+                logger = mockk(relaxed = true),
+                injectedNodeManager = nodeManager,
+                recentFilesRepository = mockk(relaxed = true),
+            )
+
+            viewModel.loadMindMap(FEATURE_TEST_MM_XML.byteInputStream())
+
+            eventually {
+                assertFalse(viewModel.uiState.value.loading)
+                assertEquals(setOf("ID_1478696366"), viewModel.uiState.value.collapsedNodeIds)
+            }
+
+            // Configure sibling node ID_1756066841 with an internal link to #ID_1128035855 ("enfant 1")
+            val siblingNode = assertNotNull(nodeManager.getNodeByID("ID_1756066841"))
+            val linkedSibling = siblingNode.copy(link = MindMapUri.parse("#ID_1128035855"))
+            assertTrue(nodeManager.updateNode(linkedSibling))
+
+            viewModel.onNodeClick(linkedSibling)
+
+            eventually {
+                assertFalse("ID_1478696366" in viewModel.uiState.value.collapsedNodeIds)
+                assertEquals(false, nodeManager.getNodeByID("ID_1478696366")?.isFolded)
+                assertEquals("ID_1128035855", viewModel.uiState.value.selectedNodeId)
+                assertTrue(viewModel.hasUnsavedChangesState)
+            }
+        }
+
+        "loadMindMap with FileInputStream from disk loads without Stream Closed error and closes stream when finished" {
+            val nodeManager = realNodeManager()
+            val viewModel = MainViewModel(
+                logger = mockk(relaxed = true),
+                injectedNodeManager = nodeManager,
+                recentFilesRepository = mockk(relaxed = true),
+            )
+            val tempFile = java.io.File.createTempFile("desktop_open_test_", ".mm")
+            try {
+                tempFile.writeText(FEATURE_TEST_MM_XML, Charsets.UTF_8)
+                val fileInputStream = java.io.FileInputStream(tempFile)
+                viewModel.loadMindMap(fileInputStream)
+
+                eventually {
+                    assertFalse(viewModel.uiState.value.loading)
+                    assertEquals("", viewModel.uiState.value.error)
+                    assertEquals("ID_1090958577", nodeManager.rootNode?.id)
+                    assertEquals(setOf("ID_1478696366"), viewModel.uiState.value.collapsedNodeIds)
+                }
+            } finally {
+                tempFile.delete()
+            }
+        }
     }
 
     /** Polls [condition] until it stops throwing, or fails after ~2s. */
@@ -1596,5 +1768,25 @@ class MainViewModelTest : KStringSpec() {
         val rootNode = FakeDataSource.getFakeRootNode()
         viewModel.setInitialStateForTest(rootNode)
         return viewModel
+    }
+
+    companion object {
+        internal val FEATURE_TEST_MM_XML = """
+            <map version="freeplane 1.12.15">
+                <bookmarks/>
+                <node LOCALIZED_STYLE_REF="AutomaticLayout.level.root" FOLDED="false" ID="ID_1090958577" CREATED="1409300609620" MODIFIED="1792230718501">
+                    <richcontent TYPE="NODE">
+                        <html><head></head><body><p style="text-align: right">feature rich texte</p></body></html>
+                    </richcontent>
+                    <hook NAME="accessories/plugins/AutomaticLayout.properties" VALUE="ALL"/>
+                    <font BOLD="true"/>
+                    <node TEXT="test" FOLDED="true" POSITION="bottom_or_right" ID="ID_1478696366" CREATED="1792230719592" MODIFIED="1792230750542" TEXT_ALIGN="RIGHT">
+                        <node TEXT="enfant 1" ID="ID_1128035855" CREATED="1793965383229" MODIFIED="1793965421741"/>
+                        <node TEXT="enfant 2" ID="ID_22398760" CREATED="1793965422991" MODIFIED="1793965425479"/>
+                    </node>
+                    <node TEXT="à partir de quand le texte passe à la ligne suivante ?&#xa;est géré" POSITION="bottom_or_right" ID="ID_1756066841" CREATED="1792230757655" MODIFIED="1792230867476" TEXT_ALIGN="RIGHT"/>
+                </node>
+            </map>
+        """.trimIndent()
     }
 }
