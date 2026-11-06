@@ -1083,6 +1083,119 @@ class NodeManagerTest : KStringSpec() {
             assertEquals(listOf("Node B"), reloadedRoot.childNodes.map { it.text })
             assertEquals(listOf("Node A"), reloadedRoot.childNodes.first().childNodes.map { it.text })
         }
+
+        "addNodeToMindmap on a folded parent automatically unfolds that parent" {
+            val nodeManager = initNodeManager()
+            val root = nodeManager.createNewMindmap("Root")
+            val parentNumericId = assertNotNull(nodeManager.addNodeToMindmap("Branch A", root))
+            val parentNode = assertNotNull(nodeManager.getNodeByNumericId(parentNumericId))
+            val firstChildId = assertNotNull(nodeManager.addNodeToMindmap("Child A1", parentNode))
+            assertNotNull(nodeManager.getNodeByNumericId(firstChildId))
+
+            assertTrue(nodeManager.setNodeFolded(parentNode.id, true))
+            assertTrue(assertNotNull(nodeManager.getNodeByID(parentNode.id)).isFolded)
+
+            val secondChildId = nodeManager.addNodeToMindmap(
+                "Child A2",
+                nodeManager.getNodeByID(parentNode.id),
+            )
+            assertNotNull(secondChildId)
+
+            val parentAfter = assertNotNull(nodeManager.getNodeByID(parentNode.id))
+            assertFalse(parentAfter.isFolded)
+            assertEquals(2, parentAfter.childNodes.size)
+        }
+
+        "deleteNode of last child resets isFolded on parent becoming leaf and preserves isFolded when children remain" {
+            val nodeManager = initNodeManager()
+            val root = nodeManager.createNewMindmap("Root")
+            val parentNumericId = assertNotNull(nodeManager.addNodeToMindmap("Branch A", root))
+            val parentNode = assertNotNull(nodeManager.getNodeByNumericId(parentNumericId))
+            val child1NumericId = assertNotNull(nodeManager.addNodeToMindmap("Child A1", parentNode))
+            val child2NumericId = assertNotNull(
+                nodeManager.addNodeToMindmap("Child A2", nodeManager.getNodeByID(parentNode.id))
+            )
+            val child1 = assertNotNull(nodeManager.getNodeByNumericId(child1NumericId))
+            val child2 = assertNotNull(nodeManager.getNodeByNumericId(child2NumericId))
+
+            assertTrue(nodeManager.setNodeFolded(parentNode.id, true))
+            assertTrue(assertNotNull(nodeManager.getNodeByID(parentNode.id)).isFolded)
+
+            // Deleting one child while another remains preserves isFolded == true
+            assertTrue(nodeManager.deleteNode(child1.id))
+            val parentAfterFirstDelete = assertNotNull(nodeManager.getNodeByID(parentNode.id))
+            assertEquals(1, parentAfterFirstDelete.childNodes.size)
+            assertTrue(parentAfterFirstDelete.isFolded)
+
+            // Deleting the last child resets isFolded = false on the parent becoming a leaf
+            assertTrue(nodeManager.deleteNode(child2.id))
+            val parentAfterLastDelete = assertNotNull(nodeManager.getNodeByID(parentNode.id))
+            assertTrue(parentAfterLastDelete.childNodes.isEmpty())
+            assertFalse(parentAfterLastDelete.isFolded)
+        }
+
+        "restoreSubtree into a folded parent automatically unfolds that parent" {
+            val nodeManager = initNodeManager()
+            val root = nodeManager.createNewMindmap("Root")
+            val parentNumericId = assertNotNull(nodeManager.addNodeToMindmap("Branch A", root))
+            val parentNode = assertNotNull(nodeManager.getNodeByNumericId(parentNumericId))
+            val child1NumericId = assertNotNull(nodeManager.addNodeToMindmap("Child A1", parentNode))
+            val child2NumericId = assertNotNull(
+                nodeManager.addNodeToMindmap("Child A2", nodeManager.getNodeByID(parentNode.id))
+            )
+            val child1 = assertNotNull(nodeManager.getNodeByNumericId(child1NumericId))
+            assertNotNull(nodeManager.getNodeByNumericId(child2NumericId))
+
+            val snapshot = assertNotNull(nodeManager.createDeleteSnapshot(child1.id))
+            assertTrue(nodeManager.deleteNode(child1.id))
+
+            // Fold parent while it still has child2
+            assertTrue(nodeManager.setNodeFolded(parentNode.id, true))
+            assertTrue(assertNotNull(nodeManager.getNodeByID(parentNode.id)).isFolded)
+
+            // Restoring deleted child1 into folded parent must unfold the parent
+            assertTrue(nodeManager.restoreSubtree(snapshot))
+
+            val parentAfterRestore = assertNotNull(nodeManager.getNodeByID(parentNode.id))
+            assertFalse(parentAfterRestore.isFolded)
+            assertEquals(2, parentAfterRestore.childNodes.size)
+            assertNotNull(nodeManager.getNodeByID(child1.id))
+        }
+
+        "moveNode moving last child out of folded parent resets isFolded on old parent and unfolds target parent" {
+            val nodeManager = initNodeManager()
+            val root = nodeManager.createNewMindmap("Root")
+            val oldParentNumericId = assertNotNull(nodeManager.addNodeToMindmap("Branch A", root))
+            val targetParentNumericId = assertNotNull(nodeManager.addNodeToMindmap("Branch B", root))
+            val oldParent = assertNotNull(nodeManager.getNodeByNumericId(oldParentNumericId))
+            val targetParent = assertNotNull(nodeManager.getNodeByNumericId(targetParentNumericId))
+
+            val lastChildNumericId = assertNotNull(nodeManager.addNodeToMindmap("Child A1", oldParent))
+            val lastChild = assertNotNull(nodeManager.getNodeByNumericId(lastChildNumericId))
+            val targetExistingChildId = assertNotNull(nodeManager.addNodeToMindmap("Child B1", targetParent))
+            assertNotNull(nodeManager.getNodeByNumericId(targetExistingChildId))
+
+            assertTrue(nodeManager.setNodeFolded(oldParent.id, true))
+            assertTrue(nodeManager.setNodeFolded(targetParent.id, true))
+            assertTrue(assertNotNull(nodeManager.getNodeByID(oldParent.id)).isFolded)
+            assertTrue(assertNotNull(nodeManager.getNodeByID(targetParent.id)).isFolded)
+
+            val moved = nodeManager.moveNode(
+                draggedNodeId = lastChild.id,
+                targetParentId = targetParent.id,
+                targetSiblingId = null,
+                insertAfter = true,
+            )
+            assertTrue(moved)
+
+            val updatedOldParent = assertNotNull(nodeManager.getNodeByID(oldParent.id))
+            assertTrue(updatedOldParent.childNodes.isEmpty())
+            assertFalse(updatedOldParent.isFolded)
+
+            val updatedTargetParent = assertNotNull(nodeManager.getNodeByID(targetParent.id))
+            assertEquals(2, updatedTargetParent.childNodes.size)
+            assertFalse(updatedTargetParent.isFolded)
+        }
     }
 
     private fun openTestMapStream(): InputStream? =

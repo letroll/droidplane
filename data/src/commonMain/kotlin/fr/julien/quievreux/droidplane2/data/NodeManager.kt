@@ -185,6 +185,14 @@ class NodeManager(
                 rootNode = allParsedNodes.firstOrNull { it.parentNode == null } ?: allParsedNodes.first()
             }
 
+            if (allParsedNodes.size > 1) {
+                allParsedNodes.forEach { parsedNode ->
+                    if (parsedNode.parentNode == null || parsedNode.childNodes.isEmpty()) {
+                        parsedNode.isFolded = false
+                    }
+                }
+            }
+
             // Ensure _allNodes contains all parsed nodes in the correct order
             _allNodes.value = allParsedNodes
 
@@ -506,7 +514,9 @@ class NodeManager(
             node.color?.let { serializer.nodeAttribute(COLOR, it) }
             node.backgroundColor?.let { serializer.nodeAttribute(BACKGROUND_COLOR, it) }
             node.style?.let { serializer.nodeAttribute(STYLE, it) }
-            if (node.isFolded) {
+            val hasChildren = node.childNodes.isNotEmpty() || !childrenByParentId[node.id].isNullOrEmpty()
+            val isSingleRootMap = node.parentNode == null && !hasChildren
+            if (node.isFolded && ((node.parentNode != null && hasChildren) || isSingleRootMap)) {
                 serializer.nodeAttribute(FOLDED, "true")
             }
             node.hgap?.let { serializer.nodeAttribute(HGAP, it.toString()) }
@@ -769,6 +779,7 @@ class NodeManager(
                 arrowLinkDestinationIds = ArrayList(currentParent.arrowLinkDestinationIds),
                 arrowLinkDestinationNodes = ArrayList(currentParent.arrowLinkDestinationNodes),
                 arrowLinkIncomingNodes = ArrayList(currentParent.arrowLinkIncomingNodes),
+                isFolded = false,
                 modificationDate = time,
             )
             val fixedNewNode = newNode.copy(parentNode = updatedParent)
@@ -890,6 +901,65 @@ class NodeManager(
         }
 
         return updatedNode
+    }
+
+    override suspend fun setNodeFolded(nodeId: String, isFolded: Boolean): Boolean {
+        val targetNode = getNodeByID(nodeId) ?: return false
+        if (targetNode.parentNode == null) return false
+        if (isFolded && targetNode.childNodes.isEmpty()) return false
+
+        val updatedNode = targetNode.copy(
+            isFolded = isFolded,
+            childNodes = targetNode.childNodes.toMutableList(),
+        )
+        val updatedNodesMap = mutableMapOf<String, Node>()
+        updatedNodesMap[updatedNode.id] = updatedNode
+        updateDescendantParents(updatedNode, updatedNodesMap)
+
+        var currentChild = updatedNode
+        var currentParent = currentChild.parentNode?.id?.let { getNodeByID(it) } ?: currentChild.parentNode
+        while (currentParent != null) {
+            val newChildren = currentParent.childNodes.toMutableList()
+            val childIdx = newChildren.indexOfFirst { it.id == currentChild.id }
+            val updatedAncestor = currentParent.copy(childNodes = mutableListOf())
+            val fixedChild = currentChild.copy(
+                parentNode = updatedAncestor,
+                childNodes = currentChild.childNodes.toMutableList(),
+            )
+            updatedNodesMap[fixedChild.id] = fixedChild
+            updateDescendantParents(fixedChild, updatedNodesMap)
+            if (childIdx != -1) {
+                newChildren[childIdx] = fixedChild
+            }
+            updatedAncestor.childNodes.addAll(newChildren)
+            updatedAncestor.childNodes.replaceAll { c ->
+                if (c.id == fixedChild.id) {
+                    fixedChild
+                } else {
+                    val updatedC = c.copy(
+                        parentNode = updatedAncestor,
+                        childNodes = c.childNodes.toMutableList(),
+                    )
+                    updatedNodesMap[updatedC.id] = updatedC
+                    updateDescendantParents(updatedC, updatedNodesMap)
+                }
+            }
+            updatedNodesMap[updatedAncestor.id] = updatedAncestor
+            if (updatedAncestor.id == rootNode?.id) {
+                rootNode = updatedAncestor
+                break
+            }
+            currentChild = updatedAncestor
+            currentParent = currentChild.parentNode?.id?.let { updatedNodesMap[it] ?: getNodeByID(it) }
+        }
+
+        _allNodes.update { nodes ->
+            nodes.map { node ->
+                updatedNodesMap[node.id] ?: node
+            }
+        }
+        updatemMindmapIndexes(nodeUtils.loadAndIndexNodesByIds(rootNode))
+        return true
     }
 
     override suspend fun updateNode(updatedNode: Node): Boolean {
@@ -1027,12 +1097,16 @@ class NodeManager(
             getNodeByID(id)?.numericId
         }.toSet()
 
-        val directParent = getNodeByID(targetNode.parentNode?.id) ?: targetNode.parentNode!!
+        val parentRef = targetNode.parentNode ?: return false
+        val directParent = getNodeByID(parentRef.id) ?: parentRef
         val updatedNodesMap = mutableMapOf<String, Node>()
 
         // Filter out deleted nodes from parent's children
         val survivingChildren = directParent.childNodes.filter { it.id !in idsToDelete }
-        val updatedParent = directParent.copy(childNodes = mutableListOf())
+        val updatedParent = directParent.copy(
+            childNodes = mutableListOf(),
+            isFolded = if (survivingChildren.isEmpty()) false else directParent.isFolded,
+        )
         val updatedChildren = survivingChildren.map { child ->
             val updatedChild = child.copy(parentNode = updatedParent)
             updatedNodesMap[updatedChild.id] = updatedChild
@@ -1153,7 +1227,7 @@ class NodeManager(
         
         // Rebuild parent-child relationships
         for (originalNode in snapshot.deletedSubtree) {
-            val restoredNode = restoredNodes[originalNode.id]!!
+            val restoredNode = restoredNodes[originalNode.id] ?: continue
             for (child in originalNode.childNodes) {
                 val restoredChild = restoredNodes[child.id]
                 if (restoredChild != null) {
@@ -1165,11 +1239,11 @@ class NodeManager(
         }
         
         // Insert the restored subtree back into the parent's children at the original index
-        val restoredRoot = restoredNodes[snapshot.deletedNodeId]!!
+        val restoredRoot = restoredNodes[snapshot.deletedNodeId] ?: return false
         val newChildren = parentNode.childNodes.toMutableList()
         newChildren.add(snapshot.parentChildIndex, restoredRoot)
 
-        val updatedParent = parentNode.copy(childNodes = mutableListOf())
+        val updatedParent = parentNode.copy(childNodes = mutableListOf(), isFolded = false)
         val updatedRestoredRoot = restoredRoot.copy(parentNode = updatedParent)
         restoredNodes[snapshot.deletedNodeId] = updatedRestoredRoot
 
@@ -1389,6 +1463,7 @@ class NodeManager(
         children.removeAt(oldIndex)
         return oldParent.copy(
             childNodes = children,
+            isFolded = if (children.isEmpty()) false else oldParent.isFolded,
             modificationDate = timestamp,
         )
     }

@@ -5,6 +5,13 @@ import io.kotest.core.spec.style.StringSpec
 import io.kotest.matchers.collections.shouldContainExactlyInAnyOrder
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.shouldNotBe
+import org.xmlpull.v1.XmlPullParser
+import org.xmlpull.v1.XmlPullParserFactory
+import java.io.StringReader
+import kotlin.test.assertEquals
+import kotlin.test.assertFalse
+import kotlin.test.assertNotNull
+import kotlin.test.assertTrue
 
 class NodeUtilsTest : StringSpec() {
     init {
@@ -229,5 +236,143 @@ class NodeUtilsTest : StringSpec() {
             idxRoot shouldNotBe null
             idxRoot?.parentNode shouldBe null
         }
+
+        "parseNodeTag should parse FOLDED attribute on standard node with parent" {
+            val root = Node(
+                parentNode = null,
+                id = "ID_100",
+                numericId = 100,
+                text = "Root Node",
+                creationDate = 1000L,
+                modificationDate = 1000L,
+            )
+
+            val foldedNode = assertNotNull(
+                nodeUtils.parseNodeTag(
+                    createNodeXmlPullParser("""<node ID="ID_101" TEXT="Folded Child" FOLDED="true"/>"""),
+                    root,
+                ).getOrNull(),
+            )
+            assertTrue(foldedNode.isFolded)
+
+            val unfoldedNode = assertNotNull(
+                nodeUtils.parseNodeTag(
+                    createNodeXmlPullParser("""<node ID="ID_102" TEXT="Unfolded Child" FOLDED="false"/>"""),
+                    root,
+                ).getOrNull(),
+            )
+            assertFalse(unfoldedNode.isFolded)
+
+            val defaultNode = assertNotNull(
+                nodeUtils.parseNodeTag(
+                    createNodeXmlPullParser("""<node ID="ID_103" TEXT="Default Child"/>"""),
+                    root,
+                ).getOrNull(),
+            )
+            assertFalse(defaultNode.isFolded)
+        }
+
+        "loadMindMapFromXml should ignore FOLDED=true on root node and leaf node without children" {
+            val xml = """
+                <map version="freeplane 1.12.1">
+                    <node ID="ID_100" TEXT="Root Node" FOLDED="true">
+                        <node ID="ID_101" TEXT="Leaf Node" FOLDED="true"/>
+                        <node ID="ID_102" TEXT="Folded Branch" FOLDED="true">
+                            <node ID="ID_103" TEXT="Branch Child"/>
+                        </node>
+                    </node>
+                </map>
+            """.trimIndent()
+            val logger = io.mockk.mockk<fr.julien.quievreux.droidplane2.core.log.Logger>(relaxed = true)
+            val xmlParseUtils = XmlParseUtilsDefaultImpl(nodeUtils, logger)
+            val nodeManager = NodeManager(
+                logger = logger,
+                nodeUtils = nodeUtils,
+                xmlParseUtils = xmlParseUtils,
+                coroutineScope = kotlinx.coroutines.test.TestScope(),
+            )
+            val factory = XmlPullParserFactory.newInstance()
+            factory.isNamespaceAware = true
+            val xpp = factory.newPullParser()
+            xpp.setInput(StringReader(xml))
+
+            nodeManager.loadMindMapFromXml(
+                xpp = xpp,
+                onError = { throw it },
+                onParentNodeUpdate = {},
+            )
+
+            val indexedRoot = assertNotNull(nodeManager.getNodeByID("ID_100"))
+            val indexedLeaf = assertNotNull(nodeManager.getNodeByID("ID_101"))
+            val indexedBranch = assertNotNull(nodeManager.getNodeByID("ID_102"))
+            val indexedBranchChild = assertNotNull(nodeManager.getNodeByID("ID_103"))
+
+            assertFalse(indexedRoot.isFolded)
+            assertTrue(indexedLeaf.childNodes.isEmpty())
+            assertFalse(indexedLeaf.isFolded)
+            assertTrue(indexedBranch.isFolded)
+            assertFalse(indexedBranchChild.isFolded)
+        }
+
+        "loadAndIndexNodesByIds should preserve isFolded=true on nested folded nodes with children" {
+            val root = Node(
+                parentNode = null,
+                id = "ID_100",
+                numericId = 100,
+                text = "Root Node",
+                creationDate = 1000L,
+                modificationDate = 1000L,
+            )
+            val foldedParent = assertNotNull(
+                nodeUtils.parseNodeTag(
+                    createNodeXmlPullParser("""<node ID="ID_101" TEXT="Folded Parent" FOLDED="true"/>"""),
+                    root,
+                ).getOrNull(),
+            )
+            val foldedChild = assertNotNull(
+                nodeUtils.parseNodeTag(
+                    createNodeXmlPullParser("""<node ID="ID_102" TEXT="Folded Child" FOLDED="true"/>"""),
+                    foldedParent,
+                ).getOrNull(),
+            )
+            val grandChild = assertNotNull(
+                nodeUtils.parseNodeTag(
+                    createNodeXmlPullParser("""<node ID="ID_103" TEXT="GrandChild"/>"""),
+                    foldedChild,
+                ).getOrNull(),
+            )
+
+            foldedChild.childNodes.add(grandChild)
+            foldedParent.childNodes.add(foldedChild)
+            root.childNodes.add(foldedParent)
+
+            val indexes = nodeUtils.loadAndIndexNodesByIds(root)
+
+            val indexedRoot = assertNotNull(indexes.nodesByIdIndex["ID_100"])
+            val indexedParent = assertNotNull(indexes.nodesByIdIndex["ID_101"])
+            val indexedChild = assertNotNull(indexes.nodesByIdIndex["ID_102"])
+            val indexedGrandChild = assertNotNull(indexes.nodesByIdIndex["ID_103"])
+
+            assertFalse(indexedRoot.isFolded)
+            assertTrue(indexedParent.isFolded)
+            assertTrue(indexedChild.isFolded)
+            assertFalse(indexedGrandChild.isFolded)
+            assertEquals("ID_101", indexedChild.parentNode?.id)
+            assertEquals("ID_102", indexedGrandChild.parentNode?.id)
+        }
+    }
+
+    private fun createNodeXmlPullParser(xml: String): XmlPullParser {
+        val factory = XmlPullParserFactory.newInstance()
+        factory.isNamespaceAware = true
+        val xpp = factory.newPullParser()
+        xpp.setInput(StringReader(xml))
+        while (xpp.eventType != XmlPullParser.END_DOCUMENT) {
+            if (xpp.eventType == XmlPullParser.START_TAG && xpp.name == "node") {
+                break
+            }
+            xpp.next()
+        }
+        return xpp
     }
 }

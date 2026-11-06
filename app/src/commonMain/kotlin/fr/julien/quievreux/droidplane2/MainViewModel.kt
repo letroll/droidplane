@@ -139,12 +139,14 @@ class MainViewModel(
                     inputStream = inputStream,
                     onLoadFinished = {
                         setMindmapIsLoading(false)
+                        val initialCollapsedNodeIds = collectInitialCollapsedNodeIds()
                         updateUiState { currentState ->
                             currentState.copy(
                                 treeVersion = currentState.treeVersion + 1,
-                                collapsedNodeIds = emptySet(),
+                                collapsedNodeIds = initialCollapsedNodeIds,
                                 canUndoDelete = false,
                                 snackbarMessage = null,
+                                error = "",
                             )
                         }
                         onLoadFinished?.invoke()
@@ -172,6 +174,28 @@ class MainViewModel(
                 } catch (_: Exception) {}
             }
         }
+    }
+
+    private fun collectInitialCollapsedNodeIds(): Set<String> {
+        val collapsedIds = mutableSetOf<String>()
+        nodeManager.allNodes.value.forEach { node ->
+            val actualNode = nodeManager.getNodeByID(node.id) ?: node
+            if (actualNode.parentNode != null && actualNode.isFolded && actualNode.childNodes.isNotEmpty()) {
+                collapsedIds.add(actualNode.id)
+            }
+        }
+        val stack = ArrayDeque<Node>()
+        nodeManager.rootNode?.let { stack.addLast(it) }
+        while (stack.isNotEmpty()) {
+            val current = stack.removeLast()
+            if (current.parentNode != null && current.isFolded && current.childNodes.isNotEmpty()) {
+                collapsedIds.add(current.id)
+            }
+            for (child in current.childNodes) {
+                stack.addLast(child)
+            }
+        }
+        return collapsedIds
     }
 
     private fun updateNodeDisplayed(parentNode: Node) {
@@ -473,13 +497,30 @@ class MainViewModel(
      * Toggles the collapsed/expanded branch state for [node].
      */
     fun toggleNodeCollapse(node: Node) {
+        val nodeId = node.id
+        val targetNode = nodeManager.getNodeByID(nodeId)?.takeIf { it.id == nodeId } ?: node
+        val willBeCollapsed = !_uiState.value.collapsedNodeIds.contains(nodeId)
+        val canPersistFold = targetNode.parentNode != null && (!willBeCollapsed || targetNode.childNodes.isNotEmpty())
+        if (canPersistFold) {
+            node.isFolded = willBeCollapsed
+            targetNode.isFolded = willBeCollapsed
+            hasUnsavedChanges = true
+        }
         updateUiState { currentState ->
-            val updatedCollapsed = if (currentState.collapsedNodeIds.contains(node.id)) {
-                currentState.collapsedNodeIds - node.id
+            val updatedCollapsed = if (willBeCollapsed) {
+                currentState.collapsedNodeIds + nodeId
             } else {
-                currentState.collapsedNodeIds + node.id
+                currentState.collapsedNodeIds - nodeId
             }
-            currentState.copy(collapsedNodeIds = updatedCollapsed)
+            currentState.copy(
+                treeVersion = currentState.treeVersion + 1,
+                collapsedNodeIds = updatedCollapsed,
+            )
+        }
+        if (canPersistFold) {
+            viewModelScope.launch {
+                nodeManager.setNodeFolded(nodeId, willBeCollapsed)
+            }
         }
     }
 
@@ -774,11 +815,33 @@ nodeFindList:${nodeManager.getSearchResult().map { getNodeText(it) }.joinToStrin
         // reverse the list, so that we start with the root node
         nodeHierarchy.reverse()
 
+        val unfoldedIds = mutableSetOf<String>()
+
         // descent from the root node down to the target node
         for (mindmapNode in nodeHierarchy) {
 //            scrollTo(mindmapNode)
             if ((mindmapNode != node || openLast) && mindmapNode.childNodes.size > 0) {
+                if (mindmapNode.parentNode != null &&
+                    (mindmapNode.isFolded || _uiState.value.collapsedNodeIds.contains(mindmapNode.id))
+                ) {
+                    mindmapNode.isFolded = false
+                    nodeManager.setNodeFolded(mindmapNode.id, false)
+                    unfoldedIds.add(mindmapNode.id)
+                }
                 showNode(mindmapNode)
+            }
+        }
+
+        if (unfoldedIds.isNotEmpty() || _uiState.value.selectedNodeId != node.id) {
+            if (unfoldedIds.isNotEmpty()) {
+                hasUnsavedChanges = true
+            }
+            updateUiState { currentState ->
+                currentState.copy(
+                    treeVersion = if (unfoldedIds.isNotEmpty()) currentState.treeVersion + 1 else currentState.treeVersion,
+                    collapsedNodeIds = currentState.collapsedNodeIds - unfoldedIds,
+                    selectedNodeId = node.id,
+                )
             }
         }
     }
@@ -1327,8 +1390,9 @@ nodeFindList:${nodeManager.getSearchResult().map { getNodeText(it) }.joinToStrin
                 }
             }
             updateUiState { currentState ->
-                val newCollapsed = if (restoredParentId != null) {
-                    currentState.collapsedNodeIds - restoredParentId!!
+                val parentIdToRemove = restoredParentId
+                val newCollapsed = if (parentIdToRemove != null) {
+                    currentState.collapsedNodeIds - parentIdToRemove
                 } else {
                     currentState.collapsedNodeIds
                 }
@@ -1488,6 +1552,7 @@ nodeFindList:${nodeManager.getSearchResult().map { getNodeText(it) }.joinToStrin
         targetPosition: String? = null,
     ) {
         viewModelScope.launch {
+            val oldParentId = nodeManager.getNodeByID(draggedNodeId)?.parentNode?.id
             val success = nodeManager.moveNode(
                 draggedNodeId = draggedNodeId,
                 targetParentId = targetParentId,
@@ -1504,10 +1569,18 @@ nodeFindList:${nodeManager.getSearchResult().map { getNodeText(it) }.joinToStrin
                         showNode(updatedDisplayed)
                     }
                 }
+                val oldParentNowLeaf = oldParentId != null &&
+                    nodeManager.getNodeByID(oldParentId)?.childNodes?.isEmpty() == true
                 updateUiState { currentState ->
+                    val newCollapsedIds = currentState.collapsedNodeIds.toMutableSet().apply {
+                        remove(targetParentId)
+                        if (oldParentNowLeaf) {
+                            remove(oldParentId)
+                        }
+                    }
                     currentState.copy(
                         treeVersion = currentState.treeVersion + 1,
-                        collapsedNodeIds = currentState.collapsedNodeIds - targetParentId,
+                        collapsedNodeIds = newCollapsedIds,
                         leaving = false,
                     )
                 }
