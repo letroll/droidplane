@@ -5,8 +5,8 @@ plugins {
     alias(libs.plugins.compose.compiler)
 }
 
-val appVersionCode = 38
-val appVersionName = "1.0.38"
+val appVersionCode = 39
+val appVersionName = "1.0.39"
 
 android {
     defaultConfig {
