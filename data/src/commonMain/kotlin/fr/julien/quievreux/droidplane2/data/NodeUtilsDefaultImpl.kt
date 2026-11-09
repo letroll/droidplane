@@ -99,7 +99,13 @@ class NodeUtilsDefaultImpl : NodeUtils {
         nodesById?.let {
             for (nodeId in nodesById.keys) {
                 nodesById[nodeId]?.let { mindmapNode ->
-                    mindmapNode.arrowLinkDestinationIds?.let { nodeIds ->
+                    mindmapNode.connectors.removeAll { connector ->
+                        !nodesById.containsKey(connector.destinationId)
+                    }
+                    mindmapNode.arrowLinkDestinationIds.removeAll { linkDestinationId ->
+                        !nodesById.containsKey(linkDestinationId)
+                    }
+                    mindmapNode.arrowLinkDestinationIds.let { nodeIds ->
                         for (linkDestinationId in nodeIds) {
                             val destinationNode = nodesById[linkDestinationId]
                             if (destinationNode != null) {

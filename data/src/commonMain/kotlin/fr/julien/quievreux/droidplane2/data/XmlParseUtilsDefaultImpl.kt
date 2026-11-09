@@ -160,13 +160,15 @@ class XmlParseUtilsDefaultImpl(
         val parent = nodes.last()
         val name = xpp.getAttributeValue(null, NodeAttribute.NAME.text) ?: ""
         when {
-            name == "ExternalObject" -> {
+            name == HOOK_NAME_EXTERNAL_OBJECT -> {
                 val uri = xpp.getAttributeValue(null, NodeAttribute.URI.text) ?: ""
                 val size = xpp.getAttributeValue(null, NodeAttribute.SIZE.text)?.toFloatOrNull()
+                consumeHookInnerXml(xpp)
                 parent.externalObject = ExternalObjectProperties(uri, size)
             }
-            name.contains("latex", ignoreCase = true) -> {
+            name.contains(HOOK_NAME_LATEX_SUBSTRING, ignoreCase = true) -> {
                 val eq = xpp.getAttributeValue(null, NodeAttribute.EQUATION.text)
+                consumeHookInnerXml(xpp)
                 parent.latexEquation = eq
             }
             else -> {
@@ -177,8 +179,83 @@ class XmlParseUtilsDefaultImpl(
                         attrs[attrName] = xpp.getAttributeValue(i)
                     }
                 }
-                parent.addGenericHook(GenericHookElement(name = name, attributes = attrs))
+                val rawXml = consumeHookInnerXml(xpp).takeIf { it.isNotBlank() }
+                parent.addGenericHook(
+                    GenericHookElement(
+                        name = name,
+                        attributes = attrs,
+                        rawXml = rawXml,
+                    )
+                )
             }
         }
+    }
+
+    private fun consumeHookInnerXml(xpp: XmlPullParser): String {
+        if (xpp.isEmptyElementTag) {
+            return ""
+        }
+        val startingDepth = xpp.depth
+        val rawXmlBuilder = StringBuilder()
+        var eventType = xpp.next()
+        while (eventType != XmlPullParser.END_DOCUMENT &&
+            !(eventType == XmlPullParser.END_TAG && xpp.depth == startingDepth)
+        ) {
+            when (eventType) {
+                XmlPullParser.START_TAG -> {
+                    rawXmlBuilder.append('<').append(xpp.name)
+                    for (i in 0 until xpp.attributeCount) {
+                        rawXmlBuilder.append(' ')
+                            .append(xpp.getAttributeName(i))
+                            .append("=\"")
+                            .append(escapeXmlAttribute(xpp.getAttributeValue(i)))
+                            .append('"')
+                    }
+                    rawXmlBuilder.append('>')
+                }
+                XmlPullParser.END_TAG -> {
+                    rawXmlBuilder.append("</").append(xpp.name).append('>')
+                }
+                XmlPullParser.TEXT -> {
+                    rawXmlBuilder.append(escapeXmlText(xpp.text))
+                }
+            }
+            eventType = xpp.next()
+        }
+        return rawXmlBuilder.toString()
+    }
+
+    private fun escapeXmlText(text: String?): String {
+        if (text.isNullOrEmpty()) return ""
+        val sb = StringBuilder(text.length)
+        for (ch in text) {
+            when (ch) {
+                '&' -> sb.append("&amp;")
+                '<' -> sb.append("&lt;")
+                '>' -> sb.append("&gt;")
+                else -> sb.append(ch)
+            }
+        }
+        return sb.toString()
+    }
+
+    private fun escapeXmlAttribute(value: String?): String {
+        if (value.isNullOrEmpty()) return ""
+        val sb = StringBuilder(value.length)
+        for (ch in value) {
+            when (ch) {
+                '&' -> sb.append("&amp;")
+                '<' -> sb.append("&lt;")
+                '>' -> sb.append("&gt;")
+                '"' -> sb.append("&quot;")
+                else -> sb.append(ch)
+            }
+        }
+        return sb.toString()
+    }
+
+    companion object {
+        private const val HOOK_NAME_EXTERNAL_OBJECT = "ExternalObject"
+        private const val HOOK_NAME_LATEX_SUBSTRING = "latex"
     }
 }

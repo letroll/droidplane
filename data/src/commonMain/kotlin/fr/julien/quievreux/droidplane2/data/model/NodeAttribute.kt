@@ -32,6 +32,7 @@ enum class NodeAttribute(val text: String) {
     TYPE("TYPE"),
     URI("URI"),
     VALUE("VALUE"),
+    VERSION("version"),
     VGAP("VGAP"),
     VSHIFT("VSHIFT"),
     WIDTH("WIDTH");

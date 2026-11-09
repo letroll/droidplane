@@ -12,6 +12,11 @@ import kotlinx.coroutines.test.TestScope
 import java.io.ByteArrayInputStream
 import java.io.File
 import java.nio.charset.StandardCharsets
+import kotlin.test.assertEquals
+import kotlin.test.assertFalse
+import kotlin.test.assertNotNull
+import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 class HooksXmlTest : KStringSpec() {
 
@@ -37,13 +42,12 @@ class HooksXmlTest : KStringSpec() {
                 onLoadFinished = {},
             )
 
-            val root = nodeManager.rootNode
-            root shouldNotBe null
-            root!!.externalObject shouldNotBe null
-            root.externalObject!!.uri shouldBe "file:/path/to/diagram.png"
-            root.externalObject!!.size shouldBe 1.5f
+            val root = assertNotNull(nodeManager.rootNode)
+            val externalObject = assertNotNull(root.externalObject)
+            assertEquals("file:/path/to/diagram.png", externalObject.uri)
+            assertEquals(1.5f, externalObject.size)
 
-            root.latexEquation shouldBe "\\frac{a}{b} = c"
+            assertEquals("\\frac{a}{b} = c", root.latexEquation)
 
             // Serialize and verify output
             val tempDir = System.getProperty("java.io.tmpdir")
@@ -57,8 +61,8 @@ class HooksXmlTest : KStringSpec() {
                 onSaveFinished = { file -> savedFile = file }
             )
 
-            savedFile shouldNotBe null
-            val savedXml = savedFile!!.readText(StandardCharsets.UTF_8)
+            val verifiedSavedFile = assertNotNull(savedFile)
+            val savedXml = verifiedSavedFile.readText(StandardCharsets.UTF_8)
             savedXml shouldContain "<hook NAME=\"ExternalObject\" URI=\"file:/path/to/diagram.png\" SIZE=\"1.5\""
             savedXml shouldContain "<hook NAME=\"plugins/latex/LatexNodeHook.properties\" EQUATION=\"\\frac{a}{b} = c\""
 
@@ -84,10 +88,10 @@ class HooksXmlTest : KStringSpec() {
                 onLoadFinished = {},
             )
 
-            val root = nodeManager.rootNode!!
-            root.genericHooks.size shouldBe 2
+            val root = assertNotNull(nodeManager.rootNode)
+            assertEquals(2, root.genericHooks.size)
             root.genericHooks.forEach { hook ->
-                hook.attributes.containsKey("NAME") shouldBe false
+                assertFalse(hook.attributes.containsKey("NAME"))
             }
 
             // Also add a GenericHookElement constructed with "NAME" inside attributes to verify serializer guard
@@ -109,17 +113,109 @@ class HooksXmlTest : KStringSpec() {
                 onSaveFinished = { file -> savedFile = file }
             )
 
-            savedFile shouldNotBe null
-            val savedXml = savedFile!!.readText(StandardCharsets.UTF_8)
+            val verifiedSavedFile = assertNotNull(savedFile)
+            val savedXml = verifiedSavedFile.readText(StandardCharsets.UTF_8)
 
             val hookTags = Regex("<hook\\b[^>]*>").findAll(savedXml).map { it.value }.toList()
-            hookTags.size shouldBe 3
+            assertEquals(3, hookTags.size)
             hookTags.forEach { tag ->
-                Regex("\\bNAME=", RegexOption.IGNORE_CASE).findAll(tag).count() shouldBe 1
+                assertEquals(1, Regex("\\bNAME=", RegexOption.IGNORE_CASE).findAll(tag).count())
             }
             savedXml shouldContain "<hook NAME=\"MapStyle\" zoom=\"1.2\""
             savedXml shouldContain "<hook NAME=\"AutomaticEdgeColor\" COUNTER=\"4\" RULE=\"ON_BRANCH_CREATION\""
             savedXml shouldContain "<hook NAME=\"CustomHook\" EXTRA=\"val\""
+
+            savedFile?.delete()
+        }
+
+        "MapStyle hook with nested stylenodes does not leak edge, font, cloud, or arrowlink onto parent node and round-trips map version and hook XML" {
+            val xml = """
+                <map version="freeplane 1.12.15">
+                    <node ID="ID_1385587321" CREATED="1361978276662" MODIFIED="1794042503907" TEXT="DroidPlane 2">
+                        <icon BUILTIN="mindmap"/>
+                        <hook NAME="MapStyle" background="#2e3440ff">
+                            <properties show_icon_for_attributes="true" fit_to_viewport="false"/>
+                            <map_styles>
+                                <stylenode LOCALIZED_TEXT="styles.root_node" STYLE="oval">
+                                    <stylenode LOCALIZED_TEXT="styles.predefined" POSITION="bottom_or_right" STYLE="bubble">
+                                        <stylenode LOCALIZED_TEXT="default" ID="ID_1499691433" COLOR="#000000" STYLE="fork">
+                                            <arrowlink SHAPE="CUBIC_CURVE" COLOR="#000000" DESTINATION="ID_1499691433" STARTARROW="NONE" ENDARROW="DEFAULT"/>
+                                        </stylenode>
+                                        <stylenode LOCALIZED_TEXT="defaultstyle.floating">
+                                            <edge STYLE="hide_edge"/>
+                                            <cloud COLOR="#f0f0f0" SHAPE="ROUND_RECT"/>
+                                        </stylenode>
+                                        <stylenode LOCALIZED_TEXT="styles.subsubtopic">
+                                            <font NAME="Liberation Sans" SIZE="10" BOLD="true"/>
+                                        </stylenode>
+                                    </stylenode>
+                                </stylenode>
+                            </map_styles>
+                        </hook>
+                        <node ID="ID_200" TEXT="Child Topic" CREATED="1000" MODIFIED="2000"/>
+                    </node>
+                </map>
+            """.trimIndent()
+
+            val nodeManager = initNodeManager()
+            nodeManager.loadMindMapFromInputStream(
+                inputStream = ByteArrayInputStream(xml.toByteArray(StandardCharsets.UTF_8)),
+                onError = { throw it },
+                onParentNodeUpdate = {},
+                onLoadFinished = {},
+            )
+
+            val root = assertNotNull(nodeManager.rootNode)
+            assertEquals("DroidPlane 2", root.text)
+            assertEquals(listOf("mindmap"), root.iconNames)
+            assertNull(root.edge)
+            assertNull(root.cloud)
+            assertNull(root.fontName)
+            assertNull(root.fontSize)
+            assertFalse(root.isBold)
+            assertTrue(root.connectors.isEmpty())
+            assertTrue(root.arrowLinkDestinationIds.isEmpty())
+
+            assertEquals(1, root.genericHooks.size)
+            val mapStyleHook = root.genericHooks.first()
+            assertEquals("MapStyle", mapStyleHook.name)
+            assertEquals("#2e3440ff", mapStyleHook.attributes["background"])
+            val hookRawXml = assertNotNull(mapStyleHook.rawXml)
+            assertTrue(hookRawXml.contains("<map_styles>"))
+            assertTrue(hookRawXml.contains("ID_1499691433"))
+
+            val tempDir = System.getProperty("java.io.tmpdir")
+            val fileName = "test_mapstyle_isolation_${System.currentTimeMillis()}.mm"
+            var savedFile: File? = null
+
+            nodeManager.serializeMindmap(
+                filePath = "$tempDir/",
+                filename = fileName,
+                onError = { throw it },
+                onSaveFinished = { file -> savedFile = file }
+            )
+
+            val verifiedSavedFile = assertNotNull(savedFile)
+            val savedXml = verifiedSavedFile.readText(StandardCharsets.UTF_8)
+            assertTrue(savedXml.startsWith("<map version=\"freeplane 1.12.15\">"))
+            assertFalse(savedXml.contains("<?xml"))
+            assertTrue(savedXml.contains("<map_styles>"))
+            assertTrue(savedXml.contains("<stylenode LOCALIZED_TEXT=\"default\" ID=\"ID_1499691433\""))
+
+            // Reload the saved XML and verify root still has no leaked stylenode properties
+            val reloadedManager = initNodeManager()
+            reloadedManager.loadMindMapFromInputStream(
+                inputStream = ByteArrayInputStream(savedXml.toByteArray(StandardCharsets.UTF_8)),
+                onError = { throw it },
+                onParentNodeUpdate = {},
+                onLoadFinished = {},
+            )
+            val reloadedRoot = assertNotNull(reloadedManager.rootNode)
+            assertNull(reloadedRoot.edge)
+            assertNull(reloadedRoot.cloud)
+            assertNull(reloadedRoot.fontName)
+            assertFalse(reloadedRoot.isBold)
+            assertTrue(reloadedRoot.connectors.isEmpty())
 
             savedFile?.delete()
         }

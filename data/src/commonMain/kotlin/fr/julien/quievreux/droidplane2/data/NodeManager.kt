@@ -58,6 +58,7 @@ class NodeManager(
 
     private var currentMindMapUri: MindMapUri? = null
     private var currentMindMapDisplayName: String? = null
+    private var mapVersion: String = DEFAULT_MAP_VERSION
 
     private val searchManager = SearchManager(
         scope = coroutineScope,
@@ -111,6 +112,7 @@ class NodeManager(
         val xpp: XmlPullParser?
         try {
             rootNode = null
+            mapVersion = DEFAULT_MAP_VERSION
             _allNodes.value = emptyList()
             updatemMindmapIndexes(MindmapIndexes(emptyMap(), emptyMap()))
             // set up XML pull parsing
@@ -211,6 +213,12 @@ class NodeManager(
     ) {
         with(xmlParseUtils) {
             when {
+                xpp.name == MAP.text -> {
+                    xpp.getAttributeValue(null, VERSION.text)
+                        ?.takeIf { it.isNotBlank() }
+                        ?.let { mapVersion = it }
+                }
+
                 xpp.name == NODE.text -> parseNodeText(
                     nodes = nodes,
                     xpp = xpp,
@@ -285,6 +293,7 @@ class NodeManager(
         )
 
         rootNode = newRoot
+        mapVersion = DEFAULT_MAP_VERSION
         currentMindMapUri = null
         currentMindMapDisplayName = null
         _allNodes.value = listOf(newRoot)
@@ -425,9 +434,8 @@ class NodeManager(
                         val serializer = factory.newSerializer()
 
                         serializer.setOutput(outputStream, "UTF-8")
-                        serializer.startDocument("UTF-8", true)
-                        serializer.text(CHARIOT_RETURN)
                         serializer.startNodeTag(MAP)
+                        serializer.nodeAttribute(VERSION, mapVersion)
 
                         // Get all nodes and create a map of parent ID to children
                         val nodes = _allNodes.first()
@@ -448,6 +456,7 @@ class NodeManager(
                             )
                         }
 
+                        serializer.text(CHARIOT_RETURN)
                         serializer.endNodeTag(MAP)
                         serializer.endDocument()
                     }
@@ -654,7 +663,11 @@ class NodeManager(
                             serializer.attribute(null, k, v)
                         }
                     }
-                    hook.textContent?.let { text -> serializer.text(text) }
+                    if (!hook.rawXml.isNullOrBlank()) {
+                        writeRawXmlToSerializer(serializer, hook.rawXml)
+                    } else {
+                        hook.textContent?.let { text -> serializer.text(text) }
+                    }
                     serializer.endNodeTag(NodeTag.HOOK)
                 }
             }
@@ -722,18 +735,22 @@ class NodeManager(
         try {
             val factory = XmlPullParserFactory.newInstance()
             val parser = factory.newPullParser()
-            parser.setInput(StringReader(xmlString))
+            parser.setInput(StringReader("<$RAW_XML_WRAPPER_TAG>$xmlString</$RAW_XML_WRAPPER_TAG>"))
             var eventType = parser.eventType
             while (eventType != XmlPullParser.END_DOCUMENT) {
                 when (eventType) {
                     XmlPullParser.START_TAG -> {
-                        serializer.startTag(null, parser.name)
-                        for (i in 0 until parser.attributeCount) {
-                            serializer.attribute(null, parser.getAttributeName(i), parser.getAttributeValue(i))
+                        if (!(parser.depth == 1 && parser.name == RAW_XML_WRAPPER_TAG)) {
+                            serializer.startTag(null, parser.name)
+                            for (i in 0 until parser.attributeCount) {
+                                serializer.attribute(null, parser.getAttributeName(i), parser.getAttributeValue(i))
+                            }
                         }
                     }
                     XmlPullParser.END_TAG -> {
-                        serializer.endTag(null, parser.name)
+                        if (!(parser.depth == 1 && parser.name == RAW_XML_WRAPPER_TAG)) {
+                            serializer.endTag(null, parser.name)
+                        }
                     }
                     XmlPullParser.TEXT -> {
                         serializer.text(parser.text)
@@ -1522,5 +1539,7 @@ class NodeManager(
         const val NODE_ID_PREFIX = "ID_"
         const val CHARIOT_RETURN = "\n"
         const val TAB = "\t"
+        private const val DEFAULT_MAP_VERSION = "freeplane 1.11.5"
+        private const val RAW_XML_WRAPPER_TAG = "_fragment"
     }
 }
