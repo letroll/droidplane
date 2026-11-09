@@ -54,6 +54,9 @@ fun MindMapCanvasScreen(
         insertAfter: Boolean,
         targetPosition: String?,
     ) -> Unit = { _, _, _, _, _ -> },
+    onNodeImageScaleChange: (Node, Float) -> Unit = { _, _ -> },
+    onNodeImageReplace: (Node, String) -> Unit = { _, _ -> },
+    onNodeImageDelete: (Node) -> Unit = {},
     fetchText: (Node) -> String? = { it.text },
 ) {
     var zoom by remember { mutableFloatStateOf(1.0f) }
@@ -224,6 +227,9 @@ fun MindMapCanvasScreen(
                     isDraggingOrReady = isCurrentActiveNode && dragState.phase != CanvasDragPhase.Idle,
                     activeDropZone = if (isHoveredTarget) activeDropTarget?.zoneType else null,
                     dropTargetPosition = if (isHoveredTarget) activeDropTarget?.targetPosition else null,
+                    onNodeImageScaleChange = onNodeImageScaleChange,
+                    onNodeImageReplace = onNodeImageReplace,
+                    onNodeImageDelete = onNodeImageDelete,
                     fetchText = fetchText,
                     modifier = Modifier
                         .zIndex(if (isCurrentActiveNode && dragState.phase != CanvasDragPhase.Idle) 10f else 0f)

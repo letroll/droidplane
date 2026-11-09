@@ -141,6 +141,12 @@ object AppRes {
         const val update_downloading_enqueued = 1133
         const val update_no_apk_asset = 1134
         const val update_no_changelog = 1135
+        const val icons_section = 1136
+        const val images_section = 1137
+        const val browse_image = 1138
+        const val replace_image = 1139
+        const val delete_image = 1140
+        const val broken_image_placeholder = 1141
     }
 
     object drawable {
@@ -366,14 +372,26 @@ object AppRes {
         string.update_error to "Unable to check for updates. Please check your connection.",
         string.update_downloading_enqueued to "Download started. Tap the system notification once complete to install.",
         string.update_no_apk_asset to "No APK file found in this release. Opening GitHub in browser…",
-        string.update_no_changelog to "No changelog provided for this release."
+        string.update_no_changelog to "No changelog provided for this release.",
+        string.icons_section to "Icons",
+        string.images_section to "Images",
+        string.browse_image to "Browse image",
+        string.replace_image to "Replace image",
+        string.delete_image to "Delete image",
+        string.broken_image_placeholder to "Image unavailable"
     )
 
     private val frStrings: Map<Int, String> = mapOf(
         string.app_name to "DroidPlane2",
         string.overwrite_file_title to "Remplacer le fichier existant ?",
         string.overwrite_file_message to "Voulez-vous remplacer le fichier existant « %1\$s » ?",
-        string.overwrite_replace to "Remplacer"
+        string.overwrite_replace to "Remplacer",
+        string.icons_section to "Icônes",
+        string.images_section to "Images",
+        string.browse_image to "Parcourir une image",
+        string.replace_image to "Remplacer l'image",
+        string.delete_image to "Supprimer l'image",
+        string.broken_image_placeholder to "Image indisponible"
     )
 
     val drawableNames: Map<Int, String> = mapOf(

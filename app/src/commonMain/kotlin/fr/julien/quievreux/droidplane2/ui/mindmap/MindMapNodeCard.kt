@@ -7,7 +7,9 @@ import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.awaitLongPressOrCancellation
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -45,10 +47,17 @@ import compose.icons.FontAwesomeIcons
 import compose.icons.fontawesomeicons.Solid
 import compose.icons.fontawesomeicons.solid.Link
 import fr.julien.quievreux.droidplane2.res.AppRes as R
+import fr.julien.quievreux.droidplane2.data.model.ExternalObjectProperties
 import fr.julien.quievreux.droidplane2.data.model.Node
 import fr.julien.quievreux.droidplane2.ui.components.NodeIconsRow
+import fr.julien.quievreux.droidplane2.ui.media.IMAGE_VERTICAL_SPACING_DP
 import fr.julien.quievreux.droidplane2.ui.theme.ContrastAwareReplyTheme
 import kotlinx.coroutines.withTimeoutOrNull
+
+private const val NODE_STYLE_BUBBLE = "bubble"
+private const val NODE_STYLE_OVAL = "oval"
+private const val NODE_STYLE_RECTANGLE = "rectangle"
+private const val NODE_STYLE_FORK = "fork"
 
 @Composable
 fun MindMapNodeCard(
@@ -68,6 +77,9 @@ fun MindMapNodeCard(
     isDraggingOrReady: Boolean = false,
     activeDropZone: DropZoneType? = null,
     dropTargetPosition: String? = null,
+    onNodeImageScaleChange: (Node, Float) -> Unit = { _, _ -> },
+    onNodeImageReplace: (Node, String) -> Unit = { _, _ -> },
+    onNodeImageDelete: (Node) -> Unit = {},
     fetchText: (Node) -> String? = { it.text },
 ) {
     val hasChildren = node.childNodes.isNotEmpty()
@@ -176,6 +188,9 @@ fun MindMapNodeCard(
                     isCollapsed = isCollapsed,
                     cloudColor = cloudColor,
                     onToggleCollapse = onToggleCollapse,
+                    onNodeImageScaleChange = onNodeImageScaleChange,
+                    onNodeImageReplace = onNodeImageReplace,
+                    onNodeImageDelete = onNodeImageDelete,
                 )
 
                 if (activeDropZone == DropZoneType.BEFORE_SIBLING) {
@@ -303,9 +318,9 @@ private suspend fun AwaitPointerEventScope.trackPostLongPressGesture(
 }
 
 private fun resolveNodeCardShape(style: String?, isRoot: Boolean): Shape = when (style) {
-    "bubble", "oval" -> CircleShape
-    "rectangle" -> RoundedCornerShape(2.dp)
-    "fork" -> RoundedCornerShape(topStart = 0.dp, bottomStart = 0.dp, topEnd = 8.dp, bottomEnd = 8.dp)
+    NODE_STYLE_BUBBLE, NODE_STYLE_OVAL -> CircleShape
+    NODE_STYLE_RECTANGLE -> RoundedCornerShape(2.dp)
+    NODE_STYLE_FORK -> RoundedCornerShape(topStart = 0.dp, bottomStart = 0.dp, topEnd = 8.dp, bottomEnd = 8.dp)
     else -> if (isRoot) RoundedCornerShape(16.dp) else RoundedCornerShape(8.dp)
 }
 
@@ -318,74 +333,95 @@ private fun NodeCardContentRow(
     isCollapsed: Boolean,
     cloudColor: Color?,
     onToggleCollapse: () -> Unit,
+    onNodeImageScaleChange: (Node, Float) -> Unit,
+    onNodeImageReplace: (Node, String) -> Unit,
+    onNodeImageDelete: (Node) -> Unit,
 ) {
-    Row(
+    val activeExternalObject = node.externalObject?.takeIf { it.uri.isNotBlank() }
+
+    Column(
         modifier = Modifier
             .fillMaxSize()
             .padding(horizontal = 12.dp, vertical = 6.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalArrangement = Arrangement.Center,
+        horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Row(
-            modifier = Modifier.weight(1f, fill = false),
+            modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(4.dp)
+            horizontalArrangement = Arrangement.SpaceBetween,
         ) {
-            if (node.cloud != null) {
+            Row(
+                modifier = Modifier.weight(1f, fill = false),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                if (node.cloud != null) {
+                    Text(
+                        text = "☁",
+                        fontSize = 12.sp,
+                        color = cloudColor ?: MaterialTheme.colorScheme.primary
+                    )
+                }
+
+                NodeIconsRow(
+                    iconNames = node.iconNames,
+                    maxInlineIcons = Int.MAX_VALUE,
+                    iconSize = 16.dp
+                )
+
+                if (node.link != null) {
+                    Icon(
+                        imageVector = FontAwesomeIcons.Solid.Link,
+                        contentDescription = stringResource(R.string.hyperlink),
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(14.dp)
+                    )
+                }
+
+                if (!node.noteText.isNullOrBlank()) {
+                    Text(
+                        text = "📝",
+                        fontSize = 12.sp,
+                    )
+                }
+
+                if (!node.detailsText.isNullOrBlank()) {
+                    Text(
+                        text = "💬",
+                        fontSize = 12.sp,
+                    )
+                }
+
                 Text(
-                    text = "☁",
-                    fontSize = 12.sp,
-                    color = cloudColor ?: MaterialTheme.colorScheme.primary
+                    text = displayText,
+                    style = MaterialTheme.typography.bodyMedium.copy(
+                        fontSize = node.fontSize?.sp ?: (if (isRoot) 15.sp else 13.sp),
+                        fontWeight = if (node.isBold || isRoot) FontWeight.Bold else FontWeight.Normal,
+                        fontStyle = if (node.isItalic) FontStyle.Italic else FontStyle.Normal,
+                        lineHeight = (node.fontSize?.let { (it * 1.35f).sp }) ?: (if (isRoot) 19.sp else 16.sp),
+                    ),
+                    maxLines = 100,
+                    overflow = TextOverflow.Ellipsis,
                 )
             }
 
-            NodeIconsRow(
-                iconNames = node.iconNames,
-                maxInlineIcons = Int.MAX_VALUE,
-                iconSize = 16.dp
-            )
-
-            if (node.link != null) {
-                Icon(
-                    imageVector = FontAwesomeIcons.Solid.Link,
-                    contentDescription = stringResource(R.string.hyperlink),
-                    tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(14.dp)
+            if (hasChildren && !isRoot) {
+                FoldIndicator(
+                    isCollapsed = isCollapsed,
+                    onClick = onToggleCollapse,
+                    modifier = Modifier.padding(start = 6.dp),
                 )
             }
-
-            if (!node.noteText.isNullOrBlank()) {
-                Text(
-                    text = "📝",
-                    fontSize = 12.sp,
-                )
-            }
-
-            if (!node.detailsText.isNullOrBlank()) {
-                Text(
-                    text = "💬",
-                    fontSize = 12.sp,
-                )
-            }
-
-            Text(
-                text = displayText,
-                style = MaterialTheme.typography.bodyMedium.copy(
-                    fontSize = node.fontSize?.sp ?: (if (isRoot) 15.sp else 13.sp),
-                    fontWeight = if (node.isBold || isRoot) FontWeight.Bold else FontWeight.Normal,
-                    fontStyle = if (node.isItalic) FontStyle.Italic else FontStyle.Normal,
-                    lineHeight = (node.fontSize?.let { (it * 1.35f).sp }) ?: (if (isRoot) 19.sp else 16.sp),
-                ),
-                maxLines = 100,
-                overflow = TextOverflow.Ellipsis,
-            )
         }
 
-        if (hasChildren && !isRoot) {
-            FoldIndicator(
-                isCollapsed = isCollapsed,
-                onClick = onToggleCollapse,
-                modifier = Modifier.padding(start = 6.dp),
+        if (activeExternalObject != null) {
+            Spacer(modifier = Modifier.height(IMAGE_VERTICAL_SPACING_DP.dp))
+            NodeImageAttachmentView(
+                externalObject = activeExternalObject,
+                onScaleChange = { newScale -> onNodeImageScaleChange(node, newScale) },
+                onReplaceImage = { newUri -> onNodeImageReplace(node, newUri) },
+                onDeleteImage = { onNodeImageDelete(node) },
             )
         }
     }
@@ -517,6 +553,32 @@ fun PreviewMindMapNodeCardDropAsChild() {
             onNodeClick = {},
             onToggleCollapse = {},
             modifier = Modifier.size(width = 180.dp, height = 44.dp),
+        )
+    }
+}
+
+@Preview
+@Composable
+fun PreviewMindMapNodeCardWithImage() {
+    ContrastAwareReplyTheme {
+        val node = Node(
+            parentNode = null,
+            id = "preview_image_node",
+            numericId = 1,
+            text = "Node with Image",
+            externalObject = ExternalObjectProperties(uri = "file:/preview/sample.png", size = 1.0f),
+            creationDate = 0L,
+            modificationDate = 0L,
+        )
+
+        MindMapNodeCard(
+            node = node,
+            isSelected = true,
+            isCollapsed = false,
+            branchDirection = BranchDirection.RIGHT,
+            onNodeClick = {},
+            onToggleCollapse = {},
+            modifier = Modifier.size(width = 160.dp, height = 140.dp),
         )
     }
 }

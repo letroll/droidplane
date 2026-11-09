@@ -186,6 +186,12 @@ object NodeIconRegistry {
     fun getAllIcons(): List<NodeIconDescriptor> = ALL_DESCRIPTORS
 
     /**
+     * Returns all specific thematic icon categories excluding [NodeIconCategory.ALL].
+     */
+    fun categorizedEntries(): List<NodeIconCategory> =
+        NodeIconCategory.entries.filter { it != NodeIconCategory.ALL }
+
+    /**
      * Filters the catalog by category and text search query (case-insensitive on id, label, aliases).
      */
     fun filterIcons(
