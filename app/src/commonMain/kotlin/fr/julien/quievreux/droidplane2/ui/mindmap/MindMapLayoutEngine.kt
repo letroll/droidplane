@@ -1,6 +1,12 @@
 package fr.julien.quievreux.droidplane2.ui.mindmap
 
 import fr.julien.quievreux.droidplane2.data.model.Node
+import fr.julien.quievreux.droidplane2.ui.media.DEFAULT_IMAGE_BASE_HEIGHT_DP
+import fr.julien.quievreux.droidplane2.ui.media.DEFAULT_IMAGE_BASE_WIDTH_DP
+import fr.julien.quievreux.droidplane2.ui.media.DEFAULT_IMAGE_SCALE
+import fr.julien.quievreux.droidplane2.ui.media.IMAGE_VERTICAL_SPACING_DP
+import fr.julien.quievreux.droidplane2.ui.media.MAX_IMAGE_SCALE
+import fr.julien.quievreux.droidplane2.ui.media.MIN_IMAGE_SCALE
 
 enum class BranchDirection {
     ROOT,
@@ -362,9 +368,25 @@ object MindMapLayoutEngine {
             (if (!node.noteText.isNullOrBlank()) 16f else 0f) +
             (if (!node.detailsText.isNullOrBlank()) 16f else 0f)
 
-        val totalWidthDp = (maxLineWidthDp + horizontalPaddingDp + foldIndicatorDp + badgesWidthDp)
+        val baseTextWidthDp = (maxLineWidthDp + horizontalPaddingDp + foldIndicatorDp + badgesWidthDp)
             .coerceIn(70f, maxTextWidthDp + horizontalPaddingDp + foldIndicatorDp + badgesWidthDp)
-        val totalHeightDp = (displayLines * lineHeightDp + verticalPaddingDp).coerceAtLeast(38f)
+        val baseTextHeightDp = (displayLines * lineHeightDp + verticalPaddingDp).coerceAtLeast(38f)
+
+        val externalUri = node.externalObject?.uri
+        val hasImage = !externalUri.isNullOrBlank()
+        val totalWidthDp: Float
+        val totalHeightDp: Float
+        if (hasImage) {
+            val scale = (node.externalObject?.size ?: DEFAULT_IMAGE_SCALE)
+                .coerceIn(MIN_IMAGE_SCALE, MAX_IMAGE_SCALE)
+            val imageWidthDp = DEFAULT_IMAGE_BASE_WIDTH_DP * scale
+            val imageHeightDp = DEFAULT_IMAGE_BASE_HEIGHT_DP * scale
+            totalWidthDp = maxOf(baseTextWidthDp, imageWidthDp + horizontalPaddingDp)
+            totalHeightDp = baseTextHeightDp + imageHeightDp + IMAGE_VERTICAL_SPACING_DP
+        } else {
+            totalWidthDp = baseTextWidthDp
+            totalHeightDp = baseTextHeightDp
+        }
 
         return Pair(totalWidthDp * density, totalHeightDp * density)
     }

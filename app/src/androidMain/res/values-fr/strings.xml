@@ -4,4 +4,10 @@
     <string name="overwrite_file_title">Remplacer le fichier existant ?</string>
     <string name="overwrite_file_message">Voulez-vous remplacer le fichier existant « %1$s » ?</string>
     <string name="overwrite_replace">Remplacer</string>
+    <string name="icons_section">Icônes</string>
+    <string name="images_section">Images</string>
+    <string name="browse_image">Parcourir une image</string>
+    <string name="replace_image">Remplacer l\'image</string>
+    <string name="delete_image">Supprimer l\'image</string>
+    <string name="broken_image_placeholder">Image indisponible</string>
 </resources>

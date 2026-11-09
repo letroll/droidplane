@@ -9,10 +9,14 @@ import fr.julien.quievreux.droidplane2.MainUiState.SearchUiState
 import fr.julien.quievreux.droidplane2.core.log.Logger
 import fr.julien.quievreux.droidplane2.data.NodeManager
 import fr.julien.quievreux.droidplane2.data.model.DeleteSnapshot
+import fr.julien.quievreux.droidplane2.data.model.ExternalObjectProperties
 import fr.julien.quievreux.droidplane2.data.model.MindMapUri
 import fr.julien.quievreux.droidplane2.data.model.Node
 import fr.julien.quievreux.droidplane2.data.model.isInternalLink
 import fr.julien.quievreux.droidplane2.data.model.shortFamily
+import fr.julien.quievreux.droidplane2.ui.media.DEFAULT_IMAGE_SCALE
+import fr.julien.quievreux.droidplane2.ui.media.MAX_IMAGE_SCALE
+import fr.julien.quievreux.droidplane2.ui.media.MIN_IMAGE_SCALE
 import fr.julien.quievreux.droidplane2.helper.MimeTypeUtils
 import fr.julien.quievreux.droidplane2.model.ContentNodeType
 import fr.julien.quievreux.droidplane2.model.ContentNodeType.Classic
@@ -1582,6 +1586,59 @@ nodeFindList:${nodeManager.getSearchResult().map { getNodeText(it) }.joinToStrin
                         treeVersion = currentState.treeVersion + 1,
                         collapsedNodeIds = newCollapsedIds,
                         leaving = false,
+                    )
+                }
+            }
+        }
+    }
+
+    fun updateNodeImageScale(nodeId: String, newScale: Float) {
+        val targetNode = nodeManager.getNodeByID(nodeId) ?: return
+        val currentExternal = targetNode.externalObject ?: return
+        if (currentExternal.uri.isBlank()) return
+        val clampedScale = newScale.coerceIn(MIN_IMAGE_SCALE, MAX_IMAGE_SCALE)
+        val updatedNode = targetNode.copy(
+            externalObject = currentExternal.copy(size = clampedScale)
+        )
+        applyNodeImageMutation(updatedNode)
+    }
+
+    fun replaceNodeImage(nodeId: String, newUri: String) {
+        val trimmedUri = newUri.trim()
+        if (trimmedUri.isEmpty()) return
+        val targetNode = nodeManager.getNodeByID(nodeId) ?: return
+        val preservedScale = (targetNode.externalObject?.size ?: DEFAULT_IMAGE_SCALE)
+            .coerceIn(MIN_IMAGE_SCALE, MAX_IMAGE_SCALE)
+        val updatedNode = targetNode.copy(
+            externalObject = ExternalObjectProperties(
+                uri = trimmedUri,
+                size = preservedScale
+            )
+        )
+        applyNodeImageMutation(updatedNode)
+    }
+
+    fun removeNodeImage(nodeId: String) {
+        val targetNode = nodeManager.getNodeByID(nodeId) ?: return
+        val updatedNode = targetNode.copy(externalObject = null)
+        applyNodeImageMutation(updatedNode)
+    }
+
+    private fun applyNodeImageMutation(updatedNode: Node) {
+        viewModelScope.launch {
+            val success = nodeManager.updateNode(updatedNode)
+            if (success) {
+                hasUnsavedChanges = true
+                val displayedId = _uiState.value.nodeCurrentlyDisplayed?.id
+                if (displayedId != null) {
+                    val refreshedDisplayed = nodeManager.getNodeByID(displayedId)
+                    if (refreshedDisplayed != null) {
+                        showNode(refreshedDisplayed)
+                    }
+                }
+                updateUiState { currentState ->
+                    currentState.copy(
+                        treeVersion = currentState.treeVersion + 1
                     )
                 }
             }

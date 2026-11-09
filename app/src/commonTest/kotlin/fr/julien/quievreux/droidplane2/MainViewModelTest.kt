@@ -37,6 +37,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class MainViewModelTest : KStringSpec() {
@@ -1709,6 +1710,118 @@ class MainViewModelTest : KStringSpec() {
                 }
             } finally {
                 tempFile.delete()
+            }
+        }
+
+        "replaceNodeImage sets externalObject with trimmed URI and default or preserved scale, marks unsaved changes, and increments treeVersion (T013)" {
+            val nodeManager = realNodeManager()
+            val viewModel = MainViewModel(
+                logger = mockk(relaxed = true),
+                injectedNodeManager = nodeManager,
+                recentFilesRepository = mockk(relaxed = true),
+            )
+            val root = assertNotNull(nodeManager.rootNode)
+            viewModel.setInitialStateForTest(root)
+
+            val child = assertNotNull(nodeManager.getNodeByID(root.id)?.childNodes?.firstOrNull())
+            assertFalse(viewModel.hasUnsavedChangesState)
+            val initialVersion = viewModel.uiState.value.treeVersion
+
+            viewModel.replaceNodeImage(child.id, "  images/diagram.png  ")
+
+            eventually {
+                val updatedChild = assertNotNull(nodeManager.getNodeByID(child.id))
+                val externalObject = assertNotNull(updatedChild.externalObject)
+                assertEquals("images/diagram.png", externalObject.uri)
+                assertEquals(1.0f, externalObject.size)
+                assertTrue(viewModel.hasUnsavedChangesState)
+                assertTrue(viewModel.uiState.value.treeVersion > initialVersion)
+            }
+
+            viewModel.updateNodeImageScale(child.id, 1.75f)
+            eventually {
+                assertEquals(1.75f, nodeManager.getNodeByID(child.id)?.externalObject?.size)
+            }
+
+            val versionBeforeSecondReplace = viewModel.uiState.value.treeVersion
+            viewModel.replaceNodeImage(child.id, "images/updated.png")
+
+            eventually {
+                val replacedChild = assertNotNull(nodeManager.getNodeByID(child.id))
+                val replacedExternal = assertNotNull(replacedChild.externalObject)
+                assertEquals("images/updated.png", replacedExternal.uri)
+                assertEquals(1.75f, replacedExternal.size)
+                assertTrue(viewModel.uiState.value.treeVersion > versionBeforeSecondReplace)
+            }
+        }
+
+        "updateNodeImageScale updates externalObject size, clamps values to [0.2f, 4.0f], and increments treeVersion (T013)" {
+            val nodeManager = realNodeManager()
+            val viewModel = MainViewModel(
+                logger = mockk(relaxed = true),
+                injectedNodeManager = nodeManager,
+                recentFilesRepository = mockk(relaxed = true),
+            )
+            val root = assertNotNull(nodeManager.rootNode)
+            viewModel.setInitialStateForTest(root)
+
+            val child = assertNotNull(nodeManager.getNodeByID(root.id)?.childNodes?.firstOrNull())
+            viewModel.replaceNodeImage(child.id, "images/diagram.png")
+
+            eventually {
+                assertNotNull(nodeManager.getNodeByID(child.id)?.externalObject)
+            }
+
+            val versionBeforeScale = viewModel.uiState.value.treeVersion
+            viewModel.updateNodeImageScale(child.id, 2.5f)
+
+            eventually {
+                assertEquals(2.5f, nodeManager.getNodeByID(child.id)?.externalObject?.size)
+                assertTrue(viewModel.uiState.value.treeVersion > versionBeforeScale)
+            }
+
+            val versionBeforeMinClamp = viewModel.uiState.value.treeVersion
+            viewModel.updateNodeImageScale(child.id, 0.05f)
+
+            eventually {
+                assertEquals(0.2f, nodeManager.getNodeByID(child.id)?.externalObject?.size)
+                assertTrue(viewModel.uiState.value.treeVersion > versionBeforeMinClamp)
+            }
+
+            val versionBeforeMaxClamp = viewModel.uiState.value.treeVersion
+            viewModel.updateNodeImageScale(child.id, 9.5f)
+
+            eventually {
+                assertEquals(4.0f, nodeManager.getNodeByID(child.id)?.externalObject?.size)
+                assertTrue(viewModel.uiState.value.treeVersion > versionBeforeMaxClamp)
+            }
+        }
+
+        "removeNodeImage clears externalObject to null and increments treeVersion (T013)" {
+            val nodeManager = realNodeManager()
+            val viewModel = MainViewModel(
+                logger = mockk(relaxed = true),
+                injectedNodeManager = nodeManager,
+                recentFilesRepository = mockk(relaxed = true),
+            )
+            val root = assertNotNull(nodeManager.rootNode)
+            viewModel.setInitialStateForTest(root)
+
+            val child = assertNotNull(nodeManager.getNodeByID(root.id)?.childNodes?.firstOrNull())
+            viewModel.replaceNodeImage(child.id, "images/diagram.png")
+
+            eventually {
+                assertNotNull(nodeManager.getNodeByID(child.id)?.externalObject)
+            }
+
+            val versionBeforeRemove = viewModel.uiState.value.treeVersion
+            viewModel.removeNodeImage(child.id)
+
+            eventually {
+                val updatedChild = assertNotNull(nodeManager.getNodeByID(child.id))
+                assertNull(updatedChild.externalObject)
+                assertTrue(viewModel.uiState.value.treeVersion > versionBeforeRemove)
+                assertTrue(viewModel.hasUnsavedChangesState)
             }
         }
     }

@@ -448,6 +448,15 @@ fun DesktopDroidplaneApp(
                             showBottomToolbar = true
                         },
                         onMoveNode = viewModel::onMoveNode,
+                        onNodeImageScaleChange = { targetNode, newScale ->
+                            viewModel.updateNodeImageScale(targetNode.id, newScale)
+                        },
+                        onNodeImageReplace = { targetNode, newUri ->
+                            viewModel.replaceNodeImage(targetNode.id, newUri)
+                        },
+                        onNodeImageDelete = { targetNode ->
+                            viewModel.removeNodeImage(targetNode.id)
+                        },
                         fetchText = viewModel::getNodeText,
                         modifier = Modifier
                             .fillMaxSize()

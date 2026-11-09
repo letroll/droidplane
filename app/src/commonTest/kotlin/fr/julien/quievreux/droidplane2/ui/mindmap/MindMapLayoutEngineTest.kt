@@ -1,6 +1,7 @@
 package fr.julien.quievreux.droidplane2.ui.mindmap
 
 import fr.julien.quievreux.droidplane2.core.testutils.KStringSpec
+import fr.julien.quievreux.droidplane2.data.model.ExternalObjectProperties
 import fr.julien.quievreux.droidplane2.data.model.Node
 import io.kotest.matchers.collections.shouldBeEmpty
 import io.kotest.matchers.collections.shouldHaveSize
@@ -8,6 +9,8 @@ import io.kotest.matchers.comparables.shouldBeGreaterThan
 import io.kotest.matchers.comparables.shouldBeLessThan
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.shouldNotBe
+import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 
 class MindMapLayoutEngineTest : KStringSpec() {
     init {
@@ -265,6 +268,160 @@ class MindMapLayoutEngineTest : KStringSpec() {
             val badgedSize = MindMapLayoutEngine.measureNode(badgedNode, density = 1f)
 
             badgedSize.first shouldBeGreaterThan plainSize.first
+        }
+
+        "measureNode returns standard text-only dimensions when externalObject is null or has blank uri" {
+            val plainNode = Node(
+                parentNode = null,
+                id = "plain",
+                numericId = 1,
+                text = "Topic",
+                externalObject = null,
+                creationDate = 0L,
+                modificationDate = 0L,
+            )
+            val blankUriNode = Node(
+                parentNode = null,
+                id = "blank_uri",
+                numericId = 2,
+                text = "Topic",
+                externalObject = ExternalObjectProperties(uri = "   "),
+                creationDate = 0L,
+                modificationDate = 0L,
+            )
+
+            val plainSize = MindMapLayoutEngine.measureNode(plainNode, density = 1f)
+            val blankUriSize = MindMapLayoutEngine.measureNode(blankUriNode, density = 1f)
+
+            assertEquals(plainSize.first, blankUriSize.first)
+            assertEquals(plainSize.second, blankUriSize.second)
+        }
+
+        "measureNode expands height and width for externalObject with default scale when size is null" {
+            val density = 2f
+            val plainNode = Node(
+                parentNode = null,
+                id = "plain",
+                numericId = 1,
+                text = "Short",
+                externalObject = null,
+                creationDate = 0L,
+                modificationDate = 0L,
+            )
+            val imageNode = Node(
+                parentNode = null,
+                id = "img",
+                numericId = 2,
+                text = "Short",
+                externalObject = ExternalObjectProperties(
+                    uri = "content://media/external/images/media/42",
+                    size = null,
+                ),
+                creationDate = 0L,
+                modificationDate = 0L,
+            )
+
+            val plainSize = MindMapLayoutEngine.measureNode(plainNode, density = density)
+            val imageSize = MindMapLayoutEngine.measureNode(imageNode, density = density)
+
+            val expectedMinWidth = (120f + 28f) * density
+            val expectedHeight = plainSize.second + (90f + 8f) * density
+
+            assertTrue(imageSize.first >= expectedMinWidth)
+            assertEquals(expectedMinWidth, imageSize.first)
+            assertEquals(expectedHeight, imageSize.second)
+        }
+
+        "measureNode scales image dimensions with custom size and clamps out-of-range scales" {
+            val density = 1.5f
+            val plainNode = Node(
+                parentNode = null,
+                id = "plain",
+                numericId = 1,
+                text = "Short",
+                externalObject = null,
+                creationDate = 0L,
+                modificationDate = 0L,
+            )
+            val customScaledNode = Node(
+                parentNode = null,
+                id = "scaled_2x",
+                numericId = 2,
+                text = "Short",
+                externalObject = ExternalObjectProperties(
+                    uri = "images/diagram.png",
+                    size = 2.0f,
+                ),
+                creationDate = 0L,
+                modificationDate = 0L,
+            )
+            val minClampedNode = Node(
+                parentNode = null,
+                id = "clamped_min",
+                numericId = 3,
+                text = "Short",
+                externalObject = ExternalObjectProperties(
+                    uri = "images/diagram.png",
+                    size = 0.05f,
+                ),
+                creationDate = 0L,
+                modificationDate = 0L,
+            )
+            val exactMinNode = Node(
+                parentNode = null,
+                id = "exact_min",
+                numericId = 4,
+                text = "Short",
+                externalObject = ExternalObjectProperties(
+                    uri = "images/diagram.png",
+                    size = 0.2f,
+                ),
+                creationDate = 0L,
+                modificationDate = 0L,
+            )
+            val maxClampedNode = Node(
+                parentNode = null,
+                id = "clamped_max",
+                numericId = 5,
+                text = "Short",
+                externalObject = ExternalObjectProperties(
+                    uri = "images/diagram.png",
+                    size = 10.0f,
+                ),
+                creationDate = 0L,
+                modificationDate = 0L,
+            )
+            val exactMaxNode = Node(
+                parentNode = null,
+                id = "exact_max",
+                numericId = 6,
+                text = "Short",
+                externalObject = ExternalObjectProperties(
+                    uri = "images/diagram.png",
+                    size = 4.0f,
+                ),
+                creationDate = 0L,
+                modificationDate = 0L,
+            )
+
+            val plainSize = MindMapLayoutEngine.measureNode(plainNode, density = density)
+            val customScaledSize = MindMapLayoutEngine.measureNode(customScaledNode, density = density)
+            val minClampedSize = MindMapLayoutEngine.measureNode(minClampedNode, density = density)
+            val exactMinSize = MindMapLayoutEngine.measureNode(exactMinNode, density = density)
+            val maxClampedSize = MindMapLayoutEngine.measureNode(maxClampedNode, density = density)
+            val exactMaxSize = MindMapLayoutEngine.measureNode(exactMaxNode, density = density)
+
+            assertEquals((240f + 28f) * density, customScaledSize.first, absoluteTolerance = 0.01f)
+            assertEquals(plainSize.second + (180f + 8f) * density, customScaledSize.second, absoluteTolerance = 0.01f)
+
+            assertEquals(exactMinSize.first, minClampedSize.first, absoluteTolerance = 0.01f)
+            assertEquals(exactMinSize.second, minClampedSize.second, absoluteTolerance = 0.01f)
+            assertEquals(plainSize.second + (90f * 0.2f + 8f) * density, minClampedSize.second, absoluteTolerance = 0.01f)
+
+            assertEquals(exactMaxSize.first, maxClampedSize.first, absoluteTolerance = 0.01f)
+            assertEquals(exactMaxSize.second, maxClampedSize.second, absoluteTolerance = 0.01f)
+            assertEquals((120f * 4.0f + 28f) * density, maxClampedSize.first, absoluteTolerance = 0.01f)
+            assertEquals(plainSize.second + (90f * 4.0f + 8f) * density, maxClampedSize.second, absoluteTolerance = 0.01f)
         }
     }
 }

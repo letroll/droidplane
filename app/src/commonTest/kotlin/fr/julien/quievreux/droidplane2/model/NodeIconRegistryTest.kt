@@ -3,6 +3,7 @@ package fr.julien.quievreux.droidplane2.model
 import fr.julien.quievreux.droidplane2.res.AppRes as R
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
@@ -93,5 +94,47 @@ class NodeIconRegistryTest {
     fun `getAllIcons returns complete catalog containing over 80 items`() {
         val all = NodeIconRegistry.getAllIcons()
         assertTrue(all.size >= 80, "Catalog should contain at least 80 icons, actual: ${all.size}")
+    }
+
+    @Test
+    fun `categorizedEntries excludes ALL and returns all specific categories in declaration order`() {
+        val categories = NodeIconRegistry.categorizedEntries()
+
+        assertFalse(categories.contains(NodeIconCategory.ALL))
+        assertEquals(
+            listOf(
+                NodeIconCategory.STATUS,
+                NodeIconCategory.PRIORITY,
+                NodeIconCategory.EMOTION,
+                NodeIconCategory.ACTIONS_TOOLS,
+                NodeIconCategory.PEOPLE_OBJECTS
+            ),
+            categories
+        )
+    }
+
+    @Test
+    fun `every category in categorizedEntries has a non-empty list of icons`() {
+        val categories = NodeIconRegistry.categorizedEntries()
+
+        categories.forEach { category ->
+            val icons = NodeIconRegistry.filterIcons(category = category)
+            assertTrue(icons.isNotEmpty(), "Expected non-empty icon list for category $category")
+        }
+    }
+
+    @Test
+    fun `filterIcons with query across categorizedEntries returns matches only in relevant category`() {
+        val categories = NodeIconRegistry.categorizedEntries()
+
+        categories.forEach { category ->
+            val icons = NodeIconRegistry.filterIcons(query = "flag", category = category)
+            if (category == NodeIconCategory.STATUS) {
+                assertTrue(icons.isNotEmpty())
+                assertTrue(icons.all { it.category == NodeIconCategory.STATUS })
+            } else {
+                assertTrue(icons.isEmpty(), "Expected empty icon list for query 'flag' in category $category")
+            }
+        }
     }
 }

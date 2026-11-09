@@ -131,6 +131,12 @@
     <string name="external_object">External Image / Media</string>
     <string name="image_uri">URI</string>
     <string name="image_scale">Scale Factor</string>
+    <string name="icons_section">Icons</string>
+    <string name="images_section">Images</string>
+    <string name="browse_image">Browse image</string>
+    <string name="replace_image">Replace image</string>
+    <string name="delete_image">Delete image</string>
+    <string name="broken_image_placeholder">Image unavailable</string>
 
     <!-- Scripts Tab -->
     <string name="scripts_hooks">Script Hooks &amp; Add-ons</string>
