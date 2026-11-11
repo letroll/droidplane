@@ -165,7 +165,7 @@ jobs:
         include:
           - os: ubuntu-latest
             platform: linux
-            gradle_task: ":app:packageDeb"
+            gradle_task: ":app:packageDeb :app:createDistributable"
             artifact_name: "release-desktop-linux"
             artifact_path: "app/build/compose/binaries/main/deb/*.deb"
           - os: windows-latest
@@ -200,16 +200,25 @@ jobs:
         run: |
           if [ -f "./gradlew" ]; then
             chmod +x ./gradlew
+          fi
+          if [ "${{ matrix.platform }}" = "linux" ]; then
+            chmod +x scripts/package-appimage.sh
             ./gradlew ${{ matrix.gradle_task }} --no-daemon
+            ./scripts/package-appimage.sh --version "${{ needs.prepare-release.outputs.version_name }}"
           else
-            ./gradlew.bat ${{ matrix.gradle_task }} --no-daemon
+            ./gradlew ${{ matrix.gradle_task }} --no-daemon
           fi
 
       - name: 🏷️ Préparer et normaliser l'artefact Desktop (${{ matrix.platform }})
         shell: bash
         run: |
           mkdir -p dist-desktop
-          cp ${{ matrix.artifact_path }} dist-desktop/
+          if [ "${{ matrix.platform }}" = "linux" ]; then
+            cp app/build/compose/binaries/main/deb/*.deb dist-desktop/
+            cp app/build/compose/binaries/main/appimage/*.AppImage dist-desktop/
+          else
+            cp ${{ matrix.artifact_path }} dist-desktop/
+          fi
           echo "### Desktop Artifact (${{ matrix.platform }})" >> $GITHUB_STEP_SUMMARY
           ls -lh dist-desktop/ >> $GITHUB_STEP_SUMMARY
 
@@ -235,7 +244,7 @@ jobs:
       - name: 🗂️ Rassembler tous les actifs de distribution
         run: |
           mkdir -p release-assets
-          find downloaded-artifacts -type f \( -name "*.apk" -o -name "*.deb" -o -name "*.msi" -o -name "*.dmg" \) -exec cp {} release-assets/ \;
+          find downloaded-artifacts -type f \( -name "*.apk" -o -name "*.deb" -o -name "*.AppImage" -o -name "*.msi" -o -name "*.dmg" \) -exec cp {} release-assets/ \;
           if [ -f downloaded-artifacts/release-changelog/CHANGELOG.md ]; then
             cp downloaded-artifacts/release-changelog/CHANGELOG.md ./CHANGELOG.md
           fi

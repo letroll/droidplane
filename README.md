@@ -15,7 +15,8 @@ A Kotlin Multiplatform application to view and edit [Freeplane](https://docs.fre
 
 Official releases are automatically published for all major platforms simultaneously on the [Releases](../../releases) page:
 * **Android**: APK package (`droidplane-<version>.apk`)
-* **Linux**: Debian package (`droidplane_<version>_amd64.deb`)
+* **Linux (Debian/Ubuntu)**: Debian package (`droidplane_<version>_amd64.deb`)
+* **Linux (Universal)**: AppImage (`Droidplane-<version>-x86_64.AppImage`) — fonctionne sur toute distribution Linux x64 sans installation : `chmod +x Droidplane-*.AppImage && ./Droidplane-*.AppImage`
 * **Windows**: Native installer (`Droidplane-<version>.msi`)
 * **macOS**: Apple disk image (`Droidplane-<version>.dmg`)
 
