@@ -1,3 +1,5 @@
+import org.jetbrains.compose.desktop.application.dsl.TargetFormat
+
 plugins {
     alias(libs.plugins.kotlin.multiplatform)
     alias(libs.plugins.android.application)
@@ -145,5 +147,29 @@ compose.desktop {
         javaHome = javaToolchains.launcherFor {
             languageVersion.set(JavaLanguageVersion.of(21))
         }.get().metadata.installationPath.asFile.absolutePath
+
+        nativeDistributions {
+            targetFormats(
+                TargetFormat.Dmg,
+                TargetFormat.Msi,
+                TargetFormat.Deb
+            )
+            packageName = "Droidplane"
+            packageVersion = appVersionName
+            description = "Droidplane Mind Map Application"
+            vendor = "Droidplane"
+            copyright = "© 2026 Julien Quiévreux"
+
+            macOS {
+                bundleID = "fr.julien.quievreux.droidplane2"
+            }
+            windows {
+                menuGroup = "Droidplane"
+                upgradeUuid = "a4c28f6d-74d1-4cb5-8292-1e96a40a5a22"
+            }
+            linux {
+                // FreeDesktop configuration
+            }
+        }
     }
 }

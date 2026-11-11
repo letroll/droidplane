@@ -1,14 +1,23 @@
 # Droidplane
 
-An Android application to view and edit [Freeplane](https://docs.freeplane.org/) Mind Maps (`.mm`).
+A Kotlin Multiplatform application to view and edit [Freeplane](https://docs.freeplane.org/) Mind Maps (`.mm`) on Android and Desktop (Windows, Linux, macOS).
 
 <!-- TOC -->
 * [Droidplane](#droidplane)
+    * [Supported Platforms & Downloads](#supported-platforms--downloads)
     * [Features](#features)
     * [Freeplane Document Types Supported](#freeplane-document-types-supported)
     * [Author](#author)
     * [Contributor](#contributor)
 <!-- TOC -->
+
+### Supported Platforms & Downloads
+
+Official releases are automatically published for all major platforms simultaneously on the [Releases](../../releases) page:
+* **Android**: APK package (`droidplane-<version>.apk`)
+* **Linux**: Debian package (`droidplane_<version>_amd64.deb`)
+* **Windows**: Native installer (`Droidplane-<version>.msi`)
+* **macOS**: Apple disk image (`Droidplane-<version>.dmg`)
 
 ### Features
 
