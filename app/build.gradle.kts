@@ -141,6 +141,17 @@ configurations.matching {
     exclude(group = "xmlpull")
 }
 
+// `kotlinx-coroutines-debug` is a test-only artifact leaked into the production
+// runtime classpath through `:core`'s test utilities. Its jar contains a
+// duplicated `META-INF/versions/9/module-info.class`, which breaks the macOS
+// packaging step: Compose Desktop re-zips every runtime jar (to sign dylibs)
+// and `ZipOutputStream` rejects duplicate entries.
+configurations.matching {
+    it.name == "desktopRuntimeClasspath" || it.name == "releaseRuntimeClasspath"
+}.configureEach {
+    exclude(group = "org.jetbrains.kotlinx", module = "kotlinx-coroutines-debug")
+}
+
 compose.desktop {
     application {
         mainClass = "fr.julien.quievreux.droidplane2.MainKt"

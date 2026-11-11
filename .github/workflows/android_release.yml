@@ -195,12 +195,13 @@ jobs:
           java-version: '21'
           cache: gradle
 
+      - name: 🔑 Rendre Gradle exécutable
+        shell: bash
+        run: chmod +x gradlew
+
       - name: 📦 Compiler la distribution native (${{ matrix.platform }})
         shell: bash
         run: |
-          if [ -f "./gradlew" ]; then
-            chmod +x ./gradlew
-          fi
           if [ "${{ matrix.platform }}" = "linux" ]; then
             chmod +x scripts/package-appimage.sh
             ./gradlew ${{ matrix.gradle_task }} --no-daemon
