@@ -109,9 +109,16 @@ configurations.matching {
 
 ## Follow-ups
 
-- Déplacer `KStringSpec.kt` (et les dépendances Kotest / `kotlinx-coroutines-test`) hors de
+- ~~Déplacer `KStringSpec.kt` (et les dépendances Kotest / `kotlinx-coroutines-test`) hors de
   `:core/src/commonMain` vers un vrai `testFixtures`/source set de test, pour ne plus
-  embarquer de bibliothèques de test dans les distributions desktop et l'APK.
+  embarquer de bibliothèques de test dans les distributions desktop et l'APK.~~
+  **Fait le 2026-11-11** : les dépendances de test de `:core` `commonMain` sont passées en
+  `compileOnly` (`core/build.gradle.kts`), ce qui retire Kotest, `kotlinx-coroutines-test`
+  et `kotlinx-coroutines-debug` des classpaths de production. L'exclusion ciblée de
+  `kotlinx-coroutines-debug` dans `app/build.gradle.kts` a donc été supprimée. Vérifié :
+  distribution desktop 80 → 55 jars (aucune lib de test), APK release sans symbole
+  `io/kotest`, `io/mockk`, `app/cash/turbine` ni `KStringSpec`, `.deb` 107 → 97 Mo,
+  `:app:assembleRelease` et suites de tests au vert.
 - Surveiller le premier run CI après merge pour confirmer les trois runners ; si un autre jar
   multi-release dupliqué apparaît, ajouter son artefact à l'exclusion (ou corriger la
   dépendance amont).

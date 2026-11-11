@@ -31,10 +31,16 @@ kotlin {
                 implementation(compose.ui)
                 implementation(compose.components.uiToolingPreview)
                 implementation(libs.kotlinx.coroutines.core)
-                implementation(libs.kotlinx.coroutines.test)
-                implementation(libs.kotest)
-                implementation(libs.kotest.assertions)
-                implementation(libs.kotest.runner.junit5)
+                // `KStringSpec` is a shared test helper that happens to live in `commonMain`
+                // so that `:data` and `:app` tests can reuse it. Its dependencies are only
+                // needed to compile it, never at runtime: keeping them `compileOnly`
+                // prevents Kotest / kotlinx-coroutines-test (and their transitive
+                // `kotlinx-coroutines-debug`) from being packaged into the release
+                // artifacts.
+                compileOnly(libs.kotlinx.coroutines.test)
+                compileOnly(libs.kotest)
+                compileOnly(libs.kotest.assertions)
+                compileOnly(libs.kotest.runner.junit5)
                 implementation(project.dependencies.platform(libs.koin.bom))
                 implementation(libs.koin.core)
             }
