@@ -10,6 +10,33 @@ plugins {
 val appVersionCode = 43
 val appVersionName = "1.0.43"
 
+val generateAppBuildInfo = tasks.register("generateAppBuildInfo") {
+    val outputDir = layout.buildDirectory.dir("generated/source/buildInfo/commonMain/kotlin")
+    val versionNameValue = appVersionName
+    val versionCodeValue = appVersionCode
+    inputs.property("versionName", versionNameValue)
+    inputs.property("versionCode", versionCodeValue)
+    outputs.dir(outputDir)
+
+    doLast {
+        val targetFile = outputDir.get().file("fr/julien/quievreux/droidplane2/AppBuildInfo.kt").asFile
+        targetFile.parentFile.mkdirs()
+        targetFile.writeText(
+            """
+            package fr.julien.quievreux.droidplane2
+
+            /**
+             * Build version metadata generated from app/build.gradle.kts.
+             */
+            internal object AppBuildInfo {
+                const val VERSION_CODE: Int = $versionCodeValue
+                const val VERSION_NAME: String = "$versionNameValue"
+            }
+            """.trimIndent() + "\n"
+        )
+    }
+}
+
 android {
     defaultConfig {
         applicationId = "fr.julien.quievreux.droidplane2"
@@ -80,6 +107,7 @@ kotlin {
 
     sourceSets {
         val commonMain by getting {
+            kotlin.srcDir(generateAppBuildInfo)
             dependencies {
                 implementation(project(":core"))
                 implementation(project(":data"))

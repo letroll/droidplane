@@ -58,4 +58,35 @@ class VersionConfigurationTest {
         assertFalse(manifestContent.contains("android:versionCode"), "AndroidManifest.xml must not contain android:versionCode")
         assertFalse(manifestContent.contains("android:versionName"), "AndroidManifest.xml must not contain android:versionName")
     }
+
+    @Test
+    fun `generated AppBuildInfo matches gradle and desktop uses it without hardcoded version`() {
+        val root = findProjectRoot()
+        val gradleContent = File(root, "app/build.gradle.kts").readText()
+        val desktopAppFile = File(
+            root,
+            "app/src/desktopMain/kotlin/fr/julien/quievreux/droidplane2/ui/DesktopDroidplaneApp.kt"
+        )
+
+        assertTrue(desktopAppFile.exists(), "DesktopDroidplaneApp.kt must exist")
+
+        val code = Regex("""val\s+appVersionCode\s*=\s*(\d+)""").find(gradleContent)?.groupValues?.get(1)?.toInt()
+        val name = Regex("""val\s+appVersionName\s*=\s*"([^"]+)"""").find(gradleContent)?.groupValues?.get(1)
+
+        assertNotNull(code, "Must find appVersionCode in build.gradle.kts")
+        assertNotNull(name, "Must find appVersionName in build.gradle.kts")
+
+        assertEquals(code, AppBuildInfo.VERSION_CODE, "Generated AppBuildInfo.VERSION_CODE must match appVersionCode")
+        assertEquals(name, AppBuildInfo.VERSION_NAME, "Generated AppBuildInfo.VERSION_NAME must match appVersionName")
+
+        val desktopAppContent = desktopAppFile.readText()
+        assertFalse(
+            desktopAppContent.contains("DESKTOP_APP_VERSION"),
+            "DesktopDroidplaneApp.kt must not define a hardcoded DESKTOP_APP_VERSION"
+        )
+        assertTrue(
+            desktopAppContent.contains("AppBuildInfo.VERSION_NAME"),
+            "DesktopDroidplaneApp.kt must read AppBuildInfo.VERSION_NAME"
+        )
+    }
 }

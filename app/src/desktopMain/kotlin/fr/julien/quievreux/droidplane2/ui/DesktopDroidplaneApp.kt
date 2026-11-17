@@ -24,6 +24,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import fr.julien.quievreux.droidplane2.AppBuildInfo
 import fr.julien.quievreux.droidplane2.InspectorTab
 import fr.julien.quievreux.droidplane2.MainUiState
 import fr.julien.quievreux.droidplane2.MainUiState.DialogType.AddChildNode
@@ -91,8 +92,6 @@ import java.io.FileInputStream
 import java.io.FileOutputStream
 import java.io.FilenameFilter
 import java.net.URI
-
-private const val DESKTOP_APP_VERSION = "1.0.31"
 
 @Composable
 fun DesktopDroidplaneApp(
@@ -181,7 +180,7 @@ fun DesktopDroidplaneApp(
 
     fun triggerUpdateCheck(isManual: Boolean) {
         viewModel.checkForUpdates(
-            currentVersion = DESKTOP_APP_VERSION,
+            currentVersion = AppBuildInfo.VERSION_NAME,
             isManual = isManual,
             onDownloadAndInstall = { apkUrl, _ ->
                 openUrlInBrowser(apkUrl)
@@ -189,7 +188,7 @@ fun DesktopDroidplaneApp(
             onViewOnGitHub = { url ->
                 openUrlInBrowser(url)
             },
-            upToDateMessage = R.getString(R.string.update_up_to_date, DESKTOP_APP_VERSION),
+            upToDateMessage = R.getString(R.string.update_up_to_date, AppBuildInfo.VERSION_NAME),
             errorMessage = R.getString(R.string.update_error)
         )
     }
