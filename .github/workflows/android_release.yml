@@ -15,6 +15,7 @@ jobs:
   # =========================================================================
   prepare-release:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     outputs:
       version_name: ${{ steps.version.outputs.version_name }}
       version_code: ${{ steps.version.outputs.version_code }}
@@ -35,26 +36,16 @@ jobs:
           echo "tag=${PREV_TAG}" >> $GITHUB_OUTPUT
           echo "Previous tag: ${PREV_TAG:-<none>}"
 
-      - name: ☕ Configurer le JDK (Java 21)
-        uses: actions/setup-java@v4
-        with:
-          distribution: 'temurin'
-          java-version: '21'
-          cache: gradle
-
-      - name: 🔑 Rendre Gradle exécutable
-        run: chmod +x gradlew
-
       # Auto-incrémenter la version dans app/build.gradle.kts
       - name: 🔢 Auto-incrémenter la version
         id: version
         run: |
           chmod +x scripts/bump-version.sh
           ./scripts/bump-version.sh
-          
+
           NEW_CODE=$(awk -F'=' '/val appVersionCode/{gsub(/[^0-9]/, "", $2); print $2}' app/build.gradle.kts)
           NEW_NAME="1.0.${NEW_CODE}"
-          
+
           echo "version_name=${NEW_NAME}" >> $GITHUB_OUTPUT
           echo "version_code=${NEW_CODE}" >> $GITHUB_OUTPUT
           echo "APP_VERSION_NAME=${NEW_NAME}" >> $GITHUB_ENV
@@ -106,6 +97,7 @@ jobs:
   build-android:
     needs: prepare-release
     runs-on: ubuntu-latest
+    timeout-minutes: 30
 
     steps:
       - name: 📥 Cloner le dépôt au commit de version
@@ -155,7 +147,7 @@ jobs:
           path: dist-android/*.apk
 
   # =========================================================================
-  # 3. Matrice de compilation des distributions Desktop (Linux, Windows, macOS)
+  # 3. Compilation des distributions Desktop (Linux & Windows)
   # =========================================================================
   build-desktop:
     needs: prepare-release
@@ -173,13 +165,9 @@ jobs:
             gradle_task: ":app:packageMsi"
             artifact_name: "release-desktop-windows"
             artifact_path: "app/build/compose/binaries/main/msi/*.msi"
-          - os: macos-latest
-            platform: macos
-            gradle_task: ":app:packageDmg"
-            artifact_name: "release-desktop-macos"
-            artifact_path: "app/build/compose/binaries/main/dmg/*.dmg"
 
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
 
     steps:
       - name: 📥 Cloner le dépôt au commit de version
@@ -188,70 +176,127 @@ jobs:
           ref: ${{ needs.prepare-release.outputs.commit_sha }}
           fetch-depth: 0
 
-      - name: ☕ Configurer le JDK (Java 21)
-        uses: actions/setup-java@v4
+      - name: 🛠️ Compiler et téléverser (${{ matrix.platform }})
+        uses: ./.github/actions/build-desktop
         with:
-          distribution: 'temurin'
-          java-version: '21'
-          cache: gradle
-
-      - name: 🔑 Rendre Gradle exécutable
-        shell: bash
-        run: chmod +x gradlew
-
-      - name: 📦 Compiler la distribution native (${{ matrix.platform }})
-        shell: bash
-        run: |
-          if [ "${{ matrix.platform }}" = "linux" ]; then
-            chmod +x scripts/package-appimage.sh
-            ./gradlew ${{ matrix.gradle_task }} --no-daemon
-            ./scripts/package-appimage.sh --version "${{ needs.prepare-release.outputs.version_name }}"
-          else
-            ./gradlew ${{ matrix.gradle_task }} --no-daemon
-          fi
-
-      - name: 🏷️ Préparer et normaliser l'artefact Desktop (${{ matrix.platform }})
-        shell: bash
-        run: |
-          mkdir -p dist-desktop
-          if [ "${{ matrix.platform }}" = "linux" ]; then
-            cp app/build/compose/binaries/main/deb/*.deb dist-desktop/
-            cp app/build/compose/binaries/main/appimage/*.AppImage dist-desktop/
-          else
-            cp ${{ matrix.artifact_path }} dist-desktop/
-          fi
-          echo "### Desktop Artifact (${{ matrix.platform }})" >> $GITHUB_STEP_SUMMARY
-          ls -lh dist-desktop/ >> $GITHUB_STEP_SUMMARY
-
-      - name: 📤 Téléverser l'artefact Desktop (${{ matrix.platform }})
-        uses: actions/upload-artifact@v4
-        with:
-          name: ${{ matrix.artifact_name }}
-          path: dist-desktop/*
+          platform: ${{ matrix.platform }}
+          gradle_task: ${{ matrix.gradle_task }}
+          artifact_name: ${{ matrix.artifact_name }}
+          artifact_path: ${{ matrix.artifact_path }}
+          version_name: ${{ needs.prepare-release.outputs.version_name }}
 
   # =========================================================================
-  # 4. Publication atomique de la Release unique sur GitHub Releases
+  # 4. Compilation macOS (arm64 par défaut, avec repli Intel si indisponible)
   # =========================================================================
-  publish-release:
-    needs: [prepare-release, build-android, build-desktop]
-    runs-on: ubuntu-latest
+  build-desktop-macos:
+    needs: prepare-release
+    runs-on: macos-latest
+    timeout-minutes: 30
 
     steps:
-      - name: 📥 Télécharger tous les artefacts de la release
+      - name: 📥 Cloner le dépôt au commit de version
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.prepare-release.outputs.commit_sha }}
+          fetch-depth: 0
+
+      - name: 🛠️ Compiler et téléverser (macos arm64)
+        uses: ./.github/actions/build-desktop
+        with:
+          platform: "macos"
+          gradle_task: ":app:packageDmg"
+          artifact_name: "release-desktop-macos"
+          artifact_path: "app/build/compose/binaries/main/dmg/*.dmg"
+          version_name: ${{ needs.prepare-release.outputs.version_name }}
+
+  build-desktop-macos-fallback:
+    needs: [prepare-release, build-desktop-macos]
+    if: ${{ always() && needs.prepare-release.result == 'success' && (needs.build-desktop-macos.result == 'failure' || needs.build-desktop-macos.result == 'cancelled') }}
+    runs-on: macos-15-intel
+    timeout-minutes: 30
+
+    steps:
+      - name: 📥 Cloner le dépôt au commit de version
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.prepare-release.outputs.commit_sha }}
+          fetch-depth: 0
+
+      - name: 🛠️ Compiler et téléverser (macos intel fallback)
+        uses: ./.github/actions/build-desktop
+        with:
+          platform: "macos"
+          gradle_task: ":app:packageDmg"
+          artifact_name: "release-desktop-macos"
+          artifact_path: "app/build/compose/binaries/main/dmg/*.dmg"
+          version_name: ${{ needs.prepare-release.outputs.version_name }}
+
+  # =========================================================================
+  # 5. Publication non bloquante sur GitHub Releases des plateformes réussies
+  # =========================================================================
+  publish-release:
+    needs: [prepare-release, build-android, build-desktop, build-desktop-macos, build-desktop-macos-fallback]
+    if: ${{ always() && needs.prepare-release.result == 'success' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: 📥 Télécharger les artefacts disponibles de la release
         uses: actions/download-artifact@v4
         with:
           path: downloaded-artifacts
 
-      - name: 🗂️ Rassembler tous les actifs de distribution
+      - name: 🗂️ Rassembler les actifs disponibles et vérifier les plateformes
         run: |
           mkdir -p release-assets
           find downloaded-artifacts -type f \( -name "*.apk" -o -name "*.deb" -o -name "*.AppImage" -o -name "*.msi" -o -name "*.dmg" \) -exec cp {} release-assets/ \;
+
           if [ -f downloaded-artifacts/release-changelog/CHANGELOG.md ]; then
             cp downloaded-artifacts/release-changelog/CHANGELOG.md ./CHANGELOG.md
+          else
+            echo "Release v${{ needs.prepare-release.outputs.version_name }}" > ./CHANGELOG.md
           fi
-          echo "### Publication Récapitulative des Actifs" >> $GITHUB_STEP_SUMMARY
-          echo "Release tag : v${{ needs.prepare-release.outputs.version_name }}" >> $GITHUB_STEP_SUMMARY
-          ls -lh release-assets/ | tee -a $GITHUB_STEP_SUMMARY
+
+          missing_platforms=()
+          has_asset() {
+            find release-assets -maxdepth 1 -type f -name "$1" | grep -q .
+          }
+
+          if ! has_asset "*.apk"; then
+            missing_platforms+=("Android (.apk)")
+          fi
+          if ! has_asset "*.deb" && ! has_asset "*.AppImage"; then
+            missing_platforms+=("Linux (.deb / .AppImage)")
+          fi
+          if ! has_asset "*.msi"; then
+            missing_platforms+=("Windows (.msi)")
+          fi
+          if ! has_asset "*.dmg"; then
+            missing_platforms+=("macOS (.dmg)")
+          fi
+
+          echo "### Publication Récapitulative des Actifs" >> "$GITHUB_STEP_SUMMARY"
+          echo "Release tag : v${{ needs.prepare-release.outputs.version_name }}" >> "$GITHUB_STEP_SUMMARY"
+
+          if [ -z "$(ls -A release-assets)" ]; then
+            echo "::error::Aucun artefact compilé n'est disponible ; publication annulée."
+            echo "Aucun actif disponible." >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi
+
+          ls -lh release-assets/ | tee -a "$GITHUB_STEP_SUMMARY"
+
+          if [ ${#missing_platforms[@]} -gt 0 ]; then
+            missing_list="$(printf '%s, ' "${missing_platforms[@]}")"
+            missing_list="${missing_list%, }"
+            echo "::warning::Release partielle — plateformes manquantes : ${missing_list}"
+            {
+              echo ""
+              echo "---"
+              echo "> **Note :** Certains builds ont échoué sur ce cycle CI. Plateformes non incluses : ${missing_list}."
+            } >> ./CHANGELOG.md
+            echo "⚠️ Plateformes manquantes : ${missing_list}" >> "$GITHUB_STEP_SUMMARY"
+          fi
 
       - name: 🚀 Publier sur GitHub Releases
         uses: softprops/action-gh-release@v2
