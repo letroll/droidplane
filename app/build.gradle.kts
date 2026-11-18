@@ -7,8 +7,8 @@ plugins {
     alias(libs.plugins.compose.compiler)
 }
 
-val appVersionCode = 44
-val appVersionName = "1.0.44"
+val appVersionCode = 45
+val appVersionName = "1.0.45"
 
 val generateAppBuildInfo = tasks.register("generateAppBuildInfo") {
     val outputDir = layout.buildDirectory.dir("generated/source/buildInfo/commonMain/kotlin")
