@@ -60,7 +60,6 @@ fun NodePropertiesInspector(
     stylingTabContent: @Composable (Node, (Node) -> Unit) -> Unit = { n, onC -> StylingTab(node = n, onNodeChanged = onC, onMoveCloudToParent = onMoveCloudToParent) },
     edgesConnectorsTabContent: @Composable (Node, (Node) -> Unit) -> Unit = { n, onC -> EdgesConnectorsTab(node = n, onNodeChanged = onC) },
     iconsMediaTabContent: @Composable (Node, (Node) -> Unit) -> Unit = { n, onC -> IconsMediaTab(node = n, onNodeChanged = onC) },
-    scriptsTabContent: @Composable (Node, (Node) -> Unit) -> Unit = { n, onC -> ScriptsTab(node = n, onNodeChanged = onC) },
 ) {
     var currentNode by remember(node) { mutableStateOf(node) }
     var selectedTab by remember(initialTab) { mutableStateOf(initialTab) }
@@ -108,7 +107,6 @@ fun NodePropertiesInspector(
                             stylingTabContent = stylingTabContent,
                             edgesConnectorsTabContent = edgesConnectorsTabContent,
                             iconsMediaTabContent = iconsMediaTabContent,
-                            scriptsTabContent = scriptsTabContent,
                             isNewNode = isNewNode,
                         )
                     }
@@ -133,7 +131,6 @@ fun NodePropertiesInspector(
                     stylingTabContent = stylingTabContent,
                     edgesConnectorsTabContent = edgesConnectorsTabContent,
                     iconsMediaTabContent = iconsMediaTabContent,
-                    scriptsTabContent = scriptsTabContent,
                     modifier = Modifier.fillMaxHeight(0.85f),
                     isNewNode = isNewNode,
                 )
@@ -155,7 +152,6 @@ fun InspectorScaffold(
     stylingTabContent: @Composable (Node, (Node) -> Unit) -> Unit,
     edgesConnectorsTabContent: @Composable (Node, (Node) -> Unit) -> Unit,
     iconsMediaTabContent: @Composable (Node, (Node) -> Unit) -> Unit,
-    scriptsTabContent: @Composable (Node, (Node) -> Unit) -> Unit,
     modifier: Modifier = Modifier,
     isNewNode: Boolean = false,
 ) {
@@ -202,7 +198,6 @@ fun InspectorScaffold(
             InspectorTab.STYLING_CLOUD to stringResource(R.string.tab_styling),
             InspectorTab.EDGES_CONNECTORS to stringResource(R.string.tab_edges_connectors),
             InspectorTab.ICONS_MEDIA to stringResource(R.string.tab_icons_media),
-            InspectorTab.SCRIPTS to stringResource(R.string.tab_scripts),
         )
 
         ScrollableTabRow(
@@ -233,7 +228,6 @@ fun InspectorScaffold(
                 InspectorTab.STYLING_CLOUD -> stylingTabContent(node, onNodeChanged)
                 InspectorTab.EDGES_CONNECTORS -> edgesConnectorsTabContent(node, onNodeChanged)
                 InspectorTab.ICONS_MEDIA -> iconsMediaTabContent(node, onNodeChanged)
-                InspectorTab.SCRIPTS -> scriptsTabContent(node, onNodeChanged)
             }
         }
     }
@@ -279,7 +273,6 @@ fun PreviewInspectorScaffold() {
                 stylingTabContent = { n, _ -> DefaultTabPlaceholder("Styling", n) },
                 edgesConnectorsTabContent = { n, _ -> DefaultTabPlaceholder("Connectors", n) },
                 iconsMediaTabContent = { n, _ -> DefaultTabPlaceholder("Media", n) },
-                scriptsTabContent = { n, _ -> DefaultTabPlaceholder("Scripts", n) },
             )
         }
     }

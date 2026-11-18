@@ -63,7 +63,6 @@ object AppRes {
         const val tab_styling = 1055
         const val tab_edges_connectors = 1056
         const val tab_icons_media = 1057
-        const val tab_scripts = 1058
         const val node_title = 1059
         const val details = 1060
         const val notes = 1061
@@ -125,9 +124,6 @@ object AppRes {
         const val external_object = 1117
         const val image_uri = 1118
         const val image_scale = 1119
-        const val scripts_hooks = 1120
-        const val script_content = 1121
-        const val no_scripts = 1122
         const val check_for_updates = 1123
         const val checking_for_updates = 1124
         const val update_available_title = 1125
@@ -295,7 +291,6 @@ object AppRes {
         string.tab_styling to "Styling",
         string.tab_edges_connectors to "Connectors",
         string.tab_icons_media to "Media",
-        string.tab_scripts to "Scripts",
         string.node_title to "Title",
         string.details to "Details",
         string.notes to "Notes",
@@ -357,9 +352,6 @@ object AppRes {
         string.external_object to "External Image / Media",
         string.image_uri to "URI",
         string.image_scale to "Scale Factor",
-        string.scripts_hooks to "Script Hooks & Add-ons",
-        string.script_content to "Script Content",
-        string.no_scripts to "No embedded script hooks found on this node.",
         string.check_for_updates to "Check for updates",
         string.checking_for_updates to "Checking for updates…",
         string.update_available_title to "Update Available: %1\$s",

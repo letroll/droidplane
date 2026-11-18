@@ -87,56 +87,6 @@ fun IconsMediaTab(
             .padding(vertical = 8.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        FoldableMediaSection(
-            title = stringResource(R.string.icons_section),
-            isExpanded = isIconsSectionExpanded,
-            onToggleExpand = { isIconsSectionExpanded = !isIconsSectionExpanded },
-            modifier = Modifier.testTag(TEST_TAG_MEDIA_ICONS_SECTION),
-            headerInlineContent = {
-                if (node.iconNames.isNotEmpty()) {
-                    NodeIconsRow(
-                        iconNames = node.iconNames,
-                        maxInlineIcons = Int.MAX_VALUE,
-                        iconSize = 18.dp
-                    )
-                }
-            }
-        ) {
-            // Active Icons Management (US2)
-            ActiveIconsManager(
-                iconNames = node.iconNames,
-                onRemoveIcon = { index ->
-                    val updated = node.iconNames.toMutableList()
-                    if (index in updated.indices) {
-                        updated.removeAt(index)
-                        onNodeChanged(node.copy(iconNames = updated))
-                    }
-                },
-                onMoveIcon = { fromIndex, toIndex ->
-                    val updated = node.iconNames.toMutableList()
-                    if (fromIndex in updated.indices && toIndex in updated.indices) {
-                        val item = updated.removeAt(fromIndex)
-                        updated.add(toIndex, item)
-                        onNodeChanged(node.copy(iconNames = updated))
-                    }
-                },
-                onClearAll = {
-                    onNodeChanged(node.copy(iconNames = mutableListOf()))
-                }
-            )
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            // Full Freeplane Icon Catalog Browser (US3)
-            IconCatalogPicker(
-                onIconSelected = { iconId ->
-                    val updated = node.iconNames.toMutableList()
-                    updated.add(iconId)
-                    onNodeChanged(node.copy(iconNames = updated))
-                }
-            )
-        }
-
         // External Object / Media Section
         FoldableMediaSection(
             title = stringResource(R.string.images_section),
@@ -197,6 +147,57 @@ fun IconsMediaTab(
                 label = { Text(stringResource(R.string.image_scale)) },
                 placeholder = { Text("1.0") },
                 singleLine = true
+            )
+        }
+
+        // Icon Section
+        FoldableMediaSection(
+            title = stringResource(R.string.icons_section),
+            isExpanded = isIconsSectionExpanded,
+            onToggleExpand = { isIconsSectionExpanded = !isIconsSectionExpanded },
+            modifier = Modifier.testTag(TEST_TAG_MEDIA_ICONS_SECTION),
+            headerInlineContent = {
+                if (node.iconNames.isNotEmpty()) {
+                    NodeIconsRow(
+                        iconNames = node.iconNames,
+                        maxInlineIcons = Int.MAX_VALUE,
+                        iconSize = 18.dp
+                    )
+                }
+            }
+        ) {
+            // Active Icons Management (US2)
+            ActiveIconsManager(
+                iconNames = node.iconNames,
+                onRemoveIcon = { index ->
+                    val updated = node.iconNames.toMutableList()
+                    if (index in updated.indices) {
+                        updated.removeAt(index)
+                        onNodeChanged(node.copy(iconNames = updated))
+                    }
+                },
+                onMoveIcon = { fromIndex, toIndex ->
+                    val updated = node.iconNames.toMutableList()
+                    if (fromIndex in updated.indices && toIndex in updated.indices) {
+                        val item = updated.removeAt(fromIndex)
+                        updated.add(toIndex, item)
+                        onNodeChanged(node.copy(iconNames = updated))
+                    }
+                },
+                onClearAll = {
+                    onNodeChanged(node.copy(iconNames = mutableListOf()))
+                }
+            )
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // Full Freeplane Icon Catalog Browser (US3)
+            IconCatalogPicker(
+                onIconSelected = { iconId ->
+                    val updated = node.iconNames.toMutableList()
+                    updated.add(iconId)
+                    onNodeChanged(node.copy(iconNames = updated))
+                }
             )
         }
     }

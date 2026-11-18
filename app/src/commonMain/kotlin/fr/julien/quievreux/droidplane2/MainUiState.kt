@@ -124,5 +124,4 @@ enum class InspectorTab {
     STYLING_CLOUD,
     EDGES_CONNECTORS,
     ICONS_MEDIA,
-    SCRIPTS,
 }
